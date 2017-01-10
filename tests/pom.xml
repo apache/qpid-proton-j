@@ -66,7 +66,7 @@ mvn test \
           <systemPropertyVariables>
             <protonJythonIgnoreFile>${basedir}/java/pythonTests.ignore</protonJythonIgnoreFile>
             <protonJythonTestRoot>${basedir}/python</protonJythonTestRoot>
-            <protonJythonBinding>${basedir}/../proton-c/bindings/python</protonJythonBinding>
+            <protonJythonBinding>${basedir}/java/shim/binding</protonJythonBinding>
             <protonJythonShim>${basedir}/java/shim</protonJythonShim>
             <protonJythonTestScript>${basedir}/python/proton-test</protonJythonTestScript>
             <protonJythonTestXmlOutputDirectory>${testReportOutputDirectory}</protonJythonTestXmlOutputDirectory>
