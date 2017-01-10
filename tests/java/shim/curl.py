@@ -17,7 +17,7 @@
 # under the License
 #
 
-from org.apache.qpid.proton.messenger.impl import Address
+from org.apache.qpid.proton.reactor.impl import Address
 
 def pn_url():
     return Address()

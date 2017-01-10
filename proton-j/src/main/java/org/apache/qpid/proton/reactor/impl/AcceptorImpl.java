@@ -40,7 +40,6 @@ import org.apache.qpid.proton.reactor.Reactor;
 import org.apache.qpid.proton.reactor.impl.ReactorImpl;
 import org.apache.qpid.proton.reactor.Selectable;
 import org.apache.qpid.proton.reactor.Selectable.Callback;
-import org.apache.qpid.proton.messenger.impl.Address;
 
 @SuppressWarnings("deprecation")
 public class AcceptorImpl implements Acceptor {

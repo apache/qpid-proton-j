@@ -18,13 +18,12 @@
  * under the License.
  *
  */
-package org.apache.qpid.proton.messenger.impl;
+package org.apache.qpid.proton.reactor.impl;
 
 
 /**
  * Address
  *
- * @deprecated Messenger will be removed from upcoming proton-j releases.
  */
 public class Address
 {

@@ -51,7 +51,6 @@ import org.apache.qpid.proton.reactor.Selectable;
 import org.apache.qpid.proton.reactor.Selectable.Callback;
 import org.apache.qpid.proton.reactor.Selector;
 import org.apache.qpid.proton.reactor.Task;
-import org.apache.qpid.proton.messenger.impl.Address;
 
 @SuppressWarnings("deprecation")
 public class ReactorImpl implements Reactor, Extendable {

@@ -137,7 +137,6 @@
     <module>proton-j</module>
     <module>tests</module>
     <module>examples/engine/java</module>
-    <module>examples/java/messenger</module>
     <module>examples/java/reactor</module>
   </modules>
 

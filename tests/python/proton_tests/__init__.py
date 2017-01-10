@@ -22,11 +22,9 @@ import proton_tests.engine
 import proton_tests.message
 import proton_tests.handler
 import proton_tests.reactor
-import proton_tests.messenger
 import proton_tests.sasl
 import proton_tests.transport
 import proton_tests.ssl
 import proton_tests.interop
-import proton_tests.soak
 import proton_tests.url
 import proton_tests.utils

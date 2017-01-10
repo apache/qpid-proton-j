@@ -45,7 +45,6 @@ import org.apache.qpid.proton.reactor.Selectable.Callback;
 import org.apache.qpid.proton.reactor.Selector;
 import org.apache.qpid.proton.reactor.Acceptor;
 import org.apache.qpid.proton.reactor.impl.AcceptorImpl;
-import org.apache.qpid.proton.messenger.impl.Address;
 
 @SuppressWarnings("deprecation")
 public class IOHandler extends BaseHandler {

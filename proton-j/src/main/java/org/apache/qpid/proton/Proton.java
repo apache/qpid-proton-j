@@ -31,7 +31,6 @@ import org.apache.qpid.proton.amqp.messaging.Properties;
 import org.apache.qpid.proton.amqp.messaging.Section;
 import org.apache.qpid.proton.codec.Codec;
 import org.apache.qpid.proton.codec.Data;
-import org.apache.qpid.proton.driver.Driver;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
 import org.apache.qpid.proton.engine.Engine;
@@ -40,10 +39,8 @@ import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.SslPeerDetails;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.message.Message;
-import org.apache.qpid.proton.messenger.Messenger;
 import org.apache.qpid.proton.reactor.Reactor;
 
-@SuppressWarnings("deprecation")
 public final class Proton
 {
 
@@ -94,33 +91,6 @@ public final class Proton
         return Message.Factory.create(header, deliveryAnnotations,
                                       messageAnnotations, properties,
                                       applicationProperties, body, footer);
-    }
-
-    /**
-     * @deprecated Messenger will be removed from upcoming proton-j releases.
-     */
-    @Deprecated
-    public static Messenger messenger()
-    {
-        return Messenger.Factory.create();
-    }
-
-    /**
-     * @deprecated  Messenger will be removed from upcoming proton-j releases.
-     */
-    @Deprecated
-    public static Messenger messenger(String name)
-    {
-        return Messenger.Factory.create(name);
-    }
-
-    /**
-     * @deprecated Messenger and its driver will be removed from upcoming proton-j releases.
-     */
-    @Deprecated
-    public static Driver driver() throws IOException
-    {
-        return Driver.Factory.create();
     }
 
     public static Reactor reactor() throws IOException

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.qpid.proton.messenger.impl;
+package org.apache.qpid.proton.reactor.impl;
 
 import static org.junit.Assert.*;
 
