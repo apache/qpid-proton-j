@@ -27,10 +27,6 @@
   <name>proton-j</name>
   <packaging>bundle</packaging>
 
-  <scm>
-    <url>http://svn.apache.org/viewvc/qpid/proton/</url>
-  </scm>
-
   <dependencies>
     <dependency>
       <groupId>org.bouncycastle</groupId>
