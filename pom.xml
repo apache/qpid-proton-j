@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>12</version>
+    <version>18</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -33,7 +33,6 @@
     <junit-version>4.12</junit-version>
     <mockito-version>1.10.19</mockito-version>
 
-    <maven-source-plugin-version>2.2.1</maven-source-plugin-version>
     <maven-bundle-plugin-version>2.5.4</maven-bundle-plugin-version>
   </properties>
 
@@ -138,7 +137,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-source-plugin</artifactId>
-            <version>${maven-source-plugin-version}</version>
             <executions>
               <execution>
                 <id>attach-sources</id>
