@@ -25,17 +25,12 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>proton-j-reactor-examples</artifactId>
-  <name>proton-j-reactor-examples</name>
+  <name>Proton-J Reactor Examples</name>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.qpid</groupId>
       <artifactId>proton-j</artifactId>
-      <version>${project.parent.version}</version>
     </dependency>
   </dependencies>
-
-  <scm>
-    <url>http://svn.apache.org/viewvc/qpid/proton/</url>
-  </scm>
 </project>

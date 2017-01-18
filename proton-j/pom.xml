@@ -24,14 +24,25 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>proton-j</artifactId>
-  <name>proton-j</name>
   <packaging>bundle</packaging>
+
+  <name>Proton-J</name>
 
   <dependencies>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk15on</artifactId>
       <version>1.53</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

@@ -29,15 +29,50 @@
   <version>0.17.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
+  <name>Proton-J Parent</name>
+
   <properties>
     <maven.compiler.source>1.7</maven.compiler.source>
     <maven.compiler.target>1.7</maven.compiler.target>
 
+    <!-- Test dependency versions -->
     <junit-version>4.12</junit-version>
     <mockito-version>1.10.19</mockito-version>
+    <jython-version>2.7.0</jython-version>
 
+    <!-- Plugin versions -->
     <maven-bundle-plugin-version>3.2.0</maven-bundle-plugin-version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Internal module dependencies -->
+      <dependency>
+        <groupId>org.apache.qpid</groupId>
+        <artifactId>proton-j</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Test dependencies -->
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>${junit-version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <version>${mockito-version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.python</groupId>
+        <artifactId>jython-standalone</artifactId>
+        <version>${jython-version}</version>
+      <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <build>
     <plugins>
@@ -93,26 +128,12 @@
     </pluginManagement>
   </build>
 
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit-version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <version>${mockito-version}</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-
   <modules>
     <module>proton-j</module>
     <module>tests</module>
     <module>examples/engine</module>
     <module>examples/reactor</module>
+    <module>apache-qpid-proton-j</module>
   </modules>
 
   <url>http://qpid.apache.org/proton</url>
@@ -131,6 +152,27 @@
   </ciManagement>
 
   <profiles>
+    <!-- Override the apache-release profile from the parent. Skip creating
+         a source release here, we have a release module that does it.  -->
+    <profile>
+      <id>apache-release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>source-release-assembly</id>
+                <configuration>
+                  <skipAssembly>true</skipAssembly>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
     <profile>
       <id>sources</id>
       <build>
