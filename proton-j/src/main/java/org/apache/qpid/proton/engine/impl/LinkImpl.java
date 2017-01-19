@@ -100,7 +100,7 @@ public abstract class LinkImpl extends EndpointImpl implements Link
         try
         {
             DeliveryImpl delivery = new DeliveryImpl(tag, this, _tail);
-            if (_tail == null)
+            if (_tail == null || _tail.isSettled())
             {
                 _head = delivery;
             }
@@ -130,8 +130,9 @@ public abstract class LinkImpl extends EndpointImpl implements Link
     {
         DeliveryImpl dlv = _head;
         while (dlv != null) {
+            DeliveryImpl next = dlv.next();
             dlv.free();
-            dlv = dlv.next();
+            dlv = next;
         }
 
         _session.getConnectionImpl().removeLinkEndpoint(_node);
