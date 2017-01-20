@@ -21,9 +21,14 @@ package org.apache.qpid.proton.engine.impl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Random;
+import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.engine.Record;
+import org.apache.qpid.proton.test.util.MemoryLeakVerifier;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -74,4 +79,75 @@ public class DeliveryImplTest
         Record attachments2 = delivery.attachments();
         assertSame("Expected to get the same attachments", attachments, attachments2);
     }
+    @Test
+    public void testDelayedSettlementUnLinksProperly()
+    {
+        int count = 100;
+
+        LinkImpl mockLink = Mockito.mock(LinkImpl.class);
+        @SuppressWarnings("deprecation")
+        ConnectionImpl mockConnection = new ConnectionImpl();
+        Mockito.when(mockLink.getConnectionImpl()).thenReturn(mockConnection);
+        
+        
+        LinkedList<DeliveryImpl> deliveries = new LinkedList<DeliveryImpl>();
+        DeliveryImpl last = null;
+        for (int i = 0; i < count; i ++) {
+            deliveries.add(last = new DeliveryImpl(null, mockLink, last));
+            last.setRemoteDeliveryState(Accepted.getInstance());
+            mockConnection.workUpdate(last);
+            last.setDataLength(i);
+            
+        }
+        for(DeliveryImpl d : deliveries) {
+            if (d != deliveries.getFirst()) {
+                assertNotNull(d.getDataLength()+" should have work prev", d.getWorkPrev());
+            }
+            if(d != deliveries.getLast()) {
+                assertNotNull(d.getDataLength()+" should have work next", d.getWorkNext());
+            }
+        }
+        Collections.shuffle(deliveries, new Random(1000));
+        for(DeliveryImpl d : deliveries) {
+            d.settle();
+            d.getDataLength();
+        }
+        for(DeliveryImpl d : deliveries) {
+            assertNull("should have no next", d.getLinkNext());
+            assertNull("should have no prev", d.getLinkPrevious());
+            assertNull("should have no work next", d.getWorkNext());
+            assertNull("should have no work prev", d.getWorkPrev());
+            if (d != deliveries.getFirst()) {
+                assertNotNull(d.getDataLength()+" should have trans work prev", d.getTransportWorkPrev());
+            }
+            if(d != deliveries.getLast()) {
+                assertNotNull(d.getDataLength()+" should have trans work next", d.getTransportWorkNext());
+            }
+            
+        }
+        for(DeliveryImpl d : deliveries) {
+            d.clearTransportWork();
+        }
+        for(DeliveryImpl d : deliveries) {
+            assertNull("should have no work prev", d.getWorkPrev());
+            assertNull("should have no work prev", d.getWorkNext());
+        }
+        LinkedList<MemoryLeakVerifier> vs = new LinkedList<MemoryLeakVerifier>();
+        //HOLD one back to manifest a bug
+        last = deliveries.remove(count/2);
+        for(DeliveryImpl d : deliveries) {
+            vs.add(new MemoryLeakVerifier(d));
+        }
+        deliveries.clear();
+        Mockito.reset(mockLink);
+        for(MemoryLeakVerifier v : vs) {
+            try{
+                v.assertGarbageCollected("DeliverImpl");
+            } catch (Throwable t) {
+                throw t;
+            }
+        }
+        
+    }
+
 }

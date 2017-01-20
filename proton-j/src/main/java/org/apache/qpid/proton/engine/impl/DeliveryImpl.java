@@ -157,15 +157,17 @@ public class DeliveryImpl implements Delivery
         }
 
         _link.remove(this);
-        if(_linkPrevious != null)
+        if(_linkPrevious != null && _linkPrevious._linkNext == this)
         {
             _linkPrevious._linkNext = _linkNext;
         }
-        if(_linkNext != null)
+        if(_linkNext != null && _linkNext._linkPrevious == this)
         {
             _linkNext._linkPrevious = _linkPrevious;
         }
         updateWork();
+        _linkNext= null;
+        _linkPrevious = null;
     }
 
     DeliveryImpl getLinkNext()
