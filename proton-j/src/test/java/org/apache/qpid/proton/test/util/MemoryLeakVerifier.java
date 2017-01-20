@@ -3,7 +3,9 @@ package org.apache.qpid.proton.test.util;
 import static org.junit.Assert.assertNull;
 import java.lang.ref.WeakReference;
 
-
+/*
+ * Based on http://stackoverflow.com/questions/6749948/automated-memory-leak-detection-in-java
+ */
 public class MemoryLeakVerifier {
     private static final int MAX_GC_ITERATIONS = 20;
     private static final int GC_SLEEP_TIME = 10;
