@@ -434,15 +434,17 @@ public class ConnectionImpl extends EndpointImpl implements ProtonJConnection
         DeliveryImpl next = delivery.getWorkNext();
         DeliveryImpl prev = delivery.getWorkPrev();
 
-        if (prev != null) {
+        if (prev != null && prev.getWorkNext() == delivery) {
             prev.setWorkNext(next);
         }
 
-        if (next != null) {
+        if (next != null && next.getWorkPrev() == delivery) {
             next.setWorkPrev(prev);
         }
-
-
+        
+        delivery.setWorkNext(null);
+        delivery.setWorkPrev(null);
+        
         if(_workHead == delivery)
         {
             _workHead = next;
@@ -542,15 +544,17 @@ public class ConnectionImpl extends EndpointImpl implements ProtonJConnection
         DeliveryImpl next = delivery.getTransportWorkNext();
         DeliveryImpl prev = delivery.getTransportWorkPrev();
 
-        if (prev != null) {
+        if (prev != null && prev.getTransportWorkNext() == delivery) {
             prev.setTransportWorkNext(next);
         }
 
-        if (next != null) {
+        if (next != null && next.getTransportWorkPrev() == delivery) {
             next.setTransportWorkPrev(prev);
         }
 
-
+        delivery.setTransportWorkNext(null);
+        delivery.setTransportWorkPrev(null);
+        
         if(_transportWorkHead == delivery)
         {
             _transportWorkHead = next;
