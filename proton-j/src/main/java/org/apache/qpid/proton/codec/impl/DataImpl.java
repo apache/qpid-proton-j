@@ -24,7 +24,6 @@ package org.apache.qpid.proton.codec.impl;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-import org.apache.qpid.proton.ProtonUnsupportedOperationException;
 import org.apache.qpid.proton.amqp.*;
 import org.apache.qpid.proton.codec.Data;
 
@@ -116,14 +115,6 @@ public class DataImpl implements Data
 
         }
         return false;
-    }
-
-    @Override
-    public boolean lookup(String name)
-    {
-        // TODO
-        throw new ProtonUnsupportedOperationException();
-
     }
 
     @Override
@@ -476,7 +467,7 @@ public class DataImpl implements Data
         }
         else if(o instanceof Object[])
         {
-            putJavaArray((Object[]) o);
+            throw new IllegalArgumentException("Unsupported array type");
         }
         else if(o instanceof List)
         {
@@ -516,13 +507,6 @@ public class DataImpl implements Data
             putObject(o);
         }
         exit();
-    }
-
-    @Override
-    public void putJavaArray(Object[] array)
-    {
-        // TODO
-        throw new ProtonUnsupportedOperationException();
     }
 
     @Override
@@ -845,47 +829,6 @@ public class DataImpl implements Data
     }
 
     @Override
-    public void copy(Data src)
-    {
-        // TODO
-
-        throw new ProtonUnsupportedOperationException();
-    }
-
-    @Override
-    public void append(Data src)
-    {
-        // TODO
-
-        throw new ProtonUnsupportedOperationException();
-    }
-
-    @Override
-    public void appendn(Data src, int limit)
-    {
-        // TODO
-
-        throw new ProtonUnsupportedOperationException();
-    }
-
-    @Override
-    public void narrow()
-    {
-        // TODO
-
-        throw new ProtonUnsupportedOperationException();
-    }
-
-    @Override
-    public void widen()
-    {
-        // TODO
-
-        throw new ProtonUnsupportedOperationException();
-    }
-
-
-    @Override
     public String format()
     {
         StringBuilder sb = new StringBuilder();
@@ -924,5 +867,4 @@ public class DataImpl implements Data
                              System.identityHashCode(_parent),
                              sb);
     }
-
 }

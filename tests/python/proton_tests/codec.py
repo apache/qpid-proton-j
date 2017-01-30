@@ -305,41 +305,6 @@ class DataTest(Test):
   def testDecimal128(self):
     self._test("decimal128", decimal128(str2bin("fdsaasdf;lkjjkl;")), decimal128(str2bin("x"*16)))
 
-  def testCopy(self):
-    self.data.put_described()
-    self.data.enter()
-    self.data.put_ulong(123)
-    self.data.put_map()
-    self.data.enter()
-    self.data.put_string("pi")
-    self.data.put_double(3.14159265359)
-
-    dst = Data()
-    dst.copy(self.data)
-
-    copy = dst.format()
-    orig = self.data.format()
-    assert copy == orig, (copy, orig)
-
-  def testCopyNested(self):
-    nested = [1, 2, 3, [4, 5, 6], 7, 8, 9]
-    self.data.put_object(nested)
-    dst = Data()
-    dst.copy(self.data)
-    assert dst.format() == self.data.format()
-
-  def testCopyNestedArray(self):
-    nested = [Array(UNDESCRIBED, Data.LIST,
-                    ["first", [Array(UNDESCRIBED, Data.INT, 1,2,3)]],
-                    ["second", [Array(UNDESCRIBED, Data.INT, 1,2,3)]],
-                    ["third", [Array(UNDESCRIBED, Data.INT, 1,2,3)]],
-                    ),
-              "end"]
-    self.data.put_object(nested)
-    dst = Data()
-    dst.copy(self.data)
-    assert dst.format() == self.data.format()
-
   def testRoundTrip(self):
     obj = {symbol("key"): timestamp(1234),
            ulong(123): "blah",
@@ -377,23 +342,3 @@ class DataTest(Test):
       assert data.type() == Data.BINARY
       assert data.get_object() == "foo"
 
-  def testLookup(self):
-    obj = {symbol("key"): str2unicode("value"),
-           symbol("pi"): 3.14159,
-           symbol("list"): [1, 2, 3, 4]}
-    self.data.put_object(obj)
-    self.data.rewind()
-    self.data.next()
-    self.data.enter()
-    self.data.narrow()
-    assert self.data.lookup("pi")
-    assert self.data.get_object() == 3.14159
-    self.data.rewind()
-    assert self.data.lookup("key")
-    assert self.data.get_object() == str2unicode("value")
-    self.data.rewind()
-    assert self.data.lookup("list")
-    assert self.data.get_object() == [1, 2, 3, 4]
-    self.data.widen()
-    self.data.rewind()
-    assert not self.data.lookup("pi")

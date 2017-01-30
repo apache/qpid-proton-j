@@ -748,8 +748,6 @@ class pn_disposition:
     self.data.rewind()
 
   def encode(self):
-    if self.type not in DISPOSITIONS:
-      raise Skipped()
     impl = DISPOSITIONS[self.type]()
 
     if impl is None:

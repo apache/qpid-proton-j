@@ -20,7 +20,6 @@
  */
 package org.apache.qpid.proton.codec;
 
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.List;
@@ -81,8 +80,6 @@ public interface Data
     }
 
     void free();
-//    int errno();
-//    String error();
 
     void clear();
     long size();
@@ -91,12 +88,9 @@ public interface Data
     DataType prev();
     boolean enter();
     boolean exit();
-    boolean lookup(String name);
 
     DataType type();
 
-//    int print();
-//    int format(ByteBuffer buf);
     Binary encode();
     long encodedSize();
     long encode(ByteBuffer buf);
@@ -131,7 +125,6 @@ public interface Data
     void putObject(Object o);
     void putJavaMap(Map<Object, Object> map);
     void putJavaList(List<Object> list);
-    void putJavaArray(Object[] array);
     void putDescribedType(DescribedType dt);
 
     long getList();
@@ -166,17 +159,6 @@ public interface Data
     List<Object> getJavaList();
     Object[] getJavaArray();
     DescribedType getDescribedType();
-    //pnAtomT getAtom();
-
-    void copy(Data src);
-    void append(Data src);
-    void appendn(Data src, int limit);
-    void narrow();
-    void widen();
 
     String format();
-
-    // void dump();
-
-
 }

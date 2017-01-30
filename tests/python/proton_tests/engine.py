@@ -307,24 +307,6 @@ class ConnectionTest(Test):
     pump(t1, t2)
     assert c2.state == Endpoint.LOCAL_ACTIVE | Endpoint.REMOTE_CLOSED
 
-  def test_user_config(self):
-    if "java" in sys.platform:
-      raise Skipped("Unsupported API")
-
-    self.c1.user = "vindaloo"
-    self.c1.password = "secret"
-    self.c1.open()
-    self.pump()
-
-    self.c2.user = "leela"
-    self.c2.password = "trustno1"
-    self.c2.open()
-    self.pump()
-
-    assert self.c1.user == "vindaloo", self.c1.user
-    assert self.c1.password == None, self.c1.password
-    assert self.c2.user == "leela", self.c2.user
-    assert self.c2.password == None, self.c2.password
 
 class SessionTest(Test):
 
@@ -2265,8 +2247,6 @@ class DeliveryTest(Test):
                          value=ModifiedValue(failed=True, undeliverable=True,
                                              annotations={"key": "value"}))
 
-  def testCustom(self):
-    self.testDisposition(type=0x12345, value=CustomValue([1, 2, 3]))
 
 class CollectorTest(Test):
 
@@ -2648,85 +2628,3 @@ class DeliverySegFaultTest(Test):
     t.bind(conn)
     t.unbind()
     dlv = snd.delivery("tag")
-
-class SaslEventTest(CollectorTest):
-
-  def testAnonymousNoInitialResponse(self):
-    if "java" in sys.platform:
-      raise Skipped()
-    conn = Connection()
-    conn.collect(self.collector)
-    transport = Transport(Transport.SERVER)
-    transport.bind(conn)
-    self.expect(Event.CONNECTION_INIT, Event.CONNECTION_BOUND)
-
-    transport.push(str2bin('AMQP\x03\x01\x00\x00\x00\x00\x00 \x02\x01\x00\x00\x00SA'
-                           '\xd0\x00\x00\x00\x10\x00\x00\x00\x02\xa3\tANONYMOUS@'
-                           'AMQP\x00\x01\x00\x00'))
-    self.expect(Event.TRANSPORT)
-    for i in range(1024):
-      p = transport.pending()
-      self.drain()
-    p = transport.pending()
-    self.expect()
-
-  def testPipelinedServerReadFirst(self):
-    if "java" in sys.platform:
-      raise Skipped()
-    conn = Connection()
-    conn.collect(self.collector)
-    transport = Transport(Transport.CLIENT)
-    s = transport.sasl()
-    s.allowed_mechs("ANONYMOUS PLAIN")
-    transport.bind(conn)
-    self.expect(Event.CONNECTION_INIT, Event.CONNECTION_BOUND)
-    transport.push(str2bin(
-        # SASL
-        'AMQP\x03\x01\x00\x00'
-        # @sasl-mechanisms(64) [sasl-server-mechanisms=@PN_SYMBOL[:ANONYMOUS]]
-        '\x00\x00\x00\x1c\x02\x01\x00\x00\x00S@\xc0\x0f\x01\xe0\x0c\x01\xa3\tANONYMOUS'
-        # @sasl-outcome(68) [code=0]
-        '\x00\x00\x00\x10\x02\x01\x00\x00\x00SD\xc0\x03\x01P\x00'
-        # AMQP
-        'AMQP\x00\x01\x00\x00'
-         ))
-    self.expect(Event.TRANSPORT)
-    p = transport.pending()
-    bytes = transport.peek(p)
-    transport.pop(p)
-
-    server = Transport(Transport.SERVER)
-    server.push(bytes)
-    assert s.outcome == SASL.OK
-    assert server.sasl().outcome == SASL.OK
-
-  def testPipelinedServerWriteFirst(self):
-    if "java" in sys.platform:
-      raise Skipped()
-    conn = Connection()
-    conn.collect(self.collector)
-    transport = Transport(Transport.CLIENT)
-    s = transport.sasl()
-    s.allowed_mechs("ANONYMOUS")
-    transport.bind(conn)
-    p = transport.pending()
-    bytes = transport.peek(p)
-    transport.pop(p)
-    self.expect(Event.CONNECTION_INIT, Event.CONNECTION_BOUND)
-    transport.push(str2bin(
-        # SASL
-        'AMQP\x03\x01\x00\x00'
-        # @sasl-mechanisms(64) [sasl-server-mechanisms=@PN_SYMBOL[:ANONYMOUS]]
-        '\x00\x00\x00\x1c\x02\x01\x00\x00\x00S@\xc0\x0f\x01\xe0\x0c\x01\xa3\tANONYMOUS'
-        # @sasl-outcome(68) [code=0]
-        '\x00\x00\x00\x10\x02\x01\x00\x00\x00SD\xc0\x03\x01P\x00'
-        # AMQP
-        'AMQP\x00\x01\x00\x00'
-        ))
-    self.expect(Event.TRANSPORT)
-    p = transport.pending()
-    bytes = transport.peek(p)
-    transport.pop(p)
-    assert s.outcome == SASL.OK
-    # XXX: the bytes above appear to be correct, but we don't get any
-    # sort of event indicating that the transport is authenticated
