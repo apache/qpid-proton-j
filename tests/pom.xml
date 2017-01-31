@@ -77,6 +77,16 @@ mvn test \
           <skip>true</skip>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>java/pythonTests.ignore</exclude>
+            <exclude>interop/null.amqp</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 

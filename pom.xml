@@ -96,6 +96,22 @@
           </instructions>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes combine.children="append">
+            <exclude>appveyor.yml</exclude>
+            <exclude>.travis.yml</exclude>
+            <exclude>.mailmap</exclude>
+            <exclude>**/*.md</exclude>
+            <exclude>**/*.pkcs12</exclude>
+            <exclude>**/*.p12</exclude>
+            <exclude>**/*.pem</exclude>
+            <exclude>**/*.pem.txt</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
     </plugins>
     <pluginManagement>
       <plugins>
