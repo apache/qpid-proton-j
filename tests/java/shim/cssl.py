@@ -113,9 +113,6 @@ def pn_ssl_init(ssl, domain, session_id):
   # XXX: session_id
   ssl.impl = ssl.transport.impl.ssl(domain, None)
 
-def pn_ssl_resume_status(ssl):
-  raise Skipped()
-
 def pn_ssl_get_cipher_name(ssl, size):
   name = ssl.impl.getCipherName()
   return (bool(name), name)

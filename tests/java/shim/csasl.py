@@ -59,25 +59,6 @@ SASL_OUTCOMES_J2P = {
   Sasl.PN_SASL_TEMP: PN_SASL_TEMP,
 }
 
-def pn_transport_require_auth(transport, require):
-  raise Skipped('Not supported in Proton-J')
-
-# TODO: Placeholders
-def pn_transport_is_authenticated(transport):
-  raise Skipped('Not supported in Proton-J')
-
-def pn_transport_is_encrypted(transport):
-  raise Skipped('Not supported in Proton-J')
-
-def pn_transport_get_user(transport):
-  raise Skipped('Not supported in Proton-J')
-
-def pn_connection_set_user(connection, user):
-  pass
-
-def pn_connection_set_password(connection, password):
-  pass
-
 def pn_sasl_allowed_mechs(sasl, mechs):
   sasl.setMechanisms(*mechs.split())
 

@@ -162,13 +162,6 @@ mech_list: EXTERNAL DIGEST-MD5 SCRAM-SHA-1 CRAM-MD5 PLAIN ANONYMOUS
 if SASL.extended():
   _cyrusSetup('sasl_conf')
 
-# TODO: remove all tests that reference this
-def ensureCanTestExtendedSASL():
-  if not SASL.extended():
-    raise Skipped('Extended SASL not supported')
-  if not createdSASLDb:
-    raise Skipped("Can't Test Extended SASL: Couldn't create auth db")
-
 class DefaultConfig:
     defines = {}
 

@@ -2728,21 +2728,6 @@ A callback for trace logging. The callback is passed the transport and log messa
   def require_auth(self, bool):
     pn_transport_require_auth(self._impl, bool)
 
-  @property
-  def authenticated(self):
-    return pn_transport_is_authenticated(self._impl)
-
-  def require_encryption(self, bool):
-    pn_transport_require_encryption(self._impl, bool)
-
-  @property
-  def encrypted(self):
-    return pn_transport_is_encrypted(self._impl)
-
-  @property
-  def user(self):
-    return pn_transport_get_user(self._impl)
-
   def bind(self, connection):
     """Assign a connection to the transport"""
     self._check(pn_transport_bind(self._impl, connection._impl))
