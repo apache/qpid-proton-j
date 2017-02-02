@@ -83,7 +83,7 @@ mvn test \
         <configuration>
           <excludes>
             <exclude>java/pythonTests.ignore</exclude>
-            <exclude>interop/null.amqp</exclude>
+            <exclude>interop/*.amqp</exclude>
           </excludes>
         </configuration>
       </plugin>
