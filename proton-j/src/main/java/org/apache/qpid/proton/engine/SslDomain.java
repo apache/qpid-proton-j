@@ -18,6 +18,7 @@
  */
 package org.apache.qpid.proton.engine;
 
+import javax.net.ssl.SSLContext;
 import org.apache.qpid.proton.engine.impl.ssl.SslDomainImpl;
 
 /**
@@ -142,4 +143,11 @@ public interface SslDomain
     void allowUnsecuredClient(boolean allowUnsecured);
 
     boolean allowUnsecuredClient();
+    
+    /**
+     * set SSLContext
+     */
+    void setSslcontext(SSLContext sslcontext);
+    
+    SSLContext getSslcontext();
 }
