@@ -442,6 +442,8 @@ public class ConnectionImpl extends EndpointImpl implements ProtonJConnection
             next.setWorkPrev(prev);
         }
 
+        delivery.setWorkNext(null);
+        delivery.setWorkPrev(null);
 
         if(_workHead == delivery)
         {
@@ -550,6 +552,8 @@ public class ConnectionImpl extends EndpointImpl implements ProtonJConnection
             next.setTransportWorkPrev(prev);
         }
 
+        delivery.setTransportWorkNext(null);
+        delivery.setTransportWorkPrev(null);
 
         if(_transportWorkHead == delivery)
         {

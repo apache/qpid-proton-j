@@ -151,6 +151,7 @@ public class DeliveryImpl implements Delivery
         {
             _transportDelivery.settled();
         }
+
         if(_link.current() == this)
         {
             _link.advance();
@@ -161,11 +162,16 @@ public class DeliveryImpl implements Delivery
         {
             _linkPrevious._linkNext = _linkNext;
         }
+
         if(_linkNext != null)
         {
             _linkNext._linkPrevious = _linkPrevious;
         }
+
         updateWork();
+
+        _linkNext= null;
+        _linkPrevious = null;
     }
 
     DeliveryImpl getLinkNext()

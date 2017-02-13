@@ -130,8 +130,9 @@ public abstract class LinkImpl extends EndpointImpl implements Link
     {
         DeliveryImpl dlv = _head;
         while (dlv != null) {
+            DeliveryImpl next = dlv.next();
             dlv.free();
-            dlv = dlv.next();
+            dlv = next;
         }
 
         _session.getConnectionImpl().removeLinkEndpoint(_node);
@@ -142,7 +143,11 @@ public abstract class LinkImpl extends EndpointImpl implements Link
         modified();
     }
 
-    public void remove(DeliveryImpl delivery)
+    /*
+     * Called when settling a message to ensure that the head/tail refs of the link are updated.
+     * The caller ensures the delivery updates its own refs appropriately.
+     */
+    void remove(DeliveryImpl delivery)
     {
         if(_head == delivery)
         {
@@ -151,10 +156,6 @@ public abstract class LinkImpl extends EndpointImpl implements Link
         if(_tail == delivery)
         {
             _tail = delivery.getLinkPrevious();
-        }
-        if(_current == delivery)
-        {
-            // TODO - what???
         }
     }
 
