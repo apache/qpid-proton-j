@@ -103,8 +103,7 @@ public class IOHandler extends BaseHandler {
         Transport transport = Proton.transport();
         Sasl sasl = transport.sasl();
         sasl.client();
-      //sasl.setMechanisms("ANONYMOUS");
-        sasl.setMechanisms("EXTERNAL");
+        sasl.setMechanisms("ANONYMOUS");
         transport.bind(connection);
     }
 

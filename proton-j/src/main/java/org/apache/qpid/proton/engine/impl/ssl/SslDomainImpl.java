@@ -19,7 +19,6 @@
 package org.apache.qpid.proton.engine.impl.ssl;
 
 import javax.net.ssl.SSLContext;
-
 import org.apache.qpid.proton.ProtonUnsupportedOperationException;
 import org.apache.qpid.proton.engine.ProtonJSslDomain;
 import org.apache.qpid.proton.engine.SslDomain;
@@ -82,13 +81,15 @@ public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, Proton
     }
     
     @Override
-    public void setSslcontext(SSLContext sslcontext){
-    	_sslcontext = sslcontext;
+    public void setSslcontext(SSLContext sslcontext)
+    {
+        _sslcontext = sslcontext;
     }
     
     @Override
-    public SSLContext getSslcontext(){
-    	return _sslcontext;
+    public SSLContext getSslcontext()
+    {
+        return _sslcontext;
     }
 
     @Override
