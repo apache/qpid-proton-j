@@ -21,9 +21,14 @@ package org.apache.qpid.proton.engine.impl.ssl;
 import static org.junit.Assert.assertNotNull;
 
 import java.net.URL;
+import java.security.NoSuchAlgorithmException;
 
+import javax.net.ssl.SSLContext;
+
+import org.apache.qpid.proton.engine.SslDomain;
+import org.apache.qpid.proton.engine.SslPeerDetails;
 import org.junit.Test;
-
+import static org.mockito.Mockito.mock;
 public class SslEngineFacadeFactoryTest {
 
     private static final String PASSWORD = "unittest";
@@ -59,6 +64,27 @@ public class SslEngineFacadeFactoryTest {
 
         assertNotNull("Key was NULL", factory.readPrivateKey(keyFile, null));
     }
+    
+    @Test
+    public void testSSLContext(){
+        String certFile = resolveFilename("cert.pem.txt");
+        String keyFile = resolveFilename("private-key-clear.pem.txt");
+        //sslDomain object
+        SslDomain domain=SslDomain.Factory.create();
+        domain.setCredentials(certFile, keyFile, null);
+        //Dummy SSLContext
+        DummySslContextFactory dummySSLContext = new DummySslContextFactory();
+	    SSLContext sslContext=dummySSLContext.getOrCreateSslContext(domain);
+	    //set SSLContext in SslDomainObject
+	    domain.setSslcontext(sslContext);
+	    
+	    SslEngineFacadeFactory factory = new SslEngineFacadeFactory();
+	    //Ensure sslEngine is created with the provided SSLContext
+	    ProtonSslEngine sslEngine= factory.createProtonSslEngine(domain,  SslPeerDetails.Factory.create("127.0.0.1",1));
+		
+	    //Verify sslEngine is created with provided SSLContext
+	    assertNotNull("Cant create SSLEngine with provided Context", sslEngine);
+	}
 
     private String resolveFilename(String testFilename) {
         URL resourceUri = this.getClass().getResource(testFilename);

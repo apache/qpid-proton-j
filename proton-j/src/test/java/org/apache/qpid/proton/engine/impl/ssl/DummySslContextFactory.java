@@ -60,16 +60,12 @@ import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.SslPeerDetails;
 import org.apache.qpid.proton.engine.TransportException;
 
-public class SslEngineFacadeFactory
+/**
+ * Creates dummy SSLContext for unit testing
+ */
+public class DummySslContextFactory
 {
-    private static final Logger _logger = Logger.getLogger(SslEngineFacadeFactory.class.getName());
-
-    /**
-     * The protocol name used to create an {@link SSLContext}, taken from Java's list of
-     * standard names at http://docs.oracle.com/javase/6/docs/technotes/guides/security/StandardNames.html
-     *
-     * TODO allow the protocol name to be overridden somehow
-     */
+    private static final Logger _logger = Logger.getLogger(DummySslContextFactory.class.getName());
     private static final String TLS_PROTOCOL = "TLS";
 
     // BouncyCastle Reflection Helpers
@@ -155,7 +151,7 @@ public class SslEngineFacadeFactory
         }
     }
 
-    SslEngineFacadeFactory()
+    DummySslContextFactory()
     {
     }
 
@@ -174,23 +170,6 @@ public class SslEngineFacadeFactory
 
 
     /**
-     * Returns a {@link ProtonSslEngine}. May cache the domain's settings so callers should invoke
-     * {@link #resetCache()} if the domain changes.
-     *
-     * @param peerDetails may be used to return an engine that supports SSL resume.
-     */
-    public ProtonSslEngine createProtonSslEngine(SslDomain domain, SslPeerDetails peerDetails)
-    {
-        SSLEngine engine = createAndInitialiseSslEngine(domain, peerDetails);
-        if(_logger.isLoggable(Level.FINE))
-        {
-            _logger.fine("Created SSL engine: " + engineToString(engine));
-        }
-        return new DefaultSslEngineFacade(engine);
-    }
-
-
-    /**
      * Guarantees that no cached settings are used in subsequent calls to
      * {@link #createProtonSslEngine(SslDomain, SslPeerDetails)}.
      */
@@ -199,71 +178,12 @@ public class SslEngineFacadeFactory
         _sslContext = null;
     }
 
-
-    private SSLEngine createAndInitialiseSslEngine(SslDomain domain, SslPeerDetails peerDetails)
-    {
-        SslDomain.Mode mode = domain.getMode();
-
-        SSLContext sslContext = getOrCreateSslContext(domain);
-        SSLEngine sslEngine = createSslEngine(sslContext, peerDetails);
-
-        if (domain.getPeerAuthentication() == SslDomain.VerifyMode.ANONYMOUS_PEER)
-        {
-            addAnonymousCipherSuites(sslEngine);
-        }
-        else
-        {
-            if (mode == SslDomain.Mode.SERVER)
-            {
-                sslEngine.setNeedClientAuth(true);
-            }
-        }
-
-        if(_logger.isLoggable(Level.FINE))
-        {
-            _logger.log(Level.FINE, mode + " Enabled cipher suites " + Arrays.asList(sslEngine.getEnabledCipherSuites()));
-        }
-
-        boolean useClientMode = mode == SslDomain.Mode.CLIENT ? true : false;
-        sslEngine.setUseClientMode(useClientMode);
-
-        removeSSLv3Support(sslEngine);
-
-        return sslEngine;
-    }
-
-    private static final String SSLV3_PROTOCOL = "SSLv3";
-
-    private static void removeSSLv3Support(final SSLEngine engine)
-    {
-        List<String> enabledProtocols = Arrays.asList(engine.getEnabledProtocols());
-        if(enabledProtocols.contains(SSLV3_PROTOCOL))
-        {
-            List<String> allowedProtocols = new ArrayList<String>(enabledProtocols);
-            allowedProtocols.remove(SSLV3_PROTOCOL);
-            engine.setEnabledProtocols(allowedProtocols.toArray(new String[allowedProtocols.size()]));
-        }
-    }
-
     /**
-     * @param sslPeerDetails is allowed to be null. A non-null value is used to hint that SSL resumption
-     * should be attempted
+     * creates sslcontext
+     * @param sslDomain
+     * @return
      */
-    private SSLEngine createSslEngine(SSLContext sslContext, SslPeerDetails sslPeerDetails)
-    {
-        final SSLEngine sslEngine;
-        if(sslPeerDetails == null)
-        {
-            sslEngine = sslContext.createSSLEngine();
-        }
-        else
-        {
-            sslEngine = sslContext.createSSLEngine(sslPeerDetails.getHostname(), sslPeerDetails.getPort());
-        }
-        return sslEngine;
-    }
-
-    private SSLContext getOrCreateSslContext(SslDomain sslDomain)
+    public SSLContext getOrCreateSslContext(SslDomain sslDomain)
     {
     	if(sslDomain.getSslcontext()!=null){
     		_sslContext = sslDomain.getSslcontext();
@@ -371,59 +291,8 @@ public class SslEngineFacadeFactory
         }
     }
 
-    private void addAnonymousCipherSuites(SSLEngine sslEngine)
-    {
-        List<String> supportedSuites = Arrays.asList(sslEngine.getSupportedCipherSuites());
-        List<String> currentEnabledSuites = Arrays.asList(sslEngine.getEnabledCipherSuites());
 
-        List<String> enabledSuites = buildEnabledSuitesIncludingAnonymous(ANONYMOUS_CIPHER_SUITES, supportedSuites, currentEnabledSuites);
-        sslEngine.setEnabledCipherSuites(enabledSuites.toArray(new String[0]));
-    }
 
-    private List<String> buildEnabledSuitesIncludingAnonymous(
-            List<String> anonymousCipherSuites, List<String> supportedSuites, List<String> currentEnabled)
-    {
-        List<String> newEnabled = new ArrayList<String>(currentEnabled);
-
-        int addedAnonymousCipherSuites = 0;
-        for (String anonymousCipherSuiteName : anonymousCipherSuites)
-        {
-            if (supportedSuites.contains(anonymousCipherSuiteName))
-            {
-                newEnabled.add(anonymousCipherSuiteName);
-                addedAnonymousCipherSuites++;
-            }
-        }
-
-        if (addedAnonymousCipherSuites == 0)
-        {
-            throw new TransportException
-                ("None of " + anonymousCipherSuites
-                 + " anonymous cipher suites are within the supported list "
-                 + supportedSuites);
-        }
-
-        if(_logger.isLoggable(Level.FINE))
-        {
-            _logger.fine("There are now " + newEnabled.size()
-                    + " cipher suites enabled (previously " + currentEnabled.size()
-                    + "), including " + addedAnonymousCipherSuites + " out of the "
-                    + anonymousCipherSuites.size() + " requested anonymous ones." );
-        }
-
-        return newEnabled;
-    }
-
-    private String engineToString(SSLEngine engine)
-    {
-        return new StringBuilder("[ " )
-            .append(engine)
-            .append(", needClientAuth=").append(engine.getNeedClientAuth())
-            .append(", useClientMode=").append(engine.getUseClientMode())
-            .append(", peerHost=").append(engine.getPeerHost())
-            .append(", peerPort=").append(engine.getPeerPort())
-            .append(" ]").toString();
-    }
 
     Certificate readCertificate(String pemFile)
     {
