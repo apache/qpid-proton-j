@@ -265,7 +265,11 @@ public class SslEngineFacadeFactory
 
     private SSLContext getOrCreateSslContext(SslDomain sslDomain)
     {
-        if(_sslContext == null)
+        if(_sslContext == null && sslDomain.getSslContext() != null)
+        {
+            _sslContext = sslDomain.getSslContext();
+        }
+        else if(_sslContext == null)
         {
             if(_logger.isLoggable(Level.FINE))
             {

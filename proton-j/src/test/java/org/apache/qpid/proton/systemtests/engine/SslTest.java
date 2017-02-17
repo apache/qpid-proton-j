@@ -1,0 +1,172 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.qpid.proton.systemtests.engine;
+
+import static org.apache.qpid.proton.engine.EndpointState.ACTIVE;
+import static org.apache.qpid.proton.engine.EndpointState.UNINITIALIZED;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+
+import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.amqp.transport.ErrorCondition;
+import org.apache.qpid.proton.engine.Connection;
+import org.apache.qpid.proton.engine.Endpoint;
+import org.apache.qpid.proton.engine.EndpointState;
+import org.apache.qpid.proton.engine.SslDomain;
+import org.apache.qpid.proton.engine.SslDomain.Mode;
+import org.apache.qpid.proton.engine.SslDomain.VerifyMode;
+import org.apache.qpid.proton.engine.Transport;
+import org.junit.Test;
+
+public class SslTest
+{
+    private static final String SERVER_PKCS12_KEYSTORE = "src/test/resources/server-pkcs12.keystore";
+    private static final String SERVER_PKCS12_TRUSTSTORE = "src/test/resources/server-pkcs12.truststore";
+    private static final String CLIENT_PKCS12_KEYSTORE = "src/test/resources/client-pkcs12.keystore";
+    private static final String CLIENT_PKCS12_TRUSTSTORE = "src/test/resources/client-pkcs12.truststore";
+    private static final String PASSWORD = "password";
+
+    private static final String SERVER_CONTAINER = "serverContainer";
+    private static final String CLIENT_CONTAINER = "clientContainer";
+
+    private final Transport _clientTransport = Proton.transport();
+    private final Transport _serverTransport = Proton.transport();
+
+    private final TransportPumper _pumper = new TransportPumper(_clientTransport, _serverTransport);
+
+    private final Connection _clientConnection = Proton.connection();
+    private final Connection _serverConnection = Proton.connection();
+
+    @Test
+    public void testOpenConnectionOverSslTransports() throws Exception
+    {
+        SslDomain clientSslDomain = SslDomain.Factory.create();
+        clientSslDomain.init(Mode.CLIENT);
+        clientSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER);
+        SSLContext clientSslContext = createSslContext(CLIENT_PKCS12_KEYSTORE, PASSWORD, CLIENT_PKCS12_TRUSTSTORE, PASSWORD);
+        clientSslDomain.setSslContext(clientSslContext);
+        _clientTransport.ssl(clientSslDomain);
+
+        SslDomain serverSslDomain = SslDomain.Factory.create();
+        serverSslDomain.init(Mode.SERVER);
+        serverSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER);
+        SSLContext serverSslContext = createSslContext(SERVER_PKCS12_KEYSTORE, PASSWORD, SERVER_PKCS12_TRUSTSTORE, PASSWORD);
+        serverSslDomain.setSslContext(serverSslContext);
+        _serverTransport.ssl(serverSslDomain);
+
+        _clientConnection.setContainer(CLIENT_CONTAINER);
+        _serverConnection.setContainer(SERVER_CONTAINER);
+
+        _clientTransport.bind(_clientConnection);
+        _serverTransport.bind(_serverConnection);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+
+        _clientConnection.open();
+
+        assertEndpointState(_clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(_serverConnection, UNINITIALIZED, UNINITIALIZED);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+
+        _pumper.pumpAll();
+
+        assertEndpointState(_clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(_serverConnection, UNINITIALIZED, ACTIVE);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+
+        _serverConnection.open();
+
+        assertEndpointState(_clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(_serverConnection, ACTIVE, ACTIVE);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+
+        _pumper.pumpAll();
+
+        assertEndpointState(_clientConnection, ACTIVE, ACTIVE);
+        assertEndpointState(_serverConnection, ACTIVE, ACTIVE);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+    }
+
+    private void assertConditions(Transport transport)
+    {
+        ErrorCondition remoteCondition = transport.getRemoteCondition();
+        if (remoteCondition != null)
+        {
+            assertNull(remoteCondition.getCondition());
+        }
+
+        ErrorCondition condition = transport.getCondition();
+        if (condition != null)
+        {
+            assertNull(condition.getCondition());
+        }
+    }
+
+    private SSLContext createSslContext(String keyStoreLocation, String keyStorePassword,
+                                        String trustStoreLocation, String trustStorePassword) throws Exception
+    {
+        SSLContext context = SSLContext.getInstance("TLS");
+
+        KeyManagerFactory keyFact = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        TrustManagerFactory trustFact = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (InputStream in = new FileInputStream(new File(keyStoreLocation));)
+        {
+            keyStore.load(in, keyStorePassword.toCharArray());
+        }
+        keyFact.init(keyStore, keyStorePassword.toCharArray());
+
+        KeyStore trustStore = KeyStore.getInstance("PKCS12");
+        try (InputStream in = new FileInputStream(new File(trustStoreLocation));)
+        {
+            trustStore.load(in, trustStorePassword.toCharArray());
+        }
+        trustFact.init(trustStore);
+
+        context.init(keyFact.getKeyManagers(), trustFact.getTrustManagers(), new SecureRandom());
+
+        return context;
+    }
+
+    private void assertEndpointState(Endpoint endpoint, EndpointState localState, EndpointState remoteState)
+    {
+        assertEquals("Unexpected local state", localState, endpoint.getLocalState());
+        assertEquals("Unexpected remote state", remoteState, endpoint.getRemoteState());
+    }
+}

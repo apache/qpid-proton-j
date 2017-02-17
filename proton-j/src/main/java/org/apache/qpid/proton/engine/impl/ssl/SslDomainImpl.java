@@ -18,6 +18,7 @@
  */
 package org.apache.qpid.proton.engine.impl.ssl;
 
+import javax.net.ssl.SSLContext;
 import org.apache.qpid.proton.ProtonUnsupportedOperationException;
 import org.apache.qpid.proton.engine.ProtonJSslDomain;
 import org.apache.qpid.proton.engine.SslDomain;
@@ -32,6 +33,7 @@ public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, Proton
     private String _privateKeyPassword;
     private String _trustedCaDb;
     private boolean _allowUnsecuredClient;
+    private SSLContext _sslContext;
 
     private final SslEngineFacadeFactory _sslEngineFacadeFactory = new SslEngineFacadeFactory();
 
@@ -76,6 +78,18 @@ public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, Proton
     public String getTrustedCaDb()
     {
         return _trustedCaDb;
+    }
+
+    @Override
+    public void setSslContext(SSLContext sslContext)
+    {
+        _sslContext = sslContext;
+    }
+
+    @Override
+    public SSLContext getSslContext()
+    {
+        return _sslContext;
     }
 
     @Override

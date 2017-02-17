@@ -19,9 +19,12 @@
  */
 package org.apache.qpid.proton.systemtests.engine;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.engine.Transport;
+import org.apache.qpid.proton.engine.TransportResult;
 
 public class TransportPumper
 {
@@ -60,13 +63,26 @@ public class TransportPumper
 
     private int pumpOnce(Transport transportFrom, String fromRole, Transport transportTo, String toRole)
     {
-        final byte[] output = new byte[1024];
-        int outputLength = transportFrom.output(output, 0, output.length);
+        int outputLength = transportFrom.pending();
         if (outputLength > 0)
         {
-            int numberConsumedByServer = transportTo.input(output, 0, outputLength);
-            assertEquals("Expecting " + toRole + " to consume all of " + fromRole + "'s output", outputLength, numberConsumedByServer);
+            ByteBuffer outputBuffer = transportFrom.head();
+
+            int remaining = outputBuffer.remaining();
+            assertTrue("Unexpected remaining in buffer: " + remaining + " vs " + outputLength, remaining >= outputLength);
+
+            byte[] output = new byte[remaining];
+            outputBuffer.get(output);
+
+            transportFrom.pop(remaining);
+
+            ByteBuffer inputBuffer = transportTo.getInputBuffer();
+            inputBuffer.put(output, 0, output.length);
+
+            TransportResult result = transportTo.processInput();
+            result.checkIsOk();
         }
+
         return outputLength;
     }
 

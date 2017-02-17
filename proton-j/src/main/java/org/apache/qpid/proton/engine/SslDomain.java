@@ -18,6 +18,7 @@
  */
 package org.apache.qpid.proton.engine;
 
+import javax.net.ssl.SSLContext;
 import org.apache.qpid.proton.engine.impl.ssl.SslDomainImpl;
 
 /**
@@ -142,4 +143,19 @@ public interface SslDomain
     void allowUnsecuredClient(boolean allowUnsecured);
 
     boolean allowUnsecuredClient();
+
+    /**
+     * Sets an SSLContext for use when establishing SSL transport. Setting a context this way overrides alternate
+     * configuration that might otherwise have been used to create a context, such as key and trust store paths.
+     *
+     *@param sslContext the context to use
+     */
+    void setSslContext(SSLContext sslContext);
+
+    /**
+     * Returns the SSLContext set by {@link #setSslContext(SSLContext)}.
+     *
+     * @return the SSLContext, or null if none was set.
+     */
+    SSLContext getSslContext();
 }
