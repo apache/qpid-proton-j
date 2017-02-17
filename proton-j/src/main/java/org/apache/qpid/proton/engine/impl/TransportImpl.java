@@ -526,7 +526,7 @@ public class TransportImpl extends EndpointImpl
         boolean wasDone = delivery.isDone();
 
         if(!delivery.isDone() &&
-           (delivery.getDataLength() > 0 || delivery != snd.current()) &&
+           (delivery.getReadableBytes() > 0 || delivery != snd.current()) &&
            tpSession.hasOutgoingCredit() && tpLink.hasCredit() &&
            tpSession.isLocalChannelSet() &&
            tpLink.getLocalHandle() != null && !_frameWriter.isFull())
@@ -578,7 +578,7 @@ public class TransportImpl extends EndpointImpl
 
             ByteBuffer payload = delivery.getData() ==  null ? null :
                 ByteBuffer.wrap(delivery.getData(), delivery.getDataOffset(),
-                                delivery.getDataLength());
+                                delivery.getReadableBytes());
 
             writeFrame(tpSession.getLocalChannel(), transfer, payload,
                        new PartialTransfer(transfer));
@@ -605,7 +605,7 @@ public class TransportImpl extends EndpointImpl
             }
             else
             {
-                int delta = delivery.getDataLength() - payload.remaining();
+                int delta = delivery.getReadableBytes() - payload.remaining();
                 delivery.setDataOffset(delivery.getDataOffset() + delta);
                 delivery.setDataLength(payload.remaining());
                 session.incrementOutgoingBytes(-delta);

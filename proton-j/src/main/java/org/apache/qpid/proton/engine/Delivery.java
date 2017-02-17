@@ -54,6 +54,12 @@ public interface Delivery extends Extendable
      */
     public void settle();
 
+    /** Returns the number of available bytes to be read at this delivery.
+     *
+     *  The delivery might still be incomplete at the time this method is called,
+     *  so this will only return the number of bytes it already knows.*/
+    int getReadableBytes();
+
     /**
      * Returns whether this delivery has been settled.
      *
