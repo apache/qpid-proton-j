@@ -109,6 +109,10 @@
             <exclude>**/*.p12</exclude>
             <exclude>**/*.pem</exclude>
             <exclude>**/*.pem.txt</exclude>
+            <exclude>**/*.crt</exclude>
+            <exclude>**/*.csr</exclude>
+            <exclude>**/*.keystore</exclude>
+            <exclude>**/*.truststore</exclude>
           </excludes>
         </configuration>
       </plugin>
