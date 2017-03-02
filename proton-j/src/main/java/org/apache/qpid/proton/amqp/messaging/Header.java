@@ -37,6 +37,19 @@ public final class Header
     private Boolean _firstAcquirer;
     private UnsignedInteger _deliveryCount;
 
+    public Header()
+    {
+    }
+
+    public Header(Header other)
+    {
+        this._durable = other._durable;
+        this._priority = other._priority;
+        this._ttl = other._ttl;
+        this._firstAcquirer = other._firstAcquirer;
+        this._deliveryCount = other._deliveryCount;
+    }
+
     public Boolean getDurable()
     {
         return _durable;

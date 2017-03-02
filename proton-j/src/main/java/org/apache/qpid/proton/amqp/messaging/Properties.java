@@ -24,6 +24,7 @@
 package org.apache.qpid.proton.amqp.messaging;
 
 import java.util.Date;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
@@ -46,6 +47,27 @@ public final class Properties
     private String _groupId;
     private UnsignedInteger _groupSequence;
     private String _replyToGroupId;
+
+    public Properties()
+    {
+    }
+
+    public Properties(Properties other)
+    {
+        this._messageId = other._messageId;
+        this._userId = other._userId;
+        this._to = other._to;
+        this._subject = other._subject;
+        this._replyTo = other._replyTo;
+        this._correlationId = other._correlationId;
+        this._contentType = other._contentType;
+        this._contentEncoding = other._contentEncoding;
+        this._absoluteExpiryTime = other._absoluteExpiryTime;
+        this._creationTime = other._creationTime;
+        this._groupId = other._groupId;
+        this._groupSequence = other._groupSequence;
+        this._replyToGroupId = other._replyToGroupId;
+    }
 
     public Object getMessageId()
     {
