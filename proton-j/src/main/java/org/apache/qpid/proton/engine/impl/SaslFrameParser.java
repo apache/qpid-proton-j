@@ -21,6 +21,8 @@
 
 package org.apache.qpid.proton.engine.impl;
 
+import static org.apache.qpid.proton.engine.impl.AmqpHeader.SASL_HEADER;
+
 import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.Binary;
@@ -35,6 +37,14 @@ class SaslFrameParser
 
     enum State
     {
+        HEADER0,
+        HEADER1,
+        HEADER2,
+        HEADER3,
+        HEADER4,
+        HEADER5,
+        HEADER6,
+        HEADER7,
         SIZE_0,
         SIZE_1,
         SIZE_2,
@@ -45,12 +55,11 @@ class SaslFrameParser
         ERROR
     }
 
-    private State _state = State.SIZE_0;
+    private State _state = State.HEADER0;
     private int _size;
 
     private ByteBuffer _buffer;
 
-    private int _ignore = 8;
     private final ByteBufferDecoder _decoder;
 
 
@@ -70,19 +79,144 @@ class SaslFrameParser
         State state = _state;
         ByteBuffer oldIn = null;
 
-        // Note that we simply skip over the header rather than parsing it.
-        if(_ignore != 0)
-        {
-            int bytesToEat = Math.min(_ignore, input.remaining());
-            input.position(input.position() + bytesToEat);
-            _ignore -= bytesToEat;
-        }
-
         while(input.hasRemaining() && state != State.ERROR && !_sasl.isDone())
         {
             switch(state)
             {
+                case HEADER0:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[0])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[0], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER1:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[1])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[1], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER2;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER2:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[2])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[2], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER3;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER3:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[3])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[3], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER4;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER4:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[4])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[4], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER5;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER5:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[5])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[5], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER6;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER6:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[6])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[6], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.HEADER7;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                case HEADER7:
+                    if(input.hasRemaining())
+                    {
+                        byte c = input.get();
+                        if(c != SASL_HEADER[7])
+                        {
+                            frameParsingError = new TransportException("AMQP SASL header mismatch value %x, expecting %x. In state: %s", c, SASL_HEADER[7], state);
+                            state = State.ERROR;
+                            break;
+                        }
+                        state = State.SIZE_0;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 case SIZE_0:
+                    if(!input.hasRemaining())
+                    {
+                        break;
+                    }
+
                     if(input.remaining() >= 4)
                     {
                         size = input.getInt();

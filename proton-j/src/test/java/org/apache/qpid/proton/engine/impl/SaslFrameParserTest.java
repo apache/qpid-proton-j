@@ -20,9 +20,10 @@ package org.apache.qpid.proton.engine.impl;
 
 import static org.mockito.Mockito.*;
 import static org.junit.Assert.*;
-import static org.junit.matchers.JUnitMatchers.containsString;
+import static org.hamcrest.CoreMatchers.containsString;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
@@ -39,7 +40,6 @@ import org.apache.qpid.proton.engine.TransportException;
 import org.junit.Test;
 
 /**
- * TODO test case where header is malformed
  * TODO test case where input provides frame and half etc
  */
 public class SaslFrameParserTest
@@ -128,6 +128,67 @@ public class SaslFrameParserTest
             fail("expected exception");
         } catch (TransportException e) {
             // this is expected
+        }
+    }
+
+    /*
+     * Test that if the first 8 bytes don't match the AMQP SASL header, it causes an error.
+     */
+    @Test
+    public void testInputOfInvalidHeader() {
+        for (int invalidIndex = 0; invalidIndex < 8; invalidIndex++) {
+            doInputOfInvalidHeaderTestImpl(invalidIndex);
+        }
+    }
+
+    private void doInputOfInvalidHeaderTestImpl(int invalidIndex) {
+        SaslFrameHandler mockSaslFrameHandler = mock(SaslFrameHandler.class);
+        ByteBufferDecoder mockDecoder = mock(ByteBufferDecoder.class);
+
+        SaslFrameParser saslFrameParser = new SaslFrameParser(mockSaslFrameHandler, mockDecoder);
+
+        byte[] header = Arrays.copyOf(AmqpHeader.SASL_HEADER, AmqpHeader.SASL_HEADER.length);
+        header[invalidIndex] = 'X';
+
+        try {
+            saslFrameParser.input(ByteBuffer.wrap(header));
+            fail("expected exception");
+        } catch (TransportException e) {
+            assertThat(e.getMessage(), containsString("AMQP SASL header mismatch"));
+            assertThat(e.getMessage(), containsString("In state: HEADER" + invalidIndex));
+        }
+
+        // Check that further interaction throws TransportException.
+        try {
+            saslFrameParser.input(ByteBuffer.wrap(new byte[0]));
+            fail("expected exception");
+        } catch (TransportException e) {
+            // Expected
+        }
+    }
+
+    /*
+     * Test that if the first 8 bytes, fed in one at a time, don't match the AMQP SASL header, it causes an error.
+     */
+    @Test
+    public void testInputOfValidHeaderInSegments()
+    {
+        sendAmqpSaslHeaderInSegments();
+
+        // Try feeding in an actual frame now to check we get past the header parsing ok
+        when(_mockSaslFrameHandler.isDone()).thenReturn(false);
+
+        _frameParser.input(_saslFrameBytes);
+
+        verify(_mockSaslFrameHandler).handle(isA(SaslInit.class), (Binary)isNull());
+    }
+
+    private void sendAmqpSaslHeaderInSegments()
+    {
+        for (int headerIndex = 0; headerIndex < 8; headerIndex++)
+        {
+            byte headerPart = AmqpHeader.SASL_HEADER[headerIndex];
+            _frameParser.input(ByteBuffer.wrap(new byte[] { headerPart }));
         }
     }
 
