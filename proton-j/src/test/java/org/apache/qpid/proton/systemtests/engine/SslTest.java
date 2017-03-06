@@ -46,10 +46,10 @@ import org.junit.Test;
 
 public class SslTest
 {
-    private static final String SERVER_PKCS12_KEYSTORE = "src/test/resources/server-pkcs12.keystore";
-    private static final String SERVER_PKCS12_TRUSTSTORE = "src/test/resources/server-pkcs12.truststore";
-    private static final String CLIENT_PKCS12_KEYSTORE = "src/test/resources/client-pkcs12.keystore";
-    private static final String CLIENT_PKCS12_TRUSTSTORE = "src/test/resources/client-pkcs12.truststore";
+    private static final String SERVER_JKS_KEYSTORE = "src/test/resources/server-jks.keystore";
+    private static final String SERVER_JKS_TRUSTSTORE = "src/test/resources/server-jks.truststore";
+    private static final String CLIENT_JKS_KEYSTORE = "src/test/resources/client-jks.keystore";
+    private static final String CLIENT_JKS_TRUSTSTORE = "src/test/resources/client-jks.truststore";
     private static final String PASSWORD = "password";
 
     private static final String SERVER_CONTAINER = "serverContainer";
@@ -69,14 +69,14 @@ public class SslTest
         SslDomain clientSslDomain = SslDomain.Factory.create();
         clientSslDomain.init(Mode.CLIENT);
         clientSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER);
-        SSLContext clientSslContext = createSslContext(CLIENT_PKCS12_KEYSTORE, PASSWORD, CLIENT_PKCS12_TRUSTSTORE, PASSWORD);
+        SSLContext clientSslContext = createSslContext(CLIENT_JKS_KEYSTORE, PASSWORD, CLIENT_JKS_TRUSTSTORE, PASSWORD);
         clientSslDomain.setSslContext(clientSslContext);
         _clientTransport.ssl(clientSslDomain);
 
         SslDomain serverSslDomain = SslDomain.Factory.create();
         serverSslDomain.init(Mode.SERVER);
         serverSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER);
-        SSLContext serverSslContext = createSslContext(SERVER_PKCS12_KEYSTORE, PASSWORD, SERVER_PKCS12_TRUSTSTORE, PASSWORD);
+        SSLContext serverSslContext = createSslContext(SERVER_JKS_KEYSTORE, PASSWORD, SERVER_JKS_TRUSTSTORE, PASSWORD);
         serverSslDomain.setSslContext(serverSslContext);
         _serverTransport.ssl(serverSslDomain);
 
@@ -145,14 +145,14 @@ public class SslTest
         KeyManagerFactory keyFact = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         TrustManagerFactory trustFact = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        KeyStore keyStore = KeyStore.getInstance("JKS");
         try (InputStream in = new FileInputStream(new File(keyStoreLocation));)
         {
             keyStore.load(in, keyStorePassword.toCharArray());
         }
         keyFact.init(keyStore, keyStorePassword.toCharArray());
 
-        KeyStore trustStore = KeyStore.getInstance("PKCS12");
+        KeyStore trustStore = KeyStore.getInstance("JKS");
         try (InputStream in = new FileInputStream(new File(trustStoreLocation));)
         {
             trustStore.load(in, trustStorePassword.toCharArray());

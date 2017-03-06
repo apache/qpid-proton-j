@@ -26,34 +26,34 @@ rm -f *.crt *.csr *.keystore *.truststore
 
 # Create a key and self-signed certificate for the CA, to sign certificate requests and use for trust:
 # ----------------------------------------------------------------------------------------------------
-keytool -storetype pkcs12 -keystore ca-pkcs12.keystore -storepass password -keypass password -alias ca -genkey -dname "O=My Trusted Inc.,CN=my-ca.org" -validity 9999 -ext bc:c=ca:true
-keytool -storetype pkcs12 -keystore ca-pkcs12.keystore -storepass password -alias ca -exportcert -rfc > ca.crt
+keytool -storetype jks -keystore ca-jks.keystore -storepass password -keypass password -alias ca -genkey -dname "O=My Trusted Inc.,CN=my-ca.org" -validity 9999 -ext bc:c=ca:true
+keytool -storetype jks -keystore ca-jks.keystore -storepass password -alias ca -exportcert -rfc > ca.crt
 
 # Create a key pair for the server, and sign it with the CA:
 # ----------------------------------------------------------
-keytool -storetype pkcs12 -keystore server-pkcs12.keystore -storepass password -keypass password -alias server -genkey -dname "O=Server,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
+keytool -storetype jks -keystore server-jks.keystore -storepass password -keypass password -alias server -genkey -dname "O=Server,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
 
-keytool -storetype pkcs12 -keystore server-pkcs12.keystore -storepass password -alias server -certreq -file server.csr
-keytool -storetype pkcs12 -keystore ca-pkcs12.keystore -storepass password -alias ca -gencert -rfc -infile server.csr -outfile server.crt -validity 9999 -ext bc=ca:false -ext eku=sA
+keytool -storetype jks -keystore server-jks.keystore -storepass password -alias server -certreq -file server.csr
+keytool -storetype jks -keystore ca-jks.keystore -storepass password -alias ca -gencert -rfc -infile server.csr -outfile server.crt -validity 9999 -ext bc=ca:false -ext eku=sA
 
-keytool -storetype pkcs12 -keystore server-pkcs12.keystore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
-keytool -storetype pkcs12 -keystore server-pkcs12.keystore -storepass password -keypass password -importcert -alias server -file server.crt
+keytool -storetype jks -keystore server-jks.keystore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
+keytool -storetype jks -keystore server-jks.keystore -storepass password -keypass password -importcert -alias server -file server.crt
 
 # Create trust store for the server, import the CA cert:
 # -------------------------------------------------------
-keytool -storetype pkcs12 -keystore server-pkcs12.truststore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
+keytool -storetype jks -keystore server-jks.truststore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
 
 # Create a key pair for a client, and sign it with the CA:
 # ----------------------------------------------------------
-keytool -storetype pkcs12 -keystore client-pkcs12.keystore -storepass password -keypass password -alias client -genkey -dname "O=Client,CN=client" -validity 9999 -ext bc=ca:false -ext eku=cA
+keytool -storetype jks -keystore client-jks.keystore -storepass password -keypass password -alias client -genkey -dname "O=Client,CN=client" -validity 9999 -ext bc=ca:false -ext eku=cA
 
-keytool -storetype pkcs12 -keystore client-pkcs12.keystore -storepass password -alias client -certreq -file client.csr
-keytool -storetype pkcs12 -keystore ca-pkcs12.keystore -storepass password -alias ca -gencert -rfc -infile client.csr -outfile client.crt -validity 9999 -ext bc=ca:false -ext eku=cA
+keytool -storetype jks -keystore client-jks.keystore -storepass password -alias client -certreq -file client.csr
+keytool -storetype jks -keystore ca-jks.keystore -storepass password -alias ca -gencert -rfc -infile client.csr -outfile client.crt -validity 9999 -ext bc=ca:false -ext eku=cA
 
-keytool -storetype pkcs12 -keystore client-pkcs12.keystore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
-keytool -storetype pkcs12 -keystore client-pkcs12.keystore -storepass password -keypass password -importcert -alias client -file client.crt
+keytool -storetype jks -keystore client-jks.keystore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
+keytool -storetype jks -keystore client-jks.keystore -storepass password -keypass password -importcert -alias client -file client.crt
 
 # Create trust store for the client, import the CA cert:
 # -------------------------------------------------------
-keytool -storetype pkcs12 -keystore client-pkcs12.truststore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
+keytool -storetype jks -keystore client-jks.truststore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
 
