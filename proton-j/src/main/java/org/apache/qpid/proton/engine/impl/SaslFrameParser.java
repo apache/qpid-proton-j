@@ -253,9 +253,16 @@ class SaslFrameParser
                 case PRE_PARSE:
                     if(size < 8)
                     {
-                        frameParsingError = new TransportException("specified frame size %d smaller than minimum frame header "
-                                                                   + "size %d",
-                                                                   _size, 8);
+                        frameParsingError = new TransportException(
+                                "specified frame size %d smaller than minimum SASL frame header size 8", size);
+                        state = State.ERROR;
+                        break;
+                    }
+
+                    if (size > 512)
+                    {
+                        frameParsingError = new TransportException(
+                                "specified frame size %d larger than maximum SASL frame size 512", size);
                         state = State.ERROR;
                         break;
                     }
@@ -300,7 +307,7 @@ class SaslFrameParser
                     }
                     else if(dataOffset > size)
                     {
-                        frameParsingError = new TransportException("specified frame data offset %d larger than the frame size %d", dataOffset, _size);
+                        frameParsingError = new TransportException("specified frame data offset %d larger than the frame size %d", dataOffset, size);
                         state = State.ERROR;
                         break;
                     }

@@ -77,6 +77,87 @@ public class SaslFrameParserTest
         verify(_mockSaslFrameHandler).handle(isA(SaslInit.class), (Binary)isNull());
     }
 
+    /*
+     * Test that SASL frames indicating they are over 512 bytes (the minimum max frame size, and the
+     * largest usable during SASL before max frame size is later determined by the Open frames) causes an error.
+     */
+    @Test
+    public void testInputOfFrameWithInvalidSizeExceedingMinMaxFrameSize()
+    {
+        sendAmqpSaslHeader(_frameParserWithMockDecoder);
+
+        // http://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.html#doc-idp43536
+        // Description: '513byte sized' SASL frame header
+        byte[] oversizedSaslFrameHeader = new byte[] { (byte) 0x00, 0x00, 0x02, 0x01, 0x02, 0x01, 0x00, 0x00 };
+
+        try {
+            _frameParserWithMockDecoder.input(ByteBuffer.wrap(oversizedSaslFrameHeader));
+            fail("expected exception");
+        } catch (TransportException e) {
+            assertThat(e.getMessage(), containsString("frame size 513 larger than maximum"));
+        }
+    }
+
+    /*
+     * Test that SASL frames indicating they are under 8 bytes (the minimum size of the frame header) causes an error.
+     */
+    @Test
+    public void testInputOfFrameWithInvalidSizeBelowMinimumPossible()
+    {
+        sendAmqpSaslHeader(_frameParserWithMockDecoder);
+
+        // http://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.html#doc-idp43536
+        // Description: '7byte sized' SASL frame header
+        byte[] undersizedSaslFrameHeader = new byte[] { (byte) 0x00, 0x00, 0x00, 0x07, 0x02, 0x01, 0x00, 0x00 };
+
+        try {
+            _frameParserWithMockDecoder.input(ByteBuffer.wrap(undersizedSaslFrameHeader));
+            fail("expected exception");
+        } catch (TransportException e) {
+            assertThat(e.getMessage(), containsString("frame size 7 smaller than minimum"));
+        }
+    }
+
+    /*
+     * Test that SASL frames indicating a doff under 8 bytes (the minimum size of the frame header) causes an error.
+     */
+    @Test
+    public void testInputOfFrameWithInvalidDoffBelowMinimumPossible()
+    {
+        sendAmqpSaslHeader(_frameParserWithMockDecoder);
+
+        // http://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.html#doc-idp43536
+        // Description: '8byte sized' SASL frame header with invalid doff of 1[*4 = 4bytes]
+        byte[] underMinDoffSaslFrameHeader = new byte[] { (byte) 0x00, 0x00, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00 };
+
+        try {
+            _frameParserWithMockDecoder.input(ByteBuffer.wrap(underMinDoffSaslFrameHeader));
+            fail("expected exception");
+        } catch (TransportException e) {
+            assertThat(e.getMessage(), containsString("data offset 4 smaller than minimum"));
+        }
+    }
+
+    /*
+     * Test that SASL frames indicating a doff larger than the frame size causes an error.
+     */
+    @Test
+    public void testInputOfFrameWithInvalidDoffAboveMaximumPossible()
+    {
+        sendAmqpSaslHeader(_frameParserWithMockDecoder);
+
+        // http://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.html#doc-idp43536
+        // Description: '8byte sized' SASL frame header with invalid doff of 3[*4 = 12bytes]
+        byte[] overFrameSizeDoffSaslFrameHeader = new byte[] { (byte) 0x00, 0x00, 0x00, 0x08, 0x03, 0x01, 0x00, 0x00 };
+
+        try {
+            _frameParserWithMockDecoder.input(ByteBuffer.wrap(overFrameSizeDoffSaslFrameHeader));
+            fail("expected exception");
+        } catch (TransportException e) {
+            assertThat(e.getMessage(), containsString("data offset 12 larger than the frame size 8"));
+        }
+    }
+
     @Test
     public void testInputOfInvalidFrame_causesErrorAndRefusesFurtherInput()
     {

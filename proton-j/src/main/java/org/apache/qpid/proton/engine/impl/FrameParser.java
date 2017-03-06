@@ -340,7 +340,7 @@ class FrameParser implements TransportInput
                     }
                     else if(dataOffset > size)
                     {
-                        frameParsingError = new TransportException("specified frame data offset %d larger than the frame size %d", dataOffset, _size);
+                        frameParsingError = new TransportException("specified frame data offset %d larger than the frame size %d", dataOffset, size);
                         state = State.ERROR;
                         break;
                     }
