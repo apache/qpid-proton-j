@@ -387,6 +387,12 @@ public class DeliveryImpl implements Delivery
     }
 
     @Override
+    public int available()
+    {
+        return _dataSize;
+    }
+
+    @Override
     public boolean isWritable()
     {
         return getLink() instanceof SenderImpl

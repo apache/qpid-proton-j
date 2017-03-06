@@ -413,10 +413,13 @@ public class DeferredSettlementTest extends EngineTestBase
         assertFalse(delivery.isPartial());
         assertTrue(delivery.isReadable());
 
-        byte[] received = new byte[BUFFER_SIZE];
-        int len = clientReceiver.recv(received, 0, BUFFER_SIZE);
+        int size = delivery.available();
+        byte[] received = new byte[size];
 
-        assertTrue("given array was too small", len < BUFFER_SIZE);
+        int len = clientReceiver.recv(received, 0, size);
+
+        assertEquals("Should have received " + size + " bytes", size, len);
+        assertEquals("Should be no bytes left", 0, delivery.available());
 
         Message m = Proton.message();
         m.decode(received, 0, len);

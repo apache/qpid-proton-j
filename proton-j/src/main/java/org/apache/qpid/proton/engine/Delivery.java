@@ -143,4 +143,20 @@ public interface Delivery extends Extendable
      */
     public int getMessageFormat();
 
+    /**
+     * Returns the number of bytes currently available for this delivery, which may not be complete yet, that are still
+     * to either be received by the application or sent by the transport.
+     *
+     * Note that this value will change as bytes are received/sent, and is in general not equal to the total length of
+     * a delivery, except the point where {@link #isPartial()} returns false and no content has yet been received by the
+     * application or sent by the transport.
+     *
+     * @return the number of bytes currently available for the delivery
+     *
+     * @see Receiver#recv(byte[], int, int)
+     * @see Receiver#recv(org.apache.qpid.proton.codec.WritableBuffer)
+     * @see Sender#send(byte[], int, int)
+     * @see Sender#send(org.apache.qpid.proton.codec.ReadableBuffer)
+     */
+    int available();
 }

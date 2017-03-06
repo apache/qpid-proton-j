@@ -22,7 +22,11 @@ package org.apache.qpid.proton.engine.impl;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
+import java.nio.charset.StandardCharsets;
+
+import org.apache.qpid.proton.engine.Delivery;
 import org.apache.qpid.proton.engine.Record;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -73,5 +77,40 @@ public class DeliveryImplTest
         Record attachments = delivery.attachments();
         Record attachments2 = delivery.attachments();
         assertSame("Expected to get the same attachments", attachments, attachments2);
+    }
+
+    @Test
+    public void testAvailable() throws Exception
+    {
+        // Set up a delivery with some data
+        byte[] myData = "myData".getBytes(StandardCharsets.UTF_8);
+
+        DeliveryImpl deliveyImpl = new DeliveryImpl(null, Mockito.mock(LinkImpl.class), null);
+        deliveyImpl.setData(myData);
+        deliveyImpl.setDataLength(myData.length);
+
+        Delivery delivery = deliveyImpl;
+
+        // Check the full data is available
+        assertNotNull("expected the delivery to be present", delivery);
+        assertEquals("unexpectd available count", myData.length, delivery.available());
+
+        // Extract some of the data as the receiver link will, check available gets reduced accordingly.
+        int partLength = 2;
+        int remainderLength = myData.length - partLength;
+        assertTrue(partLength < myData.length);
+
+        byte[] myRecievedData1 = new byte[partLength];
+
+        int received = deliveyImpl.recv(myRecievedData1, 0, myRecievedData1.length);
+        assertEquals("Unexpected data length received", partLength, received);
+        assertEquals("Unexpected data length available", remainderLength, delivery.available());
+
+        // Extract remainder of the data as the receiver link will, check available hits 0.
+        byte[] myRecievedData2 = new byte[remainderLength];
+
+        received = deliveyImpl.recv(myRecievedData2, 0, remainderLength);
+        assertEquals("Unexpected data length received", remainderLength, received);
+        assertEquals("Expected no data to remain available", 0, delivery.available());
     }
 }
