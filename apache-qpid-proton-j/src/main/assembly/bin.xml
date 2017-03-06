@@ -103,7 +103,7 @@
             <fileMode>0644</fileMode>
           </fileSet>
           <fileSet>
-            <outputDirectory>examples/engine</outputDirectory>
+            <outputDirectory>examples/reactor</outputDirectory>
             <includes>
               <include>run</include>
             </includes>
