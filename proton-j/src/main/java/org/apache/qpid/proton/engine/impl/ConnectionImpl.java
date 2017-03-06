@@ -78,10 +78,9 @@ public class ConnectionImpl extends EndpointImpl implements ProtonJConnection
     private static final Symbol[] EMPTY_SYMBOL_ARRAY = new Symbol[0];
 
     /**
-     * @deprecated This constructor's visibility will be reduced to the default scope in a future release.
-     * Client code outside this module should use {@link org.apache.qpid.proton.engine.Connection.Factory#create()} instead.
+     * Application code should use {@link org.apache.qpid.proton.engine.Connection.Factory#create()} instead.
      */
-    @Deprecated public ConnectionImpl()
+    public ConnectionImpl()
     {
     }
 

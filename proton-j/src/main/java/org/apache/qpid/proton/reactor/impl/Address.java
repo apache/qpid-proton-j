@@ -48,17 +48,11 @@ public class Address
         _name = null;
     }
 
-    /**
-     * @deprecated Messenger will be removed from upcoming proton-j releases.
-     */
     public Address()
     {
         clear();
     }
 
-    /**
-     * @deprecated Messenger will be removed from upcoming proton-j releases.
-     */
     public Address(String address)
     {
         clear();

@@ -38,10 +38,9 @@ public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, Proton
     private final SslEngineFacadeFactory _sslEngineFacadeFactory = new SslEngineFacadeFactory();
 
     /**
-     * @deprecated This constructor's visibility will be reduced to the default scope in a future release.
-     * Client code outside this module should use {@link SslDomain.Factory#create()} instead.
+     * Application code should use {@link org.apache.qpid.proton.engine.SslDomain.Factory#create()} instead.
      */
-    @Deprecated public SslDomainImpl()
+    public SslDomainImpl()
     {
     }
 

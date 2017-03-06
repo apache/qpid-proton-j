@@ -27,10 +27,9 @@ public class SslPeerDetailsImpl implements ProtonJSslPeerDetails
     private final int _port;
 
     /**
-     * @deprecated This constructor's visibility will be reduced to the default scope in a future release.
-     * Client code outside this module should use {@link org.apache.qpid.proton.engine.SslPeerDetails.Factory#create(String, int)} instead.
+     * Application code should use {@link org.apache.qpid.proton.engine.SslPeerDetails.Factory#create(String, int)} instead.
      */
-    @Deprecated public SslPeerDetailsImpl(String hostname, int port)
+    public SslPeerDetailsImpl(String hostname, int port)
     {
         _hostname = hostname;
         _port = port;

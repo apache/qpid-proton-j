@@ -143,10 +143,9 @@ public class TransportImpl extends EndpointImpl
     private List<TransportLayer> _additionalTransportLayers;
 
     /**
-     * @deprecated This constructor's visibility will be reduced to the default scope in a future release.
-     * Client code outside this module should use {@link org.apache.qpid.proton.engine.Transport.Factory#create()} instead
+     * Application code should use {@link org.apache.qpid.proton.engine.Transport.Factory#create()} instead
      */
-    @Deprecated public TransportImpl()
+    public TransportImpl()
     {
         this(DEFAULT_MAX_FRAME_SIZE);
     }

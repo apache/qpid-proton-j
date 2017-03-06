@@ -56,19 +56,17 @@ public class MessageImpl implements ProtonJMessage
       };
 
     /**
-     * @deprecated This constructor's visibility will be reduced to the default scope in a future release.
-     * Client code outside this module should use {@link Message.Factory#create()} instead
+     * Application code should use {@link org.apache.qpid.proton.message.Message.Factory#create()} instead.
      */
-    @Deprecated public MessageImpl()
+    public MessageImpl()
     {
     }
 
     /**
-     * @deprecated This constructor's visibility will be reduced to the default scope in a future release.
-     * Client code outside this module should instead use
-     * {@link Message.Factory#create(Header, DeliveryAnnotations, MessageAnnotations, Properties, ApplicationProperties, Section, Footer)}
+     * Application code should instead use
+     * {@link org.apache.qpid.proton.message.Message.Factory#create(Header, DeliveryAnnotations, MessageAnnotations, Properties, ApplicationProperties, Section, Footer)}
      */
-    @Deprecated public MessageImpl(Header header, DeliveryAnnotations deliveryAnnotations, MessageAnnotations messageAnnotations,
+    public MessageImpl(Header header, DeliveryAnnotations deliveryAnnotations, MessageAnnotations messageAnnotations,
                        Properties properties, ApplicationProperties applicationProperties, Section body, Footer footer)
     {
         _header = header;
