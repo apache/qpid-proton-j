@@ -299,7 +299,7 @@ class TransportSession
         // TODO - should this be a copy?
         if(payload != null)
         {
-            if(delivery.getDataLength() == 0)
+            if(delivery.getReadableBytes() == 0)
             {
                 delivery.setData(payload.getArray());
                 delivery.setDataLength(payload.getLength());
@@ -307,9 +307,9 @@ class TransportSession
             }
             else
             {
-                byte[] data = new byte[delivery.getDataLength() + payload.getLength()];
-                System.arraycopy(delivery.getData(), delivery.getDataOffset(), data, 0, delivery.getDataLength());
-                System.arraycopy(payload.getArray(), payload.getArrayOffset(), data, delivery.getDataLength(), payload.getLength());
+                byte[] data = new byte[delivery.getReadableBytes() + payload.getLength()];
+                System.arraycopy(delivery.getData(), delivery.getDataOffset(), data, 0, delivery.getReadableBytes());
+                System.arraycopy(payload.getArray(), payload.getArrayOffset(), data, delivery.getReadableBytes(), payload.getLength());
                 delivery.setData(data);
                 delivery.setDataOffset(0);
                 delivery.setDataLength(data.length);
