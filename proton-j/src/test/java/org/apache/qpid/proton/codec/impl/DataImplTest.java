@@ -22,6 +22,9 @@ package org.apache.qpid.proton.codec.impl;
 
 import static org.junit.Assert.*;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.codec.Data;
@@ -80,5 +83,69 @@ public class DataImplTest
 
         Object[] array = data2.getJavaArray();
         assertArrayEquals("Array not as expected", input, array);
+    }
+
+    @Test
+    public void testEncodeString32()
+    {
+        byte[] strPayload = createStringPayloadBytes(256);
+        String content = new String(strPayload, StandardCharsets.UTF_8);
+        assertTrue("Length must be over 255 to ensure use of str32 encoding", content.length() > 255);
+
+        int encodedSize = 1 + 4 + strPayload.length; // 1b type + 4b length + content
+        ByteBuffer expectedEncoding = ByteBuffer.allocate(encodedSize);
+        expectedEncoding.put((byte) 0xB1);
+        expectedEncoding.putInt(strPayload.length);
+        expectedEncoding.put(strPayload);
+
+        Data data = new DataImpl();
+        data.putString(content);
+
+        Binary encoded = data.encode();
+
+        assertEquals("unexpected encoding", new Binary(expectedEncoding.array()), encoded);
+    }
+
+    @Test
+    public void testEncodeDecodeString32()
+    {
+        byte[] payload = createStringPayloadBytes(1025);
+        String content = new String(payload, StandardCharsets.UTF_8);
+        assertTrue("Length must be over 255 to ensure use of str32 encoding", content.length() > 255);
+
+        doEncodeDecodeStringTestImpl(content);
+    }
+
+    @Test
+    public void testEncodeDecodeString8()
+    {
+        String content = "testRoundTripString8";
+        assertTrue("Length must be <= 255 to allow use of str8 encoding", content.length() <= 255);
+
+        doEncodeDecodeStringTestImpl("testRoundTripString8");
+    }
+
+    private void doEncodeDecodeStringTestImpl(String string)
+    {
+        Data data = new DataImpl();
+        data.putString(string);
+
+        Binary encoded = data.encode();
+
+        Data data2 = new DataImpl();
+        data2.decode(encoded.asByteBuffer());
+
+        assertEquals("unexpected type", Data.DataType.STRING, data2.type());
+        assertEquals("unexpected string", string, data2.getString());
+    }
+
+    private byte[] createStringPayloadBytes(int length)
+    {
+        byte[] payload = new byte[length];
+        for (int i = 0; i < length; i++) {
+            payload[i] = (byte) ((i % 10) + 48);
+        }
+
+        return payload;
     }
 }

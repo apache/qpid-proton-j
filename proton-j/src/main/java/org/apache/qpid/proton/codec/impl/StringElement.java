@@ -127,7 +127,7 @@ class StringElement extends AtomicElement<String>
         else
         {
             b.put((byte)0xb1);
-            b.put((byte)length);
+            b.putInt(length);
         }
         b.put(bytes);
         return size;
