@@ -76,8 +76,10 @@ class MapElement extends AbstractElement<Map<Object,Object>>
                     size += 2;
                 }
             }
-            size += 8;
-
+            else
+            {
+                size += 8;
+            }
         }
         else
         {

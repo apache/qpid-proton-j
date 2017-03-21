@@ -86,6 +86,132 @@ public class DataImplTest
     }
 
     @Test
+    public void testEncodeArrayOfLists()
+    {
+        // encode an array of two empty lists
+        Data data = new DataImpl();
+        data.putArray(false, Data.DataType.LIST);
+        data.enter();
+        data.putList();
+        data.putList();
+        data.exit();
+
+        int expectedEncodedSize = 4; // 1b type + 1b size + 1b length + 1b element constructor
+
+
+        Binary encoded = data.encode();
+        assertEquals("unexpected encoding size", expectedEncodedSize, encoded.getLength());
+
+        ByteBuffer expectedEncoding = ByteBuffer.allocate(expectedEncodedSize);
+        expectedEncoding.put((byte)0xe0);   // constructor
+        expectedEncoding.put((byte)2);   // size
+        expectedEncoding.put((byte)2);   // count
+        expectedEncoding.put((byte)0x45);   // element constructor
+
+        assertEquals("unexpected encoding", new Binary(expectedEncoding.array()), encoded);
+
+        data = new DataImpl();
+        data.putArray(false, Data.DataType.LIST);
+        data.enter();
+        data.putList();
+        data.putList();
+        data.putList();
+        data.enter();
+        data.putNull();
+        data.exit();
+        data.exit();
+
+        expectedEncodedSize = 11; // 1b type + 1b size + 1b length + 1b element constructor + 3 * (1b size + 1b count) + 1b null elt
+
+        encoded = data.encode();
+        assertEquals("unexpected encoding size", expectedEncodedSize, encoded.getLength());
+
+        expectedEncoding = ByteBuffer.allocate(expectedEncodedSize);
+        expectedEncoding.put((byte)0xe0);   // constructor
+        expectedEncoding.put((byte)9);   // size
+        expectedEncoding.put((byte)3);   // count
+        expectedEncoding.put((byte)0xc0);   // element constructor
+        expectedEncoding.put((byte)1);   // size
+        expectedEncoding.put((byte)0);   // count
+        expectedEncoding.put((byte)1);   // size
+        expectedEncoding.put((byte)0);   // count
+        expectedEncoding.put((byte)2);   // size
+        expectedEncoding.put((byte)1);   // count
+        expectedEncoding.put((byte)0x40);   // null value
+
+        assertEquals("unexpected encoding", new Binary(expectedEncoding.array()), encoded);
+
+        data = new DataImpl();
+        data.putArray(false, Data.DataType.LIST);
+        data.enter();
+        data.putList();
+        data.putList();
+        data.putList();
+        data.enter();
+        for(int i = 0; i < 256; i++)
+        {
+            data.putNull();
+        }
+        data.exit();
+        data.exit();
+
+        expectedEncodedSize = 290; // 1b type + 4b size + 4b length + 1b element constructor + 3 * (4b size + 4b count) + (256 * 1b) null elt
+        encoded = data.encode();
+        assertEquals("unexpected encoding size", expectedEncodedSize, encoded.getLength());
+
+        expectedEncoding = ByteBuffer.allocate(expectedEncodedSize);
+        expectedEncoding.put((byte)0xf0);   // constructor
+        expectedEncoding.putInt(285);   // size
+        expectedEncoding.putInt(3);   // count
+        expectedEncoding.put((byte)0xd0);   // element constructor
+        expectedEncoding.putInt(4);   // size
+        expectedEncoding.putInt(0);   // count
+        expectedEncoding.putInt(4);   // size
+        expectedEncoding.putInt(0);   // count
+        expectedEncoding.putInt(260);   // size
+        expectedEncoding.putInt(256);   // count
+        for(int i = 0; i < 256; i++)
+        {
+            expectedEncoding.put((byte)0x40);   // null value
+        }
+
+        assertEquals("unexpected encoding", new Binary(expectedEncoding.array()), encoded);
+
+    }
+
+    @Test
+    public void testEncodeArrayOfMaps()
+    {
+        // encode an array of two empty maps
+        Data data = new DataImpl();
+        data.putArray(false, Data.DataType.MAP);
+        data.enter();
+        data.putMap();
+        data.putMap();
+        data.exit();
+
+        int expectedEncodedSize = 8; // 1b type + 1b size + 1b length + 1b element constructor + 2 * (1b size + 1b count)
+
+
+        Binary encoded = data.encode();
+        assertEquals("unexpected encoding size", expectedEncodedSize, encoded.getLength());
+
+        ByteBuffer expectedEncoding = ByteBuffer.allocate(expectedEncodedSize);
+        expectedEncoding.put((byte) 0xe0);   // constructor
+        expectedEncoding.put((byte) 6);   // size
+        expectedEncoding.put((byte) 2);   // count
+        expectedEncoding.put((byte) 0xc1);   // element constructor
+        expectedEncoding.put((byte)1);   // size
+        expectedEncoding.put((byte)0);   // count
+        expectedEncoding.put((byte)1);   // size
+        expectedEncoding.put((byte)0);   // count
+
+
+        assertEquals("unexpected encoding", new Binary(expectedEncoding.array()), encoded);
+
+    }
+
+        @Test
     public void testEncodeString32()
     {
         byte[] strPayload = createStringPayloadBytes(256);

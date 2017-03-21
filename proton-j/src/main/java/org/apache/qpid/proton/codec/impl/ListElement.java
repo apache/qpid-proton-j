@@ -83,7 +83,10 @@ class ListElement extends AbstractElement<List<Object>>
                     size += 2;
                 }
             }
-            size += 8;
+            else
+            {
+                size += 8;
+            }
 
         }
         else
