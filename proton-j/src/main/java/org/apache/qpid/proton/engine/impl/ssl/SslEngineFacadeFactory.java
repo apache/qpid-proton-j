@@ -130,10 +130,7 @@ public class SslEngineFacadeFactory
             PrivateKeyInfoClassResult = Class.forName("org.bouncycastle.asn1.pkcs.PrivateKeyInfo");
             getPrivateKeyMethodResult = jcaPEMKeyConverterClass.getMethod("getPrivateKey", PrivateKeyInfoClassResult);
 
-            // Try loading BC as a provider
-            Class<?> klass = Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider");
-            Provider provider = (Provider) klass.getConstructor().newInstance();
-            Security.addProvider(provider);
+            registerBouncyCastleProvider();
         }
         catch (Exception e)
         {
@@ -152,6 +149,23 @@ public class SslEngineFacadeFactory
             builderMethod = builderMethodResult;
             PrivateKeyInfoClass = PrivateKeyInfoClassResult;
             bouncyCastleSetupException = bouncyCastleSetupExceptionResult;
+        }
+    }
+
+    static void registerBouncyCastleProvider()
+            throws ClassNotFoundException, InstantiationException, IllegalAccessException,
+                   InvocationTargetException, NoSuchMethodException
+    {
+        // Try loading BC as a provider
+        Class<?> klass = Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider");
+
+        Provider bouncyCastleProvider = (Provider) klass.getConstructor().newInstance();
+        synchronized (Security.class)
+        {
+            if(Security.getProvider(bouncyCastleProvider.getName()) == null)
+            {
+                Security.addProvider(bouncyCastleProvider);
+            }
         }
     }
 

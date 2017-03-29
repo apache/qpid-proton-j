@@ -18,6 +18,7 @@
  */
 package org.apache.qpid.proton.engine.impl.ssl;
 
+import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertNotNull;
 
 import java.net.URL;
@@ -28,6 +29,21 @@ public class SslEngineFacadeFactoryTest {
 
     private static final String PASSWORD = "unittest";
 
+    @Test
+    public void testDuplicateRegistrationOfSecurityProvider() {
+        // ensure the provider is already registered
+        SslEngineFacadeFactory factory = new SslEngineFacadeFactory();
+
+        try
+        {
+            SslEngineFacadeFactory.registerBouncyCastleProvider();
+        }
+        catch (Exception e)
+        {
+            fail("Exception thrown when re-registering BouncyCastle provider " + e.getMessage());
+        }
+    }
+    
     @Test
     public void testCertifcateLoad() {
         String ipFile = resolveFilename("cert.pem.txt");
