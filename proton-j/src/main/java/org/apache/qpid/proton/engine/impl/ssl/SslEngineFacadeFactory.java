@@ -45,6 +45,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -350,8 +351,11 @@ public class SslEngineFacadeFactory
                 {
                     _logger.log(Level.FINE, "_sslParams.getTrustedCaDb() : " + sslDomain.getTrustedCaDb());
                 }
-                Certificate trustedCaCert = readCertificate(sslDomain.getTrustedCaDb());
-                keystore.setCertificateEntry(caCertAlias, trustedCaCert);
+                int i = 1;
+                for(Certificate trustedCaCert : readCertificates(sslDomain.getTrustedCaDb()))
+                {
+                    keystore.setCertificateEntry(caCertAlias + (i++), trustedCaCert);
+                }
             }
 
             if (sslDomain.getCertificateFile() != null
@@ -467,6 +471,35 @@ public class SslEngineFacadeFactory
             closeSafely(is);
         }
     }
+
+    Collection<? extends Certificate> readCertificates(String pemFile)
+    {
+        InputStream is = null;
+
+        try
+        {
+            CertificateFactory cFactory = CertificateFactory.getInstance("X.509");
+            is = new FileInputStream(pemFile);
+            return cFactory.generateCertificates(is);
+        }
+        catch (CertificateException ce)
+        {
+            String msg = "Failed to load certificates [" + pemFile + "]";
+            _logger.log(Level.SEVERE, msg, ce);
+            throw new TransportException(msg, ce);
+        }
+        catch (FileNotFoundException e)
+        {
+            String msg = "Certificates file not found [" + pemFile + "]";
+            _logger.log(Level.SEVERE, msg);
+            throw new TransportException(msg, e);
+        }
+        finally
+        {
+            closeSafely(is);
+        }
+    }
+
 
     PrivateKey readPrivateKey(String pemFile, String password)
     {
