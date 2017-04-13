@@ -26,6 +26,7 @@ import static org.apache.qpid.proton.engine.impl.ByteBufferUtils.pourAll;
 import static org.apache.qpid.proton.engine.impl.ByteBufferUtils.pourBufferToArray;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -443,8 +444,8 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     {
         client();
         _chosenMechanism = Symbol.valueOf("PLAIN");
-        byte[] usernameBytes = username.getBytes();
-        byte[] passwordBytes = password.getBytes();
+        byte[] usernameBytes = username.getBytes(StandardCharsets.UTF_8);
+        byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);
         byte[] data = new byte[usernameBytes.length+passwordBytes.length+2];
         System.arraycopy(usernameBytes, 0, data, 1, usernameBytes.length);
         System.arraycopy(passwordBytes, 0, data, 2+usernameBytes.length, passwordBytes.length);
