@@ -24,6 +24,7 @@ import java.util.EnumSet;
 import java.util.Map;
 
 import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
 import org.apache.qpid.proton.amqp.transport.Source;
@@ -49,6 +50,8 @@ public abstract class LinkImpl extends EndpointImpl implements Link
     private int _credit;
     private int _unsettled;
     private int _drained;
+    private UnsignedLong _maxMessageSize;
+    private UnsignedLong _remoteMaxMessageSize;
 
     private SenderSettleMode _senderSettleMode;
     private SenderSettleMode _remoteSenderSettleMode;
@@ -451,6 +454,29 @@ public abstract class LinkImpl extends EndpointImpl implements Link
     }
 
     @Override
+    public UnsignedLong getMaxMessageSize()
+    {
+        return _maxMessageSize;
+    }
+
+    @Override
+    public void setMaxMessageSize(UnsignedLong maxMessageSize)
+    {
+        _maxMessageSize = maxMessageSize;
+    }
+
+    @Override
+    public UnsignedLong getRemoteMaxMessageSize()
+    {
+        return _remoteMaxMessageSize;
+    }
+
+    void setRemoteMaxMessageSize(UnsignedLong remoteMaxMessageSize)
+    {
+        _remoteMaxMessageSize = remoteMaxMessageSize;
+    }
+
+    @Override
     public int drained()
     {
         int drained = 0;
@@ -511,5 +537,4 @@ public abstract class LinkImpl extends EndpointImpl implements Link
     {
         return _detached;
     }
-
 }

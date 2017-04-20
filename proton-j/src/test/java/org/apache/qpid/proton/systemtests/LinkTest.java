@@ -36,14 +36,19 @@ import java.util.logging.Logger;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.Source;
 import org.apache.qpid.proton.amqp.messaging.Target;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
+import org.apache.qpid.proton.engine.Connection;
 import org.apache.qpid.proton.engine.Delivery;
 import org.apache.qpid.proton.engine.Link;
+import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.engine.Sender;
+import org.apache.qpid.proton.engine.Session;
+import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.message.Message;
 import org.junit.Test;
 
@@ -57,6 +62,8 @@ public class LinkTest extends EngineTestBase
     private static final Integer RCV_PROP_VAL = 1234;
     private static final Symbol SND_PROP = Symbol.valueOf("SenderPropName");
     private static final Integer SND_PROP_VAL = 5678;
+    private static final UnsignedLong CLIENT_MAX_MSG_SIZE = UnsignedLong.valueOf(54321);
+    private static final UnsignedLong SERVER_MAX_MSG_SIZE = UnsignedLong.valueOf(12345);
 
     private final String _sourceAddress = getServer().containerId + "-link1-source";
 
@@ -428,6 +435,103 @@ public class LinkTest extends EngineTestBase
 
         assertLinkCreditState(getServer().sender, 2, 0, 2);
         assertLinkCreditState(getClient().receiver, 2, 0, 2);
+    }
+
+    //TODO
+    @Test
+    public void testMaxMessageSizeValue() throws Exception
+    {
+        LOGGER.fine(bold("======== About to create transports"));
+
+        Transport clientTransport = Proton.transport();
+        getClient().setTransport(clientTransport);
+        ProtocolTracerEnabler.setProtocolTracer(clientTransport, TestLoggingHelper.CLIENT_PREFIX);
+
+        Transport serverTransport = Proton.transport();
+        getServer().setTransport(serverTransport);
+        ProtocolTracerEnabler.setProtocolTracer(serverTransport, "            " + TestLoggingHelper.SERVER_PREFIX);
+
+        doOutputInputCycle();
+
+        Connection clientConnection = Proton.connection();
+        getClient().setConnection(clientConnection);
+        clientTransport.bind(clientConnection);
+
+        Connection serverConnection = Proton.connection();
+        getServer().setConnection(serverConnection);
+        serverTransport.bind(serverConnection);
+
+        LOGGER.fine(bold("======== About to open connections"));
+        clientConnection.open();
+        serverConnection.open();
+
+        doOutputInputCycle();
+
+        LOGGER.fine(bold("======== About to open sessions"));
+        Session clientSession = clientConnection.session();
+        getClient().setSession(clientSession);
+        clientSession.open();
+
+        pumpClientToServer();
+
+        Session serverSession = serverConnection.sessionHead(of(UNINITIALIZED), of(ACTIVE));
+        getServer().setSession(serverSession);
+
+        serverSession.open();
+
+        pumpServerToClient();
+
+        LOGGER.fine(bold("======== About to create receiver"));
+
+        Source clientSource = new Source();
+        getClient().setSource(clientSource);
+        clientSource.setAddress(_sourceAddress);
+
+        Target clientTarget = new Target();
+        getClient().setTarget(clientTarget);
+        clientTarget.setAddress(null);
+
+        Receiver clientReceiver = clientSession.receiver("link1");
+        getClient().setReceiver(clientReceiver);
+        clientReceiver.setTarget(clientTarget);
+        clientReceiver.setSource(clientSource);
+
+        clientReceiver.setReceiverSettleMode(ReceiverSettleMode.FIRST);
+        clientReceiver.setSenderSettleMode(SenderSettleMode.UNSETTLED);
+
+        // Set the local link max-message-size
+        assertNull("Expected no value to be set", clientReceiver.getMaxMessageSize());
+        clientReceiver.setMaxMessageSize(CLIENT_MAX_MSG_SIZE);
+        assertEquals("Expected value to be set", CLIENT_MAX_MSG_SIZE, clientReceiver.getMaxMessageSize());
+
+        clientReceiver.open();
+        pumpClientToServer();
+
+        LOGGER.fine(bold("======== About to set up implicitly created sender"));
+
+        Sender serverSender = (Sender) getServer().getConnection().linkHead(of(UNINITIALIZED), of(ACTIVE));
+        getServer().setSender(serverSender);
+
+        serverSender.setReceiverSettleMode(serverSender.getRemoteReceiverSettleMode());
+        serverSender.setSenderSettleMode(serverSender.getRemoteSenderSettleMode());
+
+        org.apache.qpid.proton.amqp.transport.Source serverRemoteSource = serverSender.getRemoteSource();
+        serverSender.setSource(serverRemoteSource);
+
+        assertEquals("Expected value to be set", CLIENT_MAX_MSG_SIZE, serverSender.getRemoteMaxMessageSize());
+
+        // Set the local link max-message-size
+        assertNull("Expected no value to be set", serverSender.getMaxMessageSize());
+        serverSender.setMaxMessageSize(SERVER_MAX_MSG_SIZE);
+        assertEquals("Expected value to be set", SERVER_MAX_MSG_SIZE, serverSender.getMaxMessageSize());
+
+        serverSender.open();
+
+        assertNull("Expected no value to be present yet", clientReceiver.getRemoteMaxMessageSize());
+
+        pumpServerToClient();
+
+        assertEquals("Expected value to be set", SERVER_MAX_MSG_SIZE, clientReceiver.getRemoteMaxMessageSize());
     }
 
     void assertLinkCreditState(Link link, int credit, int queued, int remoteCredit)

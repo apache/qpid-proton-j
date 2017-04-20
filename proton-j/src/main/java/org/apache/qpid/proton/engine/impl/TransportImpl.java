@@ -790,6 +790,11 @@ public class TransportImpl extends EndpointImpl
                                 attach.setDesiredCapabilities(link.getDesiredCapabilities());
                             }
 
+                            if(link.getMaxMessageSize() != null)
+                            {
+                                attach.setMaxMessageSize(link.getMaxMessageSize());
+                            }
+
                             attach.setRole(endpoint instanceof ReceiverImpl ? Role.RECEIVER : Role.SENDER);
 
                             if(link instanceof SenderImpl)
@@ -1212,6 +1217,8 @@ public class TransportImpl extends EndpointImpl
 
                 link.setRemoteDesiredCapabilities(attach.getDesiredCapabilities());
                 link.setRemoteOfferedCapabilities(attach.getOfferedCapabilities());
+
+                link.setRemoteMaxMessageSize(attach.getMaxMessageSize());
 
                 transportLink.setName(attach.getName());
                 transportLink.setRemoteHandle(handle);
