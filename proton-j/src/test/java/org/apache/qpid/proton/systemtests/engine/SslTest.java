@@ -52,6 +52,9 @@ public class SslTest
     private static final String CLIENT_JKS_TRUSTSTORE = "src/test/resources/client-jks.truststore";
     private static final String PASSWORD = "password";
 
+    private static final String SERVER_2_JKS_KEYSTORE = "src/test/resources/server2-jks.keystore";
+    private static final String CA_CERTS = "src/test/resources/ca-certs.crt";
+
     private static final String SERVER_CONTAINER = "serverContainer";
     private static final String CLIENT_CONTAINER = "clientContainer";
 
@@ -64,7 +67,7 @@ public class SslTest
     private final Connection _serverConnection = Proton.connection();
 
     @Test
-    public void testOpenConnectionOverSslTransports() throws Exception
+    public void testOpenConnectionsWithProvidedSslContext() throws Exception
     {
         SslDomain clientSslDomain = SslDomain.Factory.create();
         clientSslDomain.init(Mode.CLIENT);
@@ -168,5 +171,75 @@ public class SslTest
     {
         assertEquals("Unexpected local state", localState, endpoint.getLocalState());
         assertEquals("Unexpected remote state", remoteState, endpoint.getRemoteState());
+    }
+
+    @Test
+    public void testMultiplePemTrustCertificates() throws Exception
+    {
+        doMultiplePemTrustCertificatesTestImpl(SERVER_JKS_KEYSTORE);
+        doMultiplePemTrustCertificatesTestImpl(SERVER_2_JKS_KEYSTORE);
+    }
+
+    private void doMultiplePemTrustCertificatesTestImpl(String serverKeystore) throws Exception {
+        Transport clientTransport = Proton.transport();
+        Transport serverTransport = Proton.transport();
+
+        TransportPumper pumper = new TransportPumper(clientTransport, serverTransport);
+
+        Connection clientConnection = Proton.connection();
+        Connection serverConnection = Proton.connection();
+
+        SslDomain clientSslDomain = SslDomain.Factory.create();
+        clientSslDomain.init(Mode.CLIENT);
+        clientSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER);
+        clientSslDomain.setTrustedCaDb(CA_CERTS);
+        clientTransport.ssl(clientSslDomain);
+
+        SslDomain serverSslDomain = SslDomain.Factory.create();
+        serverSslDomain.init(Mode.SERVER);
+        SSLContext serverSslContext = createSslContext(serverKeystore, PASSWORD, SERVER_JKS_TRUSTSTORE, PASSWORD);
+        serverSslDomain.setSslContext(serverSslContext);
+        serverTransport.ssl(serverSslDomain);
+
+        clientConnection.setContainer(CLIENT_CONTAINER);
+        serverConnection.setContainer(SERVER_CONTAINER);
+
+        clientTransport.bind(clientConnection);
+        serverTransport.bind(serverConnection);
+
+        assertConditions(clientTransport);
+        assertConditions(serverTransport);
+
+        clientConnection.open();
+
+        assertEndpointState(clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(serverConnection, UNINITIALIZED, UNINITIALIZED);
+
+        assertConditions(clientTransport);
+        assertConditions(serverTransport);
+
+        pumper.pumpAll();
+
+        assertEndpointState(clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(serverConnection, UNINITIALIZED, ACTIVE);
+
+        assertConditions(clientTransport);
+        assertConditions(serverTransport);
+
+        serverConnection.open();
+
+        assertEndpointState(clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(serverConnection, ACTIVE, ACTIVE);
+
+        assertConditions(clientTransport);
+        assertConditions(serverTransport);
+
+        pumper.pumpAll();
+
+        assertEndpointState(clientConnection, ACTIVE, ACTIVE);
+        assertEndpointState(serverConnection, ACTIVE, ACTIVE);
+
+        assertConditions(clientTransport);
+        assertConditions(serverTransport);
     }
 }

@@ -57,3 +57,24 @@ keytool -storetype jks -keystore client-jks.keystore -storepass password -keypas
 # -------------------------------------------------------
 keytool -storetype jks -keystore client-jks.truststore -storepass password -keypass password -importcert -alias ca -file ca.crt -noprompt
 
+
+# Create a key and self-signed certificate for a second CA, to sign certificate requests and use for trust:
+# ---------------------------------------------------------------------------------------------------------
+
+keytool -storetype jks -keystore ca2-jks.keystore -storepass password -keypass password -alias ca2 -genkey -dname "O=My Other Trusted Inc.,CN=my-ca2.org" -validity 9999 -ext bc:c=ca:true
+keytool -storetype jks -keystore ca2-jks.keystore -storepass password -alias ca2 -exportcert -rfc > ca2.crt
+
+# Create a key pair for a second server, and sign it with the second CA:
+# ----------------------------------------------------------------------
+keytool -storetype jks -keystore server2-jks.keystore -storepass password -keypass password -alias server2 -genkey -dname "O=Server2,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
+
+keytool -storetype jks -keystore server2-jks.keystore -storepass password -alias server2 -certreq -file server2.csr
+keytool -storetype jks -keystore ca2-jks.keystore -storepass password -alias ca2 -gencert -rfc -infile server2.csr -outfile server2.crt -validity 9999 -ext bc=ca:false -ext eku=sA
+
+keytool -storetype jks -keystore server2-jks.keystore -storepass password -keypass password -importcert -alias ca2 -file ca2.crt -noprompt
+keytool -storetype jks -keystore server2-jks.keystore -storepass password -keypass password -importcert -alias server2 -file server2.crt
+
+# Create a file containing both CA certs to use for trusting both:
+# ----------------------------------------------------------------
+cat ca.crt > ca-certs.crt
+cat ca2.crt >> ca-certs.crt
