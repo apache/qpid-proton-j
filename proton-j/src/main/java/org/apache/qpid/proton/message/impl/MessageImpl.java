@@ -30,6 +30,7 @@ import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.messaging.*;
 import org.apache.qpid.proton.codec.*;
 import org.apache.qpid.proton.message.*;
+import org.apache.qpid.proton.util.TLSEncoder;
 
 public class MessageImpl implements ProtonJMessage
 {
@@ -40,20 +41,6 @@ public class MessageImpl implements ProtonJMessage
     private ApplicationProperties _applicationProperties;
     private Section _body;
     private Footer _footer;
-    
-    private static class EncoderDecoderPair {
-      DecoderImpl decoder = new DecoderImpl();
-      EncoderImpl encoder = new EncoderImpl(decoder);
-      {
-          AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-      }
-    }
-
-    private static final ThreadLocal<EncoderDecoderPair> tlsCodec = new ThreadLocal<EncoderDecoderPair>() {
-          @Override protected EncoderDecoderPair initialValue() {
-            return new EncoderDecoderPair();
-          }
-      };
 
     /**
      * Application code should use {@link org.apache.qpid.proton.message.Message.Factory#create()} instead.
@@ -576,7 +563,7 @@ public class MessageImpl implements ProtonJMessage
 
     public void decode(ByteBuffer buffer)
     {
-        DecoderImpl decoder = tlsCodec.get().decoder;
+        DecoderImpl decoder = TLSEncoder.getDecoder();
         decoder.setByteBuffer(buffer);
 
         _header = null;
@@ -707,7 +694,7 @@ public class MessageImpl implements ProtonJMessage
     public int encode(WritableBuffer buffer)
     {
         int length = buffer.remaining();
-        EncoderImpl encoder = tlsCodec.get().encoder;
+        EncoderImpl encoder = TLSEncoder.getEncoder();
         encoder.setByteBuffer(buffer);
 
         if(getHeader() != null)
