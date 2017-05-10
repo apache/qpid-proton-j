@@ -366,9 +366,10 @@ public class DeliveryImpl implements Delivery
         return _offset;
     }
 
-    int getDataLength()
+    @Override
+    public int getDataLength()
     {
-        return _dataSize;  //TODO - Implement.
+        return _dataSize;
     }
 
     void setData(byte[] data)

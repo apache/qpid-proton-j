@@ -54,6 +54,9 @@ public interface Delivery extends Extendable
      */
     public void settle();
 
+    /** This will expose the length of the current delivery buffer. */
+    int getDataLength();
+
     /**
      * Returns whether this delivery has been settled.
      *
