@@ -159,7 +159,12 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
                 org.apache.qpid.proton.amqp.security.SaslOutcome outcome =
                         new org.apache.qpid.proton.amqp.security.SaslOutcome();
                 outcome.setCode(SaslCode.values()[_outcome.getCode()]);
+                if (_outcome == PN_SASL_OK)
+                {
+                    outcome.setAdditionalData(getChallengeResponse());
+                }
                 writeFrame(outcome);
+                setChallengeResponse(null);
             }
         }
         else if(_role == Role.CLIENT)
@@ -394,6 +399,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         checkRole(Role.CLIENT);
         for(SaslOutcome outcome : SaslOutcome.values())
         {
+            setPending(saslOutcome.getAdditionalData()  == null ? null : saslOutcome.getAdditionalData().asByteBuffer());
             if(outcome.getCode() == saslOutcome.getCode().ordinal())
             {
                 _outcome = outcome;
