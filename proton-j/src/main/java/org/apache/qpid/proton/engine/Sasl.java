@@ -119,7 +119,7 @@ public interface Sasl
     int pending();
 
     /**
-     * Read challenge/response data sent from the peer.
+     * Read challenge/response/additional data sent from the peer.
      *
      * Use pending to determine the size of the data.
      *
@@ -131,7 +131,7 @@ public interface Sasl
     int recv(byte[] bytes, int offset, int size);
 
     /**
-     * Send challenge or response data to the peer.
+     * Send challenge/response/additional data to the peer.
      *
      * @param bytes The challenge/response data.
      * @param offset the point within the array at which the data starts at
