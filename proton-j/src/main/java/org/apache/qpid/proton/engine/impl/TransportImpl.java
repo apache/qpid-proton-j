@@ -102,7 +102,7 @@ public class TransportImpl extends EndpointImpl
     private EncoderImpl _encoder = new EncoderImpl(_decoder);
 
     private int _maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
-    private int _remoteMaxFrameSize = 512;
+    private int _remoteMaxFrameSize = MIN_MAX_FRAME_SIZE;
     private int _channelMax       = CHANNEL_MAX_LIMIT;
     private int _remoteChannelMax = CHANNEL_MAX_LIMIT;
 
@@ -192,6 +192,17 @@ public class TransportImpl extends EndpointImpl
     public int getRemoteMaxFrameSize()
     {
         return _remoteMaxFrameSize;
+    }
+
+    @Override
+    public void setInitialRemoteMaxFrameSize(int remoteMaxFrameSize)
+    {
+        if(_init)
+        {
+            throw new IllegalStateException("Cannot set initial remote max frame size after transport has been initialised");
+        }
+
+        _remoteMaxFrameSize = remoteMaxFrameSize;
     }
 
     @Override

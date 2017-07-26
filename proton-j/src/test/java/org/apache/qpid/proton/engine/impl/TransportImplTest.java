@@ -71,7 +71,6 @@ import org.mockito.Mockito;
 
 public class TransportImplTest
 {
-    @SuppressWarnings("deprecation")
     private TransportImpl _transport = new TransportImpl();
 
     private static final int CHANNEL_ID = 1;
@@ -136,7 +135,6 @@ public class TransportImplTest
     @Test
     public void testEmptyInputWhenRemoteConnectionIsClosedUsingOldApi_isAllowed()
     {
-        @SuppressWarnings("deprecation")
         ConnectionImpl connection = new ConnectionImpl();
         _transport.bind(connection);
         connection.setRemoteState(EndpointState.CLOSED);
@@ -174,7 +172,6 @@ public class TransportImplTest
     @Test
     public void testBoundTransport_continuesToHandleFrames()
     {
-        @SuppressWarnings("deprecation")
         Connection connection = new ConnectionImpl();
 
         assertTrue(_transport.isHandlingFrames());
@@ -217,7 +214,6 @@ public class TransportImplTest
         int smallMaxFrameSize = 512;
         _transport = new TransportImpl(smallMaxFrameSize);
 
-        @SuppressWarnings("deprecation")
         Connection conn = new ConnectionImpl();
         _transport.bind(conn);
 
@@ -1636,5 +1632,39 @@ public class TransportImplTest
 
         assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
         assertTrue("Unexpected frame type", transport.writes.get(3) instanceof Detach);
+    }
+
+    @Test
+    public void testInitialRemoteMaxFrameSizeOverride()
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        transport.setInitialRemoteMaxFrameSize(768);
+
+        assertEquals("Unexpected value : " + getFrameTypesWritten(transport), 768, transport.getRemoteMaxFrameSize());
+
+        Connection connection = Proton.connection();
+        transport.bind(connection);
+        connection.open();
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+
+        try
+        {
+            transport.setInitialRemoteMaxFrameSize(12345);
+            fail("expected an exception");
+        }
+        catch (IllegalStateException ise )
+        {
+            //expected
+        }
+
+        // Send the necessary responses to open
+        Open open = new Open();
+        open.setMaxFrameSize(UnsignedInteger.valueOf(4567));
+        transport.handleFrame(new TransportFrame(0, open, null));
+
+        assertEquals("Unexpected value : " + getFrameTypesWritten(transport), 4567, transport.getRemoteMaxFrameSize());
     }
 }

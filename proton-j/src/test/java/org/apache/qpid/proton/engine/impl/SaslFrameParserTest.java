@@ -36,6 +36,7 @@ import org.apache.qpid.proton.codec.ByteBufferDecoder;
 import org.apache.qpid.proton.codec.DecodeException;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
+import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
 import org.junit.Test;
 
@@ -47,7 +48,7 @@ public class SaslFrameParserTest
     private final SaslFrameHandler _mockSaslFrameHandler = mock(SaslFrameHandler.class);
     private final ByteBufferDecoder _mockDecoder = mock(ByteBufferDecoder.class);
     private final SaslFrameParser _frameParser;
-    private final SaslFrameParser _frameParserWithMockDecoder = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder);
+    private final SaslFrameParser _frameParserWithMockDecoder = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder, Transport.MIN_MAX_FRAME_SIZE);
     private final AmqpFramer _amqpFramer = new AmqpFramer();
 
     private final SaslInit _saslFrameBody;
@@ -59,7 +60,7 @@ public class SaslFrameParserTest
         EncoderImpl encoder = new EncoderImpl(decoder);
         AMQPDefinedTypes.registerAllTypes(decoder,encoder);
 
-        _frameParser = new SaslFrameParser(_mockSaslFrameHandler, decoder);
+        _frameParser = new SaslFrameParser(_mockSaslFrameHandler, decoder, Transport.MIN_MAX_FRAME_SIZE);
         _saslFrameBody = new SaslInit();
         _saslFrameBody.setMechanism(Symbol.getSymbol("unused"));
         _saslFrameBytes = ByteBuffer.wrap(_amqpFramer.generateSaslFrame(0, new byte[0], _saslFrameBody));
@@ -95,6 +96,28 @@ public class SaslFrameParserTest
             fail("expected exception");
         } catch (TransportException e) {
             assertThat(e.getMessage(), containsString("frame size 513 larger than maximum"));
+        }
+    }
+
+    /*
+     * Test that when the frame parser is created with a size limit above the 512 byte min-max-frame-size, frames
+     * arriving with headers indicating they are over this size causes an exception.
+     */
+    @Test
+    public void testInputOfFrameWithInvalidSizeWhenSpecifyingLargeMaxFrameSize()
+    {
+        SaslFrameParser frameParserWithLargeMaxSize = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder, 2017);
+        sendAmqpSaslHeader(frameParserWithLargeMaxSize);
+
+        // http://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.html#doc-idp43536
+        // Description: '2057byte sized' SASL frame header
+        byte[] oversizedSaslFrameHeader = new byte[] { (byte) 0x00, 0x00, 0x08, 0x09, 0x02, 0x01, 0x00, 0x00 };
+
+        try {
+            frameParserWithLargeMaxSize.input(ByteBuffer.wrap(oversizedSaslFrameHeader));
+            fail("expected exception");
+        } catch (TransportException e) {
+            assertThat(e.getMessage(), containsString("frame size 2057 larger than maximum SASL frame size 2017"));
         }
     }
 
@@ -226,7 +249,7 @@ public class SaslFrameParserTest
         SaslFrameHandler mockSaslFrameHandler = mock(SaslFrameHandler.class);
         ByteBufferDecoder mockDecoder = mock(ByteBufferDecoder.class);
 
-        SaslFrameParser saslFrameParser = new SaslFrameParser(mockSaslFrameHandler, mockDecoder);
+        SaslFrameParser saslFrameParser = new SaslFrameParser(mockSaslFrameHandler, mockDecoder, Transport.MIN_MAX_FRAME_SIZE);
 
         byte[] header = Arrays.copyOf(AmqpHeader.SASL_HEADER, AmqpHeader.SASL_HEADER.length);
         header[invalidIndex] = 'X';

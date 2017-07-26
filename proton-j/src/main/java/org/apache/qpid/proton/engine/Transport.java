@@ -217,6 +217,15 @@ public interface Transport extends Endpoint
     int getRemoteMaxFrameSize();
 
     /**
+     * Allows overriding the initial remote-max-frame-size to a value greater than the default 512bytes. The value set
+     * will be used until such time as the Open frame arrives from the peer and populates the remote max frame size.
+     *
+     * This method must be called before before {@link #sasl()} in order to influence SASL behaviour.
+     * @param size the remote frame size to use
+     */
+    void setInitialRemoteMaxFrameSize(int size);
+
+    /**
      * Gets the local channel-max value to be advertised to the remote peer
      *
      * @return the local channel-max value

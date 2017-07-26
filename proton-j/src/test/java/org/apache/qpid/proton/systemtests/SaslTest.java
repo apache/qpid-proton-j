@@ -25,6 +25,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.logging.Logger;
 
 import org.junit.Test;
@@ -284,4 +285,105 @@ public class SaslTest extends EngineTestBase
 
     }
 
+    /*
+     * Test that transports configured to do so are able to perform SASL process where frames are
+     * exchanged larger than the 512byte min-max-frame-size.
+     */
+    @Test
+    public void testSaslNegotiationWithConfiguredLargerFrameSize() throws Exception
+    {
+        final byte[] largeInitialResponseBytesOrig = fillBytes("initialResponse", 1431);
+        final byte[] largeChallengeBytesOrig = fillBytes("challenge", 1375);
+        final byte[] largeResponseBytesOrig = fillBytes("response", 1282);
+        final byte[] largeAdditionalBytesOrig = fillBytes("additionalData", 1529);
+
+        getClient().transport = Proton.transport();
+        getServer().transport = Proton.transport();
+
+        // Configure transports to allow for larger initial frame sizes
+        getClient().transport.setInitialRemoteMaxFrameSize(2048);
+        getServer().transport.setInitialRemoteMaxFrameSize(2048);
+
+        Sasl clientSasl = getClient().transport.sasl();
+        clientSasl.client();
+
+        Sasl serverSasl = getServer().transport.sasl();
+        serverSasl.server();
+
+        // Negotiate the mech
+        serverSasl.setMechanisms(TESTMECH1, TESTMECH2);
+
+        pumpClientToServer();
+        pumpServerToClient();
+
+        assertArrayEquals("Client should now know the server's mechanisms.", new String[] { TESTMECH1, TESTMECH2 },
+                clientSasl.getRemoteMechanisms());
+        assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_NONE, clientSasl.getOutcome());
+
+        // Select a mech, send large initial response along with it in sasl-init, verify server receives it
+        clientSasl.setMechanisms(TESTMECH1);
+        byte[] initialResponseBytes = Arrays.copyOf(largeInitialResponseBytesOrig, largeInitialResponseBytesOrig.length);
+        clientSasl.send(initialResponseBytes, 0, initialResponseBytes.length);
+
+        pumpClientToServer();
+
+        assertArrayEquals("Server should now know the client's chosen mechanism.", new String[] { TESTMECH1 },
+                serverSasl.getRemoteMechanisms());
+
+        byte[] serverReceivedInitialResponseBytes = new byte[serverSasl.pending()];
+        serverSasl.recv(serverReceivedInitialResponseBytes, 0, serverReceivedInitialResponseBytes.length);
+
+        assertArrayEquals("Server should now know the clients initial response", largeInitialResponseBytesOrig,
+                serverReceivedInitialResponseBytes);
+
+        // Send a large challenge in a sasl-challenge, verify client receives it
+        byte[] challengeBytes = Arrays.copyOf(largeChallengeBytesOrig, largeChallengeBytesOrig.length);
+        serverSasl.send(challengeBytes, 0, challengeBytes.length);
+
+        pumpServerToClient();
+
+        byte[] clientReceivedChallengeBytes = new byte[clientSasl.pending()];
+        clientSasl.recv(clientReceivedChallengeBytes, 0, clientReceivedChallengeBytes.length);
+
+        assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_NONE, clientSasl.getOutcome());
+        assertArrayEquals("Client should now know the server's challenge", largeChallengeBytesOrig,
+                clientReceivedChallengeBytes);
+
+        // Send a large response in a sasl-response, verify server receives it
+        byte[] responseBytes = Arrays.copyOf(largeResponseBytesOrig, largeResponseBytesOrig.length);
+        clientSasl.send(responseBytes, 0, responseBytes.length);
+
+        pumpClientToServer();
+
+        byte[] serverReceivedResponseBytes = new byte[serverSasl.pending()];
+        serverSasl.recv(serverReceivedResponseBytes, 0, serverReceivedResponseBytes.length);
+
+        assertArrayEquals("Server should now know the client's response", largeResponseBytesOrig, serverReceivedResponseBytes);
+
+        // Send an outcome with large additional data in a sasl-outcome, verify client receives it
+        byte[] additionalBytes = Arrays.copyOf(largeAdditionalBytesOrig, largeAdditionalBytesOrig.length);
+        serverSasl.send(additionalBytes, 0, additionalBytes.length);
+        serverSasl.done(SaslOutcome.PN_SASL_OK);
+        pumpServerToClient();
+
+        assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_OK, clientSasl.getOutcome());
+
+        byte[] clientReceivedAdditionalBytes = new byte[clientSasl.pending()];
+        clientSasl.recv(clientReceivedAdditionalBytes, 0, clientReceivedAdditionalBytes.length);
+
+        assertArrayEquals("Client should now know the server's outcome additional data", largeAdditionalBytesOrig,
+                clientReceivedAdditionalBytes);
+    }
+
+    private byte[] fillBytes(String seedString, int length)
+    {
+        byte[] seed = seedString.getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = new byte[length];
+        for (int i = 0; i < length; i++)
+        {
+            bytes[i] = seed[i % seed.length];
+        }
+
+        return bytes;
+    }
 }

@@ -97,7 +97,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         _outputBuffer = newWriteableBuffer(maxFrameSize);
 
         AMQPDefinedTypes.registerAllTypes(_decoder,_encoder);
-        _frameParser = new SaslFrameParser(this, _decoder);
+        _frameParser = new SaslFrameParser(this, _decoder, maxFrameSize);
         _frameWriter = new FrameWriter(_encoder, maxFrameSize, FrameWriter.SASL_FRAME_TYPE, null, _transport);
     }
 

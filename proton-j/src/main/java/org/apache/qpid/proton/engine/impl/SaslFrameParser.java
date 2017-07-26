@@ -61,12 +61,13 @@ class SaslFrameParser
     private ByteBuffer _buffer;
 
     private final ByteBufferDecoder _decoder;
+    private int _frameSizeLimit;
 
-
-    SaslFrameParser(SaslFrameHandler sasl, ByteBufferDecoder decoder)
+    SaslFrameParser(SaslFrameHandler sasl, ByteBufferDecoder decoder, int frameSizeLimit)
     {
         _sasl = sasl;
         _decoder = decoder;
+        _frameSizeLimit = frameSizeLimit;
     }
 
     /**
@@ -259,10 +260,10 @@ class SaslFrameParser
                         break;
                     }
 
-                    if (size > 512)
+                    if (size > _frameSizeLimit)
                     {
                         frameParsingError = new TransportException(
-                                "specified frame size %d larger than maximum SASL frame size 512", size);
+                                "specified frame size %d larger than maximum SASL frame size %d", size, _frameSizeLimit);
                         state = State.ERROR;
                         break;
                     }
