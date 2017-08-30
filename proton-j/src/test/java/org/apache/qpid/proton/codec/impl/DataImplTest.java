@@ -276,6 +276,26 @@ public class DataImplTest
     }
 
     @Test
+    public void testEncodeStringBinary32()
+    {
+        byte[] payload = createStringPayloadBytes(1372);
+        assertTrue("Length must be over 255 to ensure use of vbin32 encoding", payload.length > 255);
+
+        int encodedSize = 1 + 4 + payload.length; // 1b type + 4b length + content
+        ByteBuffer expectedEncoding = ByteBuffer.allocate(encodedSize);
+        expectedEncoding.put((byte) 0xB0);
+        expectedEncoding.putInt(payload.length);
+        expectedEncoding.put(payload);
+
+        Data data = new DataImpl();
+        data.putBinary(new Binary(payload));
+
+        Binary encoded = data.encode();
+
+        assertEquals("unexpected encoding", new Binary(expectedEncoding.array()), encoded);
+    }
+
+    @Test
     public void testEncodeDecodeBinary32()
     {
         byte[] initialPayload = createStringPayloadBytes(1025);
