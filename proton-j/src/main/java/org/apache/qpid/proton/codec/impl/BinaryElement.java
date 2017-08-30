@@ -119,7 +119,7 @@ class BinaryElement extends AtomicElement<Binary>
         else
         {
             b.put((byte)0xb0);
-            b.put((byte)_value.getLength());
+            b.putInt(_value.getLength());
         }
         b.put(_value.getArray(),_value.getArrayOffset(),_value.getLength());
         return size;

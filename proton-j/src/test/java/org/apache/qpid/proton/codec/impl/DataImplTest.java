@@ -274,4 +274,32 @@ public class DataImplTest
 
         return payload;
     }
+
+    @Test
+    public void testEncodeDecodeBinary32()
+    {
+        byte[] initialPayload = createStringPayloadBytes(1025);
+        String initialContent = new String(initialPayload, StandardCharsets.UTF_8);
+        assertTrue("Length must be over 255 to ensure use of str32 encoding", initialContent.length() > 255);
+
+        byte[] bytesReadBack = doEncodeDecodeBinaryTestImpl(initialPayload);
+        String readBackContent = new String(bytesReadBack, StandardCharsets.UTF_8);
+        assertEquals(initialContent, readBackContent);
+    }
+
+    private byte[] doEncodeDecodeBinaryTestImpl(byte[] payload)
+    {
+        Data data = new DataImpl();
+        data.putBinary(payload);
+
+        Binary encoded = data.encode();
+
+        ByteBuffer byteBuffer = encoded.asByteBuffer();
+        Data data2 = new DataImpl();
+        long decodeResult = data2.decode(byteBuffer);
+        assertTrue(Long.toString(decodeResult), decodeResult > 0);
+
+        assertEquals("unexpected type", Data.DataType.BINARY, data2.type());
+        return data2.getBinary().getArray();
+    }
 }
