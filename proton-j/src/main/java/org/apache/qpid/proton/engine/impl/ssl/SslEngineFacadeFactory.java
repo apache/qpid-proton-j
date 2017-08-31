@@ -414,15 +414,7 @@ public class SslEngineFacadeFactory
             }
         }
 
-        if (addedAnonymousCipherSuites == 0)
-        {
-            throw new TransportException
-                ("None of " + anonymousCipherSuites
-                 + " anonymous cipher suites are within the supported list "
-                 + supportedSuites);
-        }
-
-        if(_logger.isLoggable(Level.FINE))
+        if (addedAnonymousCipherSuites > 0 && _logger.isLoggable(Level.FINE))
         {
             _logger.fine("There are now " + newEnabled.size()
                     + " cipher suites enabled (previously " + currentEnabled.size()
