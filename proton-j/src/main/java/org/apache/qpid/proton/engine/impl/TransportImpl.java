@@ -1554,15 +1554,14 @@ public class TransportImpl extends EndpointImpl
     @Override
     public long tick(long now)
     {
-        long timeout = 0;
+        long deadline = 0;
 
         if (_localIdleTimeout > 0) {
             if (_localIdleDeadline == 0 || _lastBytesInput != _bytesInput) {
-                _localIdleDeadline = now + _localIdleTimeout;
+                _localIdleDeadline = computeDeadline(now, _localIdleTimeout);
                 _lastBytesInput = _bytesInput;
-            } else if (_localIdleDeadline <= now) {
-                _localIdleDeadline = now + _localIdleTimeout;
-
+            } else if (_localIdleDeadline - now <= 0) {
+                _localIdleDeadline = computeDeadline(now, _localIdleTimeout);
                 if (_connectionEndpoint != null &&
                     _connectionEndpoint.getLocalState() != EndpointState.CLOSED) {
                     ErrorCondition condition =
@@ -1588,24 +1587,41 @@ public class TransportImpl extends EndpointImpl
                     close_tail();
                 }
             }
-            timeout = _localIdleDeadline;
+            deadline = _localIdleDeadline;
         }
 
         if (_remoteIdleTimeout != 0 && !_isCloseSent) {
             if (_remoteIdleDeadline == 0 || _lastBytesOutput != _bytesOutput) {
-                _remoteIdleDeadline = now + (_remoteIdleTimeout / 2);
+                _remoteIdleDeadline = computeDeadline(now, _remoteIdleTimeout / 2);
                 _lastBytesOutput = _bytesOutput;
-            } else if (_remoteIdleDeadline <= now) {
-                _remoteIdleDeadline = now + (_remoteIdleTimeout / 2);
+            } else if (_remoteIdleDeadline - now <= 0) {
+                _remoteIdleDeadline = computeDeadline(now, _remoteIdleTimeout / 2);
                 if (pending() == 0) {
                     writeFrame(0, null, null, null);
                     _lastBytesOutput += pending();
                 }
             }
-            timeout = Math.min(timeout == 0 ? _remoteIdleDeadline : timeout, _remoteIdleDeadline);
+
+            if(deadline == 0) {
+                deadline = _remoteIdleDeadline;
+            } else {
+                if(_remoteIdleDeadline - _localIdleDeadline <= 0) {
+                    deadline = _remoteIdleDeadline;
+                } else {
+                    deadline = _localIdleDeadline;
+                }
+            }
         }
 
-        return timeout;
+        return deadline;
+    }
+
+    private long computeDeadline(long now, long timeout) {
+        long deadline = now + timeout;
+
+        // We use 0 to signal not-initialised and/or no-timeout, so in the
+        // unlikely event thats to be the actual deadline, return 1 instead
+        return deadline != 0 ? deadline : 1;
     }
 
     @Override
