@@ -1,1 +1,2 @@
 proton_tests.reactor_interop.*
+proton_tests.ssl.SslTest.test_defaults
