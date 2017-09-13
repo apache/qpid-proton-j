@@ -274,7 +274,24 @@ public interface Transport extends Endpoint
      */
     int getRemoteIdleTimeout();
 
-    long tick(long now);
+    /**
+     * Prompt the transport to perform work such as idle-timeout/heartbeat handling, and return an
+     * absolute deadline in milliseconds that tick must again be called by/at, based on the provided
+     * current time in milliseconds, to ensure the periodic work is carried out as necessary.
+     *
+     * A returned deadline of 0 indicates there is no periodic work necessitating tick be called, e.g.
+     * because neither peer has defined an idle-timeout value.
+     *
+     * The provided milliseconds time values can be from {@link System#currentTimeMillis()} or derived
+     * from {@link System#nanoTime()}, noting that for the later in particular that the returned
+     * deadline could be a different sign than the given time, and (if non-zero) the returned
+     * deadline should have the current time originally provided subtracted from it in order to
+     * establish a relative time delay to the next deadline.
+     *
+     * @param nowMillis the current time in milliseconds
+     * @return the absolute deadline in milliseconds to next call tick by/at, or 0 if there is none.
+     */
+    long tick(long nowMillis);
 
     long getFramesInput();
 
