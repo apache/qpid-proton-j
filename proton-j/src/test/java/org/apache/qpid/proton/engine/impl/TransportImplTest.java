@@ -1707,6 +1707,162 @@ public class TransportImplTest
     }
 
     @Test
+    public void testTickWithLocalTimeout()
+    {
+        // all-positive
+        doTickWithLocalTimeoutTestImpl(4000, 10000, 14000, 18000, 22000);
+
+        // all-negative
+        doTickWithLocalTimeoutTestImpl(2000, -100000, -98000, -96000, -94000);
+
+        // negative to positive missing 0
+        doTickWithLocalTimeoutTestImpl(500, -950, -450, 50, 550);
+
+        // negative to positive striking 0
+        doTickWithLocalTimeoutTestImpl(3000, -6000, -3000, 1, 3001);
+    }
+
+    private void doTickWithLocalTimeoutTestImpl(int localTimeout, long tick1, long expectedDeadline1, long expectedDeadline2, long expectedDeadline3)
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        Connection connection = Proton.connection();
+        transport.bind(connection);
+
+        // Set our local idleTimeout
+        transport.setIdleTimeout(localTimeout);
+
+        connection.open();
+        pumpMockTransport(transport);
+
+        assertEquals("should have written data", 1, transport.writes.size());
+        Object sentOpenFrame = transport.writes.get(0);
+        assertNotNull("should have written a non-empty frame", sentOpenFrame);
+        assertTrue("should have written an open frame", sentOpenFrame instanceof Open);
+        assertEquals("should have had an idletimeout value half our actual timeout", UnsignedInteger.valueOf(localTimeout / 2), ((Open)sentOpenFrame).getIdleTimeOut());
+
+        // Receive Protocol header
+        processInput(transport, ByteBuffer.wrap(new byte[] {'A', 'M', 'Q', 'P', 0x00, 0x01, 0x00, 0x00}));
+
+        // Handle the peer transmitting their open, without timeout.
+        Open open = new Open();
+        open.setIdleTimeOut(null);
+        TransportFrame openFrame = new TransportFrame(CHANNEL_ID, open, null);
+        transport.handleFrame(openFrame);
+        pumpMockTransport(transport);
+
+        long deadline = transport.tick(tick1);
+        assertEquals("Unexpected deadline returned", expectedDeadline1, deadline);
+
+        // Wait for less time than the deadline with no data - get the same value
+        long interimTick = tick1 + 10;
+        assertTrue (interimTick < expectedDeadline1);
+        assertEquals("When the deadline hasn't been reached tick() should return the previous deadline",  expectedDeadline1, transport.tick(interimTick));
+        assertEquals("When the deadline hasn't been reached tick() shouldn't write data", 1, transport.writes.size());
+
+        // Receive Empty frame to satisfy local deadline
+        processInput(transport,  ByteBuffer.wrap(new byte[] {0x00, 0x00, 0x00, 0x08, 0x02, 0x00, 0x00, 0x00}));
+
+        deadline = transport.tick(expectedDeadline1);
+        assertEquals("When the deadline has been reached expected a new local deadline to be returned", expectedDeadline2, deadline);
+        assertEquals("When the deadline hasn't been reached tick() shouldn't write data", 1, transport.writes.size());
+
+        pumpMockTransport(transport);
+
+        // Receive Empty frame to satisfy local deadline
+        processInput(transport,  ByteBuffer.wrap(new byte[] {0x00, 0x00, 0x00, 0x08, 0x02, 0x00, 0x00, 0x00}));
+
+        deadline = transport.tick(expectedDeadline2);
+        assertEquals("When the deadline has been reached expected a new local deadline to be returned", expectedDeadline3, deadline);
+        assertEquals("When the deadline hasn't been reached tick() shouldn't write data", 1, transport.writes.size());
+
+        pumpMockTransport(transport);
+
+        assertEquals("Connection should be active", EndpointState.ACTIVE, connection.getLocalState());
+        transport.tick(expectedDeadline3); // Wait for the deadline, but don't receive traffic, allow local timeout to expire
+        assertEquals("Calling tick() after the deadline should result in the connection being closed", EndpointState.CLOSED, connection.getLocalState());
+        assertEquals("tick() should have written data", 2, transport.writes.size());
+        assertNotNull("should have written a non-empty frame", transport.writes.get(1));
+        assertTrue("should have written a close frame", transport.writes.get(1) instanceof Close);
+    }
+
+    @Test
+    public void testTickWithRemoteTimeout()
+    {
+        // all-positive
+        doTickWithRemoteTimeoutTestImpl(4000, 10000, 14000, 18000, 22000);
+
+        // all-negative
+        doTickWithRemoteTimeoutTestImpl(2000, -100000, -98000, -96000, -94000);
+
+        // negative to positive missing 0
+        doTickWithRemoteTimeoutTestImpl(500, -950, -450, 50, 550);
+
+        // negative to positive striking 0
+        doTickWithRemoteTimeoutTestImpl(3000, -6000, -3000, 1, 3001);
+    }
+
+    private void doTickWithRemoteTimeoutTestImpl(int remoteTimeoutHalf, long tick1, long expectedDeadline1, long expectedDeadline2, long expectedDeadline3)
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        Connection connection = Proton.connection();
+        transport.bind(connection);
+
+        connection.open();
+        pumpMockTransport(transport);
+
+        assertEquals("should have written data", 1, transport.writes.size());
+        Object sentOpenFrame = transport.writes.get(0);
+        assertNotNull("should have written a non-empty frame", sentOpenFrame);
+        assertTrue("should have written an open frame", sentOpenFrame instanceof Open);
+        assertNull("should not have had an idletimeout value", ((Open)sentOpenFrame).getIdleTimeOut());
+
+        // Receive Protocol header
+        processInput(transport, ByteBuffer.wrap(new byte[] {'A', 'M', 'Q', 'P', 0x00, 0x01, 0x00, 0x00}));
+
+        // Handle the peer transmitting [half] their timeout. We half it on receipt to avoid spurious timeouts
+        // if they not have transmitted half their actual timeout, as the AMQP spec only says they SHOULD do that.
+        Open open = new Open();
+        open.setIdleTimeOut(new UnsignedInteger(remoteTimeoutHalf * 2));
+        TransportFrame openFrame = new TransportFrame(CHANNEL_ID, open, null);
+        transport.handleFrame(openFrame);
+        pumpMockTransport(transport);
+
+        long deadline = transport.tick(tick1);
+        assertEquals("Unexpected deadline returned", expectedDeadline1, deadline);
+
+        // Wait for less time than the deadline with no data - get the same value
+        long interimTick = tick1 + 10;
+        assertTrue (interimTick < expectedDeadline1);
+        assertEquals("When the deadline hasn't been reached tick() should return the previous deadline",  expectedDeadline1, transport.tick(interimTick));
+        assertEquals("When the deadline hasn't been reached tick() shouldn't write data", 1, transport.writes.size());
+
+        deadline = transport.tick(expectedDeadline1);
+        assertEquals("When the deadline has been reached expected a new remote deadline to be returned", expectedDeadline2, deadline);
+        assertEquals("tick() should have written data", 2, transport.writes.size());
+        assertEquals("tick() should have written an empty frame", null, transport.writes.get(1));
+
+        pumpMockTransport(transport);
+
+        // Do some actual work, create real traffic, removing the need to send empty frame to satisfy idle-timeout
+        connection.session().open();
+        pumpMockTransport(transport);
+        assertEquals("session open should have written data", 3, transport.writes.size());
+        Object sentBeginFrame = transport.writes.get(2);
+        assertNotNull("should have written a non-empty frame", sentBeginFrame);
+        assertTrue("session open should have written a Begin frame", sentBeginFrame instanceof Begin);
+
+        deadline = transport.tick(expectedDeadline2);
+        assertEquals("When the deadline has been reached expected a new remote deadline to be returned", expectedDeadline3, deadline);
+        assertEquals("tick() should not have written data as there was actual activity", 3, transport.writes.size());
+
+        pumpMockTransport(transport);
+
+        transport.tick(expectedDeadline3);
+        assertEquals("tick() should have written data", 4, transport.writes.size());
+        assertEquals("tick() should have written an empty frame", null, transport.writes.get(1));
+    }
+
+    @Test
     public void testTickWithBothTimeouts()
     {
         // all-positive
@@ -1746,6 +1902,9 @@ public class TransportImplTest
         assertEquals("should have written data", 1, transport.writes.size());
         assertNotNull("should have written a non-empty frame", transport.writes.get(0));
         assertTrue("should have written an open frame", transport.writes.get(0) instanceof Open);
+
+        // Receive Protocol header
+        processInput(transport, ByteBuffer.wrap(new byte[] {'A', 'M', 'Q', 'P', 0x00, 0x01, 0x00, 0x00}));
 
         // Handle the peer transmitting [half] their timeout. We half it on receipt to avoid spurious timeouts
         // if they not have transmitted half their actual timeout, as the AMQP spec only says they SHOULD do that.
@@ -1830,6 +1989,9 @@ public class TransportImplTest
         assertEquals("should have written data", 1, transport.writes.size());
         assertNotNull("should have written a non-empty frame", transport.writes.get(0));
         assertTrue("should have written an open frame", transport.writes.get(0) instanceof Open);
+
+        // Receive Protocol header
+        processInput(transport, ByteBuffer.wrap(new byte[] {'A', 'M', 'Q', 'P', 0x00, 0x01, 0x00, 0x00}));
 
         // Handle the peer transmitting [half] their timeout. We half it on receipt to avoid spurious timeouts
         // if they not have transmitted half their actual timeout, as the AMQP spec only says they SHOULD do that.
