@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.ReactorOptions;
 import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
@@ -98,8 +99,17 @@ public class ReactorImpl implements Reactor, Extendable {
         attachments = new RecordImpl();
     }
 
+    protected ReactorImpl(IO io, ReactorOptions options) throws IOException {
+        this(io);
+        global = new IOHandler(options);
+    }
+
     public ReactorImpl() throws IOException {
-        this(new IOImpl());
+        this(new IOImpl(), new ReactorOptions());
+    }
+
+    public ReactorImpl(ReactorOptions options) throws IOException {
+        this(new IOImpl(), options);
     }
 
     @Override

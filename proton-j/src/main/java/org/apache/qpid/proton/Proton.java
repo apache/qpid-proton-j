@@ -106,4 +106,19 @@ public final class Proton
         }
         return reactor;
     }
+
+
+    public static Reactor reactor(ReactorOptions options) throws IOException
+    {
+        return Reactor.Factory.create(options);
+    }
+
+    public static Reactor reactor(ReactorOptions options, Handler... handlers) throws IOException
+    {
+        Reactor reactor = Reactor.Factory.create(options);
+        for (Handler handler : handlers) {
+            reactor.getHandler().add(handler);
+        }
+        return reactor;
+    }
 }

@@ -24,6 +24,7 @@ package org.apache.qpid.proton.reactor;
 import java.io.IOException;
 import java.util.Set;
 
+import org.apache.qpid.proton.ReactorOptions;
 import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
@@ -50,6 +51,10 @@ public interface Reactor {
     {
         public static Reactor create() throws IOException {
             return new ReactorImpl();
+        }
+
+        public static Reactor create(ReactorOptions options) throws IOException {
+            return new ReactorImpl(options);
         }
     }
 
