@@ -18,35 +18,32 @@
  * under the License.
  *
  */
-package org.apache.qpid.proton;
+package org.apache.qpid.proton.reactor;
 
 public class ReactorOptions {
-    private boolean isSaslCreatedByDefault;
+    private boolean enableSaslByDefault = true;
 
-    public ReactorOptions() {
-        //Default case creates SASL
-        isSaslCreatedByDefault = true;
+    /**
+     * Sets whether SASL will be automatically enabled with ANONYMOUS as the mechanism,
+     * or if no SASL layer will be enabled. If disabled, the application handlers
+     * can still enable SASL on the transport when it is bound to the connection.
+     *
+     * True by default.
+     *
+     * @param enableSaslByDefault
+     *            true if SASL should be enabled by default, false if not.
+     */
+    public void setEnableSaslByDefault(boolean enableSaslByDefault) {
+        this.enableSaslByDefault = enableSaslByDefault;
     }
 
     /**
-     * The default handlers will not create the SASL layer by default. They can still be created by user later
+     * Returns whether SASL should be enabled by default.
+     *
+     * @return True if SASL should be enabled by default, false if not.
+     * @see #setEnableSaslByDefault(boolean)
      */
-    public void disableSaslByDefault() {
-        this.isSaslCreatedByDefault = false;
-    }
-
-    /**
-     * The default handlers will create the SASL layer by default.
-     */
-    public void enableSaslByDefault() {
-        this.isSaslCreatedByDefault = true;
-    }
-
-    /**
-     * Returns If the SASL is created by default
-     * @return True if SASL will be created by default. False otherwise
-     */
-    public boolean isSaslCreatedByDefault() {
-        return this.isSaslCreatedByDefault;
+    public boolean isEnableSaslByDefault() {
+        return this.enableSaslByDefault;
     }
 }

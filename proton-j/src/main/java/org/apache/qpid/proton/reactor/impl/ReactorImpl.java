@@ -29,7 +29,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.qpid.proton.Proton;
-import org.apache.qpid.proton.ReactorOptions;
 import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
@@ -48,12 +47,12 @@ import org.apache.qpid.proton.reactor.Acceptor;
 import org.apache.qpid.proton.reactor.impl.AcceptorImpl;
 import org.apache.qpid.proton.reactor.Reactor;
 import org.apache.qpid.proton.reactor.ReactorChild;
+import org.apache.qpid.proton.reactor.ReactorOptions;
 import org.apache.qpid.proton.reactor.Selectable;
 import org.apache.qpid.proton.reactor.Selectable.Callback;
 import org.apache.qpid.proton.reactor.Selector;
 import org.apache.qpid.proton.reactor.Task;
 
-@SuppressWarnings("deprecation")
 public class ReactorImpl implements Reactor, Extendable {
     public static final ExtendableAccessor<Event, Handler> ROOT = new ExtendableAccessor<>(Handler.class);
 
@@ -73,6 +72,7 @@ public class ReactorImpl implements Reactor, Extendable {
     private Selector selector;
     private Record attachments;
     private final IO io;
+    private final ReactorOptions options;
     protected static final String CONNECTION_PEER_ADDRESS_KEY = "pn_reactor_connection_peer_address";
 
     @Override
@@ -87,6 +87,10 @@ public class ReactorImpl implements Reactor, Extendable {
     }
 
     protected ReactorImpl(IO io) throws IOException {
+        this(io, new ReactorOptions());
+    }
+
+    protected ReactorImpl(IO io, ReactorOptions options) throws IOException {
         collector = (CollectorImpl)Proton.collector();
         global = new IOHandler();
         handler = new BaseHandler();
@@ -97,11 +101,7 @@ public class ReactorImpl implements Reactor, Extendable {
         wakeup = this.io.pipe();
         mark();
         attachments = new RecordImpl();
-    }
-
-    protected ReactorImpl(IO io, ReactorOptions options) throws IOException {
-        this(io);
-        global = new IOHandler(options);
+        this.options = options;
     }
 
     public ReactorImpl() throws IOException {
@@ -141,6 +141,11 @@ public class ReactorImpl implements Reactor, Extendable {
     @Override
     public Record attachments() {
         return attachments;
+    }
+
+    @Override
+    public ReactorOptions getOptions() {
+        return options;
     }
 
     @Override

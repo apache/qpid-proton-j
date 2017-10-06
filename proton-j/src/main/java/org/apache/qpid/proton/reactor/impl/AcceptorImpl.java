@@ -37,6 +37,7 @@ import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.impl.RecordImpl;
 import org.apache.qpid.proton.reactor.Acceptor;
 import org.apache.qpid.proton.reactor.Reactor;
+import org.apache.qpid.proton.reactor.ReactorOptions;
 import org.apache.qpid.proton.reactor.impl.ReactorImpl;
 import org.apache.qpid.proton.reactor.Selectable;
 import org.apache.qpid.proton.reactor.Selectable.Callback;
@@ -72,10 +73,12 @@ public class AcceptorImpl implements Acceptor {
                     conn_recs.set(ReactorImpl.CONNECTION_PEER_ADDRESS_KEY, Address.class, addr);
                 }
                 Transport trans = Proton.transport();
-                Sasl sasl = trans.sasl();
-                sasl.server();
-                sasl.setMechanisms("ANONYMOUS");
-                sasl.done(SaslOutcome.PN_SASL_OK);
+                if(reactor.getOptions().isEnableSaslByDefault()) {
+                    Sasl sasl = trans.sasl();
+                    sasl.server();
+                    sasl.setMechanisms("ANONYMOUS");
+                    sasl.done(SaslOutcome.PN_SASL_OK);
+                }
                 trans.bind(conn);
                 IOHandler.selectableTransport(reactor, socketChannel.socket(), trans);
             } catch(IOException ioException) {

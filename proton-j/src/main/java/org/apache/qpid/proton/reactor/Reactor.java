@@ -24,7 +24,6 @@ package org.apache.qpid.proton.reactor;
 import java.io.IOException;
 import java.util.Set;
 
-import org.apache.qpid.proton.ReactorOptions;
 import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
@@ -32,6 +31,7 @@ import org.apache.qpid.proton.engine.Event.Type;
 import org.apache.qpid.proton.engine.Handler;
 import org.apache.qpid.proton.engine.HandlerException;
 import org.apache.qpid.proton.engine.Record;
+import org.apache.qpid.proton.reactor.ReactorOptions;
 import org.apache.qpid.proton.reactor.impl.ReactorImpl;
 
 /**
@@ -282,6 +282,13 @@ public interface Reactor {
      * @param port the port to use for the connection.
      */
     void setConnectionHost(Connection c, String host, int port);
+
+    /**
+     * Gets the reactor options.
+     *
+     * @return the reactor options
+     */
+    ReactorOptions getOptions();
 
     /**
      * Get the address used by the connection

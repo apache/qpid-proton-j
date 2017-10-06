@@ -29,7 +29,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 
 import org.apache.qpid.proton.Proton;
-import org.apache.qpid.proton.ReactorOptions;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.engine.BaseHandler;
@@ -47,18 +46,7 @@ import org.apache.qpid.proton.reactor.Selector;
 import org.apache.qpid.proton.reactor.Acceptor;
 import org.apache.qpid.proton.reactor.impl.AcceptorImpl;
 
-@SuppressWarnings("deprecation")
 public class IOHandler extends BaseHandler {
-
-    private ReactorOptions options;
-
-    public IOHandler() {
-        this.options = new ReactorOptions();
-    }
-
-    public IOHandler(ReactorOptions options) {
-        this.options = options;
-    }
 
     // pni_handle_quiesced from connection.c
     private void handleQuiesced(Reactor reactor, Selector selector) throws IOException {
@@ -113,7 +101,7 @@ public class IOHandler extends BaseHandler {
         }
         Transport transport = Proton.transport();
 
-        if (this.options.isSaslCreatedByDefault()) {
+        if (reactor.getOptions().isEnableSaslByDefault()) {
             Sasl sasl = transport.sasl();
             sasl.client();
             sasl.setMechanisms("ANONYMOUS");
