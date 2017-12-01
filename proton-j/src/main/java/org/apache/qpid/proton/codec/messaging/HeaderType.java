@@ -35,7 +35,6 @@ import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DescribedTypeConstructor;
 import org.apache.qpid.proton.codec.EncoderImpl;
 
-
 public class HeaderType extends AbstractDescribedType<Header,List> implements DescribedTypeConstructor<Header>
 {
     private static final Object[] DESCRIPTORS =
@@ -154,5 +153,4 @@ public class HeaderType extends AbstractDescribedType<Header,List> implements De
         }
         encoder.register(type);
     }
-
 }

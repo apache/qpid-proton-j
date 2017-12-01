@@ -22,6 +22,8 @@ package org.apache.qpid.proton.codec;
 
 import static org.junit.Assert.*;
 
+import java.nio.ByteBuffer;
+
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.codec.UnsignedIntegerType.UnsignedIntegerEncoding;
 import org.junit.Test;
@@ -62,5 +64,29 @@ public class UnsignedIntegerTypeTest
         long val = Integer.MAX_VALUE + 1L;
         UnsignedIntegerEncoding encoding = ult.getEncoding(UnsignedInteger.valueOf(val));
         assertEquals("incorrect encoding returned", EncodingCodes.UINT, encoding.getEncodingCode());
+    }
+
+    @Test
+    public void testSkipValue()
+    {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        decoder.setByteBuffer(buffer);
+        encoder.setByteBuffer(buffer);
+
+        encoder.writeUnsignedInteger(UnsignedInteger.ZERO);
+        encoder.writeUnsignedInteger(UnsignedInteger.ONE);
+
+        buffer.clear();
+
+        TypeConstructor<?> type = decoder.readConstructor();
+        assertEquals(UnsignedInteger.class, type.getTypeClass());
+        type.skipValue();
+
+        UnsignedInteger result = decoder.readUnsignedInteger();
+        assertEquals(UnsignedInteger.ONE, result);
     }
 }

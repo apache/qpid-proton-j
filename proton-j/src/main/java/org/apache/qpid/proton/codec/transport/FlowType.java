@@ -36,7 +36,6 @@ import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DescribedTypeConstructor;
 import org.apache.qpid.proton.codec.EncoderImpl;
 
-
 public final class FlowType extends AbstractDescribedType<Flow,List> implements DescribedTypeConstructor<Flow>
 {
     private static final Object[] DESCRIPTORS =
@@ -46,7 +45,7 @@ public final class FlowType extends AbstractDescribedType<Flow,List> implements 
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000013L);
 
-    private FlowType(EncoderImpl encoder)
+    FlowType(EncoderImpl encoder)
     {
         super(encoder);
     }
@@ -176,7 +175,6 @@ public final class FlowType extends AbstractDescribedType<Flow,List> implements 
         return Flow.class;
     }
 
-
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
         FlowType type = new FlowType(encoder);
@@ -186,6 +184,4 @@ public final class FlowType extends AbstractDescribedType<Flow,List> implements 
         }
         encoder.register(type);
     }
-
 }
-  

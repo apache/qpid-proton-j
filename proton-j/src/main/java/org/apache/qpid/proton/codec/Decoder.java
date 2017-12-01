@@ -145,5 +145,6 @@ public interface Decoder
 
     void register(final Object descriptor, final DescribedTypeConstructor dtc);
 
+    void register(final Object descriptor, final FastPathDescribedTypeConstructor<?> dtc);
 
 }

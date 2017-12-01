@@ -23,6 +23,7 @@ package org.apache.qpid.proton.codec;
 import static org.junit.Assert.*;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.codec.UnsignedLongType.UnsignedLongEncoding;
@@ -64,5 +65,29 @@ public class UnsignedLongTypeTest
         BigInteger bigInt = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE);
         UnsignedLongEncoding encoding = ult.getEncoding(UnsignedLong.valueOf(bigInt));
         assertEquals("incorrect encoding returned", EncodingCodes.ULONG, encoding.getEncodingCode());
+    }
+
+    @Test
+    public void testSkipValue()
+    {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        decoder.setByteBuffer(buffer);
+        encoder.setByteBuffer(buffer);
+
+        encoder.writeUnsignedLong(UnsignedLong.ZERO);
+        encoder.writeUnsignedLong(UnsignedLong.valueOf(1));
+
+        buffer.clear();
+
+        TypeConstructor<?> type = decoder.readConstructor();
+        assertEquals(UnsignedLong.class, type.getTypeClass());
+        type.skipValue();
+
+        UnsignedLong result = decoder.readUnsignedLong();
+        assertEquals(UnsignedLong.valueOf(1), result);
     }
 }

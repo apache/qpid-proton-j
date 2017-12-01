@@ -45,6 +45,11 @@ public class TimestampType extends AbstractPrimitiveType<Date>
         return _timestampEncoding;
     }
 
+    public void fastWrite(EncoderImpl encoder, long timestamp)
+    {
+        encoder.writeRaw(EncodingCodes.TIMESTAMP);
+        encoder.writeRaw(timestamp);
+    }
 
     public TimestampEncoding getCanonicalEncoding()
     {
@@ -60,7 +65,7 @@ public class TimestampType extends AbstractPrimitiveType<Date>
     {
         _timestampEncoding.write(l);
     }
-    
+
     private class TimestampEncoding extends FixedSizePrimitiveTypeEncoding<Date>
     {
 
@@ -90,12 +95,12 @@ public class TimestampType extends AbstractPrimitiveType<Date>
         {
             getEncoder().writeRaw(val.getTime());
         }
-        
+
         public void write(final long l)
         {
             writeConstructor();
             getEncoder().writeRaw(l);
-            
+
         }
 
         public boolean encodesSuperset(final TypeEncoding<Date> encoding)

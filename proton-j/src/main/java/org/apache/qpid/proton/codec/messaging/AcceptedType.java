@@ -41,7 +41,7 @@ public final class AcceptedType extends AbstractDescribedType<Accepted,List> imp
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000024L);
 
 
-    private AcceptedType(EncoderImpl encoder)
+    AcceptedType(EncoderImpl encoder)
     {
         super(encoder);
     }

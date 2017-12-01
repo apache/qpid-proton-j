@@ -22,6 +22,7 @@ package org.apache.qpid.proton.codec;
 
 import org.apache.qpid.proton.amqp.Binary;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -53,7 +54,6 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         return val.getLength() <= 255 ? _shortBinaryEncoding : _binaryEncoding;
     }
 
-
     public BinaryEncoding getCanonicalEncoding()
     {
         return _binaryEncoding;
@@ -62,6 +62,22 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
     public Collection<BinaryEncoding> getAllEncodings()
     {
         return Arrays.asList(_shortBinaryEncoding, _binaryEncoding);
+    }
+
+    public void fastWrite(EncoderImpl encoder, Binary binary)
+    {
+        if (binary.getLength() <= 255)
+        {
+            encoder.writeRaw(EncodingCodes.VBIN8);
+            encoder.writeRaw((byte) binary.getLength());
+            encoder.writeRaw(binary.getArray(), binary.getArrayOffset(), binary.getLength());
+        }
+        else
+        {
+            encoder.writeRaw(EncodingCodes.VBIN32);
+            encoder.writeRaw(binary.getLength());
+            encoder.writeRaw(binary.getArray(), binary.getArrayOffset(), binary.getLength());
+        }
     }
 
     private class LongBinaryEncoding
@@ -115,6 +131,14 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
             decoder.readRaw(data, 0, size);
             return new Binary(data);
         }
+
+        public void skipValue()
+        {
+            DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+            int size = decoder.readRawInt();
+            buffer.position(buffer.position() + size);
+        }
     }
 
     private class ShortBinaryEncoding
@@ -162,6 +186,13 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
             byte[] data = new byte[size];
             getDecoder().readRaw(data, 0, size);
             return new Binary(data);
+        }
+
+        public void skipValue()
+        {
+            ByteBuffer buffer = getDecoder().getByteBuffer();
+            int size = ((int)getDecoder().readRawByte()) & 0xff;
+            buffer.position(buffer.position() + size);
         }
     }
 }

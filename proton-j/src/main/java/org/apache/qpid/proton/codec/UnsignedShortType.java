@@ -46,6 +46,11 @@ public class UnsignedShortType extends AbstractPrimitiveType<UnsignedShort>
         return _unsignedShortEncoder;
     }
 
+    public void fastWrite(EncoderImpl encoder, UnsignedShort value)
+    {
+        encoder.writeRaw(EncodingCodes.USHORT);
+        encoder.writeRaw(value.shortValue());
+    }
 
     public UnsignedShortEncoding getCanonicalEncoding()
     {

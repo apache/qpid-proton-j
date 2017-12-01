@@ -45,6 +45,12 @@ public class UUIDType extends AbstractPrimitiveType<UUID>
         return _uuidEncoding;
     }
 
+    public void fastWrite(EncoderImpl encoder, UUID value)
+    {
+        encoder.writeRaw(EncodingCodes.UUID);
+        encoder.writeRaw(value.getMostSignificantBits());
+        encoder.writeRaw(value.getLeastSignificantBits());
+    }
 
     public UUIDEncoding getCanonicalEncoding()
     {

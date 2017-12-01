@@ -21,16 +21,23 @@
 
 package org.apache.qpid.proton.amqp;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.qpid.proton.codec.WritableBuffer;
 
 public final class Symbol implements Comparable<Symbol>, CharSequence
 {
     private final String _underlying;
+    private final byte[] _underlyingBytes;
+
     private static final ConcurrentHashMap<String, Symbol> _symbols = new ConcurrentHashMap<String, Symbol>(2048);
 
     private Symbol(String underlying)
     {
         _underlying = underlying;
+        _underlyingBytes = underlying.getBytes(StandardCharsets.US_ASCII);
     }
 
     public int length()
@@ -90,5 +97,13 @@ public final class Symbol implements Comparable<Symbol>, CharSequence
         return symbol;
     }
 
+    public void writeTo(WritableBuffer buffer)
+    {
+        buffer.put(_underlyingBytes, 0, _underlyingBytes.length);
+    }
 
+    public void writeTo(ByteBuffer buffer)
+    {
+        buffer.put(_underlyingBytes, 0, _underlyingBytes.length);
+    }
 }

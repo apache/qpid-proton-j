@@ -35,8 +35,8 @@ public class UnsignedLongType extends AbstractPrimitiveType<UnsignedLong>
     private UnsignedLongEncoding _unsignedLongEncoding;
     private UnsignedLongEncoding _smallUnsignedLongEncoding;
     private UnsignedLongEncoding _zeroUnsignedLongEncoding;
-    
-    
+
+
     UnsignedLongType(final EncoderImpl encoder, final DecoderImpl decoder)
     {
         _unsignedLongEncoding = new AllUnsignedLongEncoding(encoder, decoder);
@@ -59,6 +59,24 @@ public class UnsignedLongType extends AbstractPrimitiveType<UnsignedLong>
             : (l >= 0 && l <= 255L) ? _smallUnsignedLongEncoding : _unsignedLongEncoding;
     }
 
+    public void fastWrite(EncoderImpl encoder, UnsignedLong value)
+    {
+        long longValue = value.longValue();
+        if (longValue == 0)
+        {
+            encoder.writeRaw(EncodingCodes.ULONG0);
+        }
+        else if (longValue > 0 && longValue <= 255)
+        {
+            encoder.writeRaw(EncodingCodes.SMALLULONG);
+            encoder.writeRaw((byte)longValue);
+        }
+        else
+        {
+            encoder.writeRaw(EncodingCodes.ULONG);
+            encoder.writeRaw(longValue);
+        }
+    }
 
     public UnsignedLongEncoding getCanonicalEncoding()
     {
@@ -157,8 +175,8 @@ public class UnsignedLongType extends AbstractPrimitiveType<UnsignedLong>
             return UnsignedLong.valueOf(((long)getDecoder().readRawByte())&0xffl);
         }
     }
-    
-    
+
+
     private class ZeroUnsignedLongEncoding
             extends FixedSizePrimitiveTypeEncoding<UnsignedLong>
             implements UnsignedLongEncoding

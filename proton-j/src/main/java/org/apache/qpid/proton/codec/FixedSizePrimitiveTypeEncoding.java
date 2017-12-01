@@ -38,5 +38,10 @@ abstract class FixedSizePrimitiveTypeEncoding<T> extends AbstractPrimitiveTypeEn
         return getFixedSize();
     }
 
+    public final void skipValue()
+    {
+        getDecoder().getByteBuffer().position(getDecoder().getByteBuffer().position() + getFixedSize());
+    }
+
     protected abstract int getFixedSize();
 }

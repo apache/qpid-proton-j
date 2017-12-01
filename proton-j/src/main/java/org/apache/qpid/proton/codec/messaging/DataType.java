@@ -43,7 +43,7 @@ public class DataType extends AbstractDescribedType<Data,Binary> implements Desc
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000075L);
 
-    private DataType(EncoderImpl encoder)
+    DataType(EncoderImpl encoder)
     {
         super(encoder);
     }
@@ -69,7 +69,7 @@ public class DataType extends AbstractDescribedType<Data,Binary> implements Desc
         return Data.class;
     }
 
-      
+
 
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
@@ -81,4 +81,3 @@ public class DataType extends AbstractDescribedType<Data,Binary> implements Desc
         encoder.register(type);
     }
 }
-  

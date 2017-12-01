@@ -21,35 +21,34 @@
 package org.apache.qpid.proton.codec;
 
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.util.Arrays;
 import java.util.Collection;
 
 public class StringType extends AbstractPrimitiveType<String>
 {
-    private static final Charset Charset_UTF8 = Charset.forName("UTF-8");
     private static final DecoderImpl.TypeDecoder<String> _stringCreator =
-            new DecoderImpl.TypeDecoder<String>()
+        new DecoderImpl.TypeDecoder<String>()
+        {
+
+            public String decode(DecoderImpl decoder, final ByteBuffer buf)
             {
-
-                public String decode(final ByteBuffer buf)
+                CharsetDecoder charsetDecoder = decoder.getCharsetDecoder();
+                try
                 {
-                    CharsetDecoder charsetDecoder = Charset_UTF8.newDecoder();
-                    try
-                    {
-                        CharBuffer charBuf = charsetDecoder.decode(buf);
-                        return charBuf.toString();
-                    }
-                    catch (CharacterCodingException e)
-                    {
-                        throw new IllegalArgumentException("Cannot parse String");
-                    }
-
+                    return decoder.getCharsetDecoder().decode(buf).toString();
                 }
-            };
+                catch (CharacterCodingException e)
+                {
+                    throw new IllegalArgumentException("Cannot parse String");
+                }
+                finally
+                {
+                    charsetDecoder.reset();
+                }
+            }
+        };
 
 
     public static interface StringEncoding extends PrimitiveTypeEncoding<String>
@@ -175,6 +174,13 @@ public class StringType extends AbstractPrimitiveType<String>
             _length = length;
         }
 
+        public void skipValue()
+        {
+            DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+            int size = decoder.readRawInt();
+            buffer.position(buffer.position() + size);
+        }
     }
 
     private class ShortStringEncoding
@@ -232,6 +238,14 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             _value = val;
             _length = length;
+        }
+
+        public void skipValue()
+        {
+            DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+            int size = ((int)decoder.readRawByte()) & 0xff;
+            buffer.position(buffer.position() + size);
         }
     }
 

@@ -53,6 +53,11 @@ public class DynamicTypeConstructor implements TypeConstructor
         return false;
     }
 
+    public void skipValue()
+    {
+        _underlyingEncoding.skipValue();
+    }
+
     public Class getTypeClass()
     {
         return _describedTypeConstructor.getTypeClass();

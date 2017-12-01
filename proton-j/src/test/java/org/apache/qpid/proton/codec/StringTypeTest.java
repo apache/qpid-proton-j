@@ -125,6 +125,30 @@ public class StringTypeTest
         }
     }
 
+    @Test
+    public void testSkipString()
+    {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        decoder.setByteBuffer(buffer);
+        encoder.setByteBuffer(buffer);
+
+        encoder.writeString("skipped");
+        encoder.writeString("read");
+
+        buffer.clear();
+
+        TypeConstructor<?> stringType = decoder.readConstructor();
+        assertEquals(String.class, stringType.getTypeClass());
+        stringType.skipValue();
+
+        String result = decoder.readString();
+        assertEquals("read", result);
+    }
+
     // build up some test data with a set of suitable Unicode characters
     private static List<String> generateTestData()
     {

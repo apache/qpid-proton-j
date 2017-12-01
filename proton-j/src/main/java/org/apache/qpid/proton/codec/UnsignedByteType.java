@@ -46,6 +46,11 @@ public class UnsignedByteType extends AbstractPrimitiveType<UnsignedByte>
         return _unsignedByteEncoding;
     }
 
+    public void fastWrite(EncoderImpl encoder, UnsignedByte value)
+    {
+        encoder.writeRaw(EncodingCodes.UBYTE);
+        encoder.writeRaw(value.byteValue());
+    }
 
     public UnsignedByteEncoding getCanonicalEncoding()
     {

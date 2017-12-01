@@ -42,7 +42,7 @@ public class AmqpValueType extends AbstractDescribedType<AmqpValue,Object> imple
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000077L);
 
-    private AmqpValueType(EncoderImpl encoder)
+    AmqpValueType(EncoderImpl encoder)
     {
         super(encoder);
     }
@@ -68,7 +68,7 @@ public class AmqpValueType extends AbstractDescribedType<AmqpValue,Object> imple
         return AmqpValue.class;
     }
 
-      
+
 
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
@@ -80,4 +80,3 @@ public class AmqpValueType extends AbstractDescribedType<AmqpValue,Object> imple
         encoder.register(type);
     }
 }
-  

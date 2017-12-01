@@ -36,7 +36,6 @@ import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DescribedTypeConstructor;
 import org.apache.qpid.proton.codec.EncoderImpl;
 
-
 public class PropertiesType  extends AbstractDescribedType<Properties,List> implements DescribedTypeConstructor<Properties>
 {
     private static final Object[] DESCRIPTORS =
@@ -46,7 +45,7 @@ public class PropertiesType  extends AbstractDescribedType<Properties,List> impl
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000073L);
 
-    private PropertiesType(EncoderImpl encoder)
+    PropertiesType(EncoderImpl encoder)
     {
         super(encoder);
     }
@@ -190,8 +189,6 @@ public class PropertiesType  extends AbstractDescribedType<Properties,List> impl
             return Properties.class;
         }
 
-
-
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
         PropertiesType type = new PropertiesType(encoder);
@@ -201,5 +198,4 @@ public class PropertiesType  extends AbstractDescribedType<Properties,List> impl
         }
         encoder.register(type);
     }
-
 }

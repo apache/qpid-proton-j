@@ -39,7 +39,6 @@ import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DescribedTypeConstructor;
 import org.apache.qpid.proton.codec.EncoderImpl;
 
-
 public final class TransferType extends AbstractDescribedType<Transfer,List> implements DescribedTypeConstructor<Transfer>
 {
     private static final Object[] DESCRIPTORS =
@@ -49,7 +48,7 @@ public final class TransferType extends AbstractDescribedType<Transfer,List> imp
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000014L);
 
-    private TransferType(EncoderImpl encoder)
+    TransferType(EncoderImpl encoder)
     {
         super(encoder);
     }
@@ -190,9 +189,6 @@ public final class TransferType extends AbstractDescribedType<Transfer,List> imp
             return Transfer.class;
         }
 
-
-
-
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
         TransferType type = new TransferType(encoder);
@@ -202,6 +198,4 @@ public final class TransferType extends AbstractDescribedType<Transfer,List> imp
         }
         encoder.register(type);
     }
-
 }
-  

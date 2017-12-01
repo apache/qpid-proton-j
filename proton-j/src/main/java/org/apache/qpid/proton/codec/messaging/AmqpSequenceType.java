@@ -42,7 +42,7 @@ public class AmqpSequenceType extends AbstractDescribedType<AmqpSequence,List> i
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000076L);
 
-    private AmqpSequenceType(EncoderImpl encoder)
+    AmqpSequenceType(EncoderImpl encoder)
     {
         super(encoder);
     }
@@ -68,7 +68,7 @@ public class AmqpSequenceType extends AbstractDescribedType<AmqpSequence,List> i
         return AmqpSequence.class;
     }
 
-      
+
 
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
@@ -80,4 +80,3 @@ public class AmqpSequenceType extends AbstractDescribedType<AmqpSequence,List> i
         encoder.register(type);
     }
 }
-  

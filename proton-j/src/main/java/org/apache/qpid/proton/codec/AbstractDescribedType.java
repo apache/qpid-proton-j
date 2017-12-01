@@ -28,17 +28,27 @@ import org.apache.qpid.proton.amqp.UnsignedLong;
 
 abstract public class AbstractDescribedType<T,M> implements AMQPType<T>
 {
-
+    private final DecoderImpl _decoder;
     private final EncoderImpl _encoder;
     private final Map<TypeEncoding<M>, TypeEncoding<T>> _encodings = new HashMap<TypeEncoding<M>, TypeEncoding<T>>();
 
     public AbstractDescribedType(EncoderImpl encoder)
     {
         _encoder = encoder;
+        _decoder = encoder.getDecoder();
     }
 
     abstract protected UnsignedLong getDescriptor();
 
+    public EncoderImpl getEncoder()
+    {
+        return _encoder;
+    }
+
+    public DecoderImpl getDecoder()
+    {
+        return _decoder;
+    }
 
     public TypeEncoding<T> getEncoding(final T val)
     {

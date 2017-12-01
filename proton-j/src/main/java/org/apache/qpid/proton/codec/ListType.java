@@ -20,6 +20,7 @@
  */
 package org.apache.qpid.proton.codec;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -55,10 +56,9 @@ public class ListType extends AbstractPrimitiveType<List>
 
     public ListEncoding getEncoding(final List val)
     {
-
         int calculatedSize = calculateSize(val, _encoder);
-        ListEncoding encoding = val.isEmpty() 
-                                    ? _zeroListEncoding 
+        ListEncoding encoding = val.isEmpty()
+                                    ? _zeroListEncoding
                                     : (val.size() > 255 || calculatedSize >= 254)
                                         ? _listEncoding
                                         : _shortListEncoding;
@@ -85,7 +85,6 @@ public class ListType extends AbstractPrimitiveType<List>
         }
         return len;
     }
-
 
     public ListEncoding getCanonicalEncoding()
     {
@@ -152,6 +151,8 @@ public class ListType extends AbstractPrimitiveType<List>
         public List readValue()
         {
             DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+
             int size = decoder.readRawInt();
             // todo - limit the decoder with size
             int count = decoder.readRawInt();
@@ -160,12 +161,76 @@ public class ListType extends AbstractPrimitiveType<List>
                 throw new IllegalArgumentException("List element count "+count+" is specified to be greater than the amount of data available ("+
                                                    decoder.getByteBufferRemaining()+")");
             }
-            List list = new ArrayList(count);
-            for(int i = 0; i < count; i++)
+
+            TypeConstructor<?> typeConstructor = null;
+
+            List<Object> list = new ArrayList<>(count);
+            for (int i = 0; i < count; i++)
             {
-                list.add(decoder.readObject());
+                boolean arrayType = false;
+                byte code = buffer.get(buffer.position());
+                switch (code)
+                {
+                    case EncodingCodes.ARRAY8:
+                    case EncodingCodes.ARRAY32:
+                        arrayType = true;
+                }
+
+                // Whenever we can just reuse the previously used TypeDecoder instead
+                // of spending time looking up the same one again.
+                if (typeConstructor == null)
+                {
+                    typeConstructor = getDecoder().readConstructor();
+                }
+                else
+                {
+                    buffer.mark();
+
+                    byte encodingCode = buffer.get();
+                    if (encodingCode == EncodingCodes.DESCRIBED_TYPE_INDICATOR || !(typeConstructor instanceof PrimitiveTypeEncoding<?>))
+                    {
+                        buffer.reset();
+                        typeConstructor = getDecoder().readConstructor();
+                    }
+                    else
+                    {
+                        PrimitiveTypeEncoding<?> primitiveConstructor = (PrimitiveTypeEncoding<?>) typeConstructor;
+                        if (encodingCode != primitiveConstructor.getEncodingCode())
+                        {
+                            buffer.reset();
+                            typeConstructor = getDecoder().readConstructor();
+                        }
+                    }
+                }
+
+                if(typeConstructor == null)
+                {
+                    throw new DecodeException("Unknown constructor");
+                }
+
+                final Object value;
+
+                if (arrayType)
+                {
+                    value = ((ArrayType.ArrayEncoding) typeConstructor).readValueArray();
+                }
+                else
+                {
+                    value = typeConstructor.readValue();
+                }
+
+                list.add(value);
             }
+
             return list;
+        }
+
+        public void skipValue()
+        {
+            DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+            int size = decoder.readRawInt();
+            buffer.position(buffer.position() + size);
         }
 
         public void setValue(final List value, final int length)
@@ -229,17 +294,82 @@ public class ListType extends AbstractPrimitiveType<List>
 
         public List readValue()
         {
-
             DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+
             int size = ((int)decoder.readRawByte()) & 0xff;
             // todo - limit the decoder with size
             int count = ((int)decoder.readRawByte()) & 0xff;
-            List list = new ArrayList(count);
-            for(int i = 0; i < count; i++)
+
+            TypeConstructor<?> typeConstructor = null;
+
+            List<Object> list = new ArrayList<>(count);
+            for (int i = 0; i < count; i++)
             {
-                list.add(decoder.readObject());
+                boolean arrayType = false;
+                byte code = buffer.get(buffer.position());
+                switch (code)
+                {
+                    case EncodingCodes.ARRAY8:
+                    case EncodingCodes.ARRAY32:
+                        arrayType = true;
+                }
+
+                // Whenever we can just reuse the previously used TypeDecoder instead
+                // of spending time looking up the same one again.
+                if (typeConstructor == null)
+                {
+                    typeConstructor = getDecoder().readConstructor();
+                }
+                else
+                {
+                    buffer.mark();
+
+                    byte encodingCode = buffer.get();
+                    if (encodingCode == EncodingCodes.DESCRIBED_TYPE_INDICATOR || !(typeConstructor instanceof PrimitiveTypeEncoding<?>))
+                    {
+                        buffer.reset();
+                        typeConstructor = getDecoder().readConstructor();
+                    }
+                    else
+                    {
+                        PrimitiveTypeEncoding<?> primitiveConstructor = (PrimitiveTypeEncoding<?>) typeConstructor;
+                        if (encodingCode != primitiveConstructor.getEncodingCode())
+                        {
+                            buffer.reset();
+                            typeConstructor = getDecoder().readConstructor();
+                        }
+                    }
+                }
+
+                if (typeConstructor == null)
+                {
+                    throw new DecodeException("Unknown constructor");
+                }
+
+                final Object value;
+
+                if (arrayType)
+                {
+                    value = ((ArrayType.ArrayEncoding) typeConstructor).readValueArray();
+                }
+                else
+                {
+                    value = typeConstructor.readValue();
+                }
+
+                list.add(value);
             }
+
             return list;
+        }
+
+        public void skipValue()
+        {
+            DecoderImpl decoder = getDecoder();
+            ByteBuffer buffer = decoder.getByteBuffer();
+            int size = ((int)decoder.readRawByte()) & 0xff;
+            buffer.position(buffer.position() + size);
         }
 
         public void setValue(final List value, final int length)
@@ -249,7 +379,7 @@ public class ListType extends AbstractPrimitiveType<List>
         }
     }
 
-    
+
     private class ZeroListEncoding
             extends FixedSizePrimitiveTypeEncoding<List>
             implements ListEncoding
@@ -270,7 +400,6 @@ public class ListType extends AbstractPrimitiveType<List>
         {
             return 0;
         }
-
 
         public ListType getType()
         {
@@ -294,7 +423,5 @@ public class ListType extends AbstractPrimitiveType<List>
         {
             return Collections.EMPTY_LIST;
         }
-
-
     }
 }

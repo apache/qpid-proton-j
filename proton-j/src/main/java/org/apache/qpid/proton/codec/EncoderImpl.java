@@ -42,9 +42,9 @@ public final class EncoderImpl implements ByteBufferEncoder
 {
     private static final byte DESCRIBED_TYPE_OP = (byte)0;
 
-
     private WritableBuffer _buffer;
 
+    private final DecoderImpl _decoder;
     private final Map<Class, AMQPType> _typeRegistry = new HashMap<Class, AMQPType>();
     private Map<Object, AMQPType> _describedDescriptorRegistry = new HashMap<Object, AMQPType>();
     private Map<Class, AMQPType>  _describedTypesClassRegistry = new HashMap<Class, AMQPType>();
@@ -88,7 +88,7 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     public EncoderImpl(DecoderImpl decoder)
     {
-
+        _decoder                = decoder;
         _nullType               = new NullType(this, decoder);
         _booleanType            = new BooleanType(this, decoder);
         _byteType               = new ByteType(this, decoder);
@@ -143,36 +143,32 @@ public final class EncoderImpl implements ByteBufferEncoder
         _buffer = buf;
     }
 
+    public WritableBuffer getBuffer()
+    {
+        return _buffer;
+    }
+
+    public DecoderImpl getDecoder()
+    {
+        return _decoder;
+    }
 
     @Override
     public AMQPType getType(final Object element)
     {
-        if(element instanceof DescribedType)
-        {
-            AMQPType amqpType;
-
-            Object descriptor = ((DescribedType)element).getDescriptor();
-            amqpType = _describedDescriptorRegistry.get(descriptor);
-            if(amqpType == null)
-            {
-                amqpType = new DynamicDescribedType(this, descriptor);
-                _describedDescriptorRegistry.put(descriptor, amqpType);
-            }
-            return amqpType;
-
-        }
-        else
-        {
-            return getTypeFromClass(element == null ? Void.class : element.getClass());
-        }
+        return getTypeFromClass(element == null ? Void.class : element.getClass(), element);
     }
 
     public AMQPType getTypeFromClass(final Class clazz)
     {
+        return getTypeFromClass(clazz, null);
+    }
+
+    private AMQPType getTypeFromClass(final Class clazz, Object instance)
+    {
         AMQPType amqpType = _typeRegistry.get(clazz);
         if(amqpType == null)
         {
-
             if(clazz.isArray())
             {
                 amqpType = _arrayType;
@@ -190,10 +186,21 @@ public final class EncoderImpl implements ByteBufferEncoder
                 else if(DescribedType.class.isAssignableFrom(clazz))
                 {
                     amqpType = _describedTypesClassRegistry.get(clazz);
+                    if(amqpType == null && instance != null)
+                    {
+                        Object descriptor = ((DescribedType) instance).getDescriptor();
+                        amqpType = _describedDescriptorRegistry.get(descriptor);
+                        if(amqpType == null)
+                        {
+                            amqpType = new DynamicDescribedType(this, descriptor);
+                            _describedDescriptorRegistry.put(descriptor, amqpType);
+                        }
+                    }
                 }
             }
             _typeRegistry.put(clazz, amqpType);
         }
+
         return amqpType;
     }
 
@@ -221,12 +228,19 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     public void writeNull()
     {
-        _nullType.write();
+        _buffer.put(EncodingCodes.NULL);
     }
 
     public void writeBoolean(final boolean bool)
     {
-        _booleanType.writeValue(bool);
+        if (bool)
+        {
+            _buffer.put(EncodingCodes.BOOLEAN_TRUE);
+        }
+        else
+        {
+            _buffer.put(EncodingCodes.BOOLEAN_FALSE);
+        }
     }
 
     public void writeBoolean(final Boolean bool)
@@ -235,9 +249,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         {
             writeNull();
         }
+        else if (Boolean.TRUE.equals(bool))
+        {
+            _buffer.put(EncodingCodes.BOOLEAN_TRUE);
+        }
         else
         {
-            _booleanType.write(bool);
+            _buffer.put(EncodingCodes.BOOLEAN_FALSE);
         }
     }
 
@@ -249,7 +267,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _unsignedByteType.write(ubyte);
+            _unsignedByteType.fastWrite(this, ubyte);
         }
     }
 
@@ -261,7 +279,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _unsignedShortType.write(ushort);
+            _unsignedShortType.fastWrite(this, ushort);
         }
     }
 
@@ -273,7 +291,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _unsignedIntegerType.write(uint);
+            _unsignedIntegerType.fastWrite(this, uint);
         }
     }
 
@@ -285,7 +303,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _unsignedLongType.write(ulong);
+            _unsignedLongType.fastWrite(this, ulong);
         }
     }
 
@@ -446,9 +464,9 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
-    public void writeTimestamp(final long d)
+    public void writeTimestamp(final long timestamp)
     {
-        _timestampType.write(d);
+        _timestampType.fastWrite(this, timestamp);
     }
 
     public void writeTimestamp(final Date d)
@@ -459,7 +477,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            writeTimestamp(d.getTime());
+            _timestampType.fastWrite(this, d.getTime());
         }
     }
 
@@ -471,7 +489,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _uuidType.write(uuid);
+            _uuidType.fastWrite(this, uuid);
         }
 
     }
@@ -484,7 +502,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _binaryType.write(b);
+            _binaryType.fastWrite(this, b);
         }
     }
 
@@ -508,7 +526,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
         else
         {
-            _symbolType.write(s);
+            _symbolType.fastWrite(this, s);
         }
 
     }
@@ -662,56 +680,19 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     public void writeObject(final Object o)
     {
-        AMQPType type = _typeRegistry.get(o == null ? Void.class : o.getClass());
+        if (o == null)
+        {
+            getBuffer().put(EncodingCodes.NULL);
+            return;
+        }
+
+        AMQPType type = _typeRegistry.get(o.getClass());
 
         if(type == null)
         {
             if(o.getClass().isArray())
             {
-                Class<?> componentType = o.getClass().getComponentType();
-                if(componentType.isPrimitive())
-                {
-                    if(componentType == Boolean.TYPE)
-                    {
-                        writeArray((boolean[])o);
-                    }
-                    else if(componentType == Byte.TYPE)
-                    {
-                        writeArray((byte[])o);
-                    }
-                    else if(componentType == Short.TYPE)
-                    {
-                        writeArray((short[])o);
-                    }
-                    else if(componentType == Integer.TYPE)
-                    {
-                        writeArray((int[])o);
-                    }
-                    else if(componentType == Long.TYPE)
-                    {
-                        writeArray((long[])o);
-                    }
-                    else if(componentType == Float.TYPE)
-                    {
-                        writeArray((float[])o);
-                    }
-                    else if(componentType == Double.TYPE)
-                    {
-                        writeArray((double[])o);
-                    }
-                    else if(componentType == Character.TYPE)
-                    {
-                        writeArray((char[])o);
-                    }
-                    else
-                    {
-                        throw new IllegalArgumentException("Cannot write arrays of type " + componentType.getName());
-                    }
-                }
-                else
-                {
-                    writeArray((Object[]) o);
-                }
+                writeArrayType(o);
             }
             else if(o instanceof List)
             {
@@ -727,14 +708,60 @@ public final class EncoderImpl implements ByteBufferEncoder
             }
             else
             {
-                throw new IllegalArgumentException("Do not know how to write Objects of class " + o.getClass()
-                                                                                                       .getName());
-
+                throw new IllegalArgumentException(
+                    "Do not know how to write Objects of class " + o.getClass().getName());
             }
         }
         else
         {
             type.write(o);
+        }
+    }
+
+    private void writeArrayType(Object array) {
+        Class<?> componentType = array.getClass().getComponentType();
+        if(componentType.isPrimitive())
+        {
+            if(componentType == Boolean.TYPE)
+            {
+                writeArray((boolean[])array);
+            }
+            else if(componentType == Byte.TYPE)
+            {
+                writeArray((byte[])array);
+            }
+            else if(componentType == Short.TYPE)
+            {
+                writeArray((short[])array);
+            }
+            else if(componentType == Integer.TYPE)
+            {
+                writeArray((int[])array);
+            }
+            else if(componentType == Long.TYPE)
+            {
+                writeArray((long[])array);
+            }
+            else if(componentType == Float.TYPE)
+            {
+                writeArray((float[])array);
+            }
+            else if(componentType == Double.TYPE)
+            {
+                writeArray((double[])array);
+            }
+            else if(componentType == Character.TYPE)
+            {
+                writeArray((char[])array);
+            }
+            else
+            {
+                throw new IllegalArgumentException("Cannot write arrays of type " + componentType.getName());
+            }
+        }
+        else
+        {
+            writeArray((Object[]) array);
         }
     }
 
@@ -813,5 +840,10 @@ public final class EncoderImpl implements ByteBufferEncoder
                 _buffer.put((byte)(0x80 | (c & 0x3F)));
             }
         }
+    }
+
+    AMQPType getNullTypeEncoder()
+    {
+        return _nullType;
     }
 }

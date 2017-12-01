@@ -59,6 +59,24 @@ public class UnsignedIntegerType extends AbstractPrimitiveType<UnsignedInteger>
             : (i >= 0 && i <= 255) ? _smallUnsignedIntegerEncoding : _unsignedIntegerEncoding;
     }
 
+    public void fastWrite(EncoderImpl encoder, UnsignedInteger value)
+    {
+        int intValue = value.intValue();
+        if (intValue == 0)
+        {
+            encoder.writeRaw(EncodingCodes.UINT0);
+        }
+        else if (intValue > 0 && intValue <= 255)
+        {
+            encoder.writeRaw(EncodingCodes.SMALLUINT);
+            encoder.writeRaw((byte)intValue);
+        }
+        else
+        {
+            encoder.writeRaw(EncodingCodes.UINT);
+            encoder.writeRaw(intValue);
+        }
+    }
 
     public UnsignedIntegerEncoding getCanonicalEncoding()
     {
@@ -102,12 +120,12 @@ public class UnsignedIntegerType extends AbstractPrimitiveType<UnsignedInteger>
         {
             getEncoder().writeRaw(val.intValue());
         }
-        
+
         public void write(final int i)
         {
             writeConstructor();
             getEncoder().writeRaw(i);
-            
+
         }
 
         public boolean encodesSuperset(final TypeEncoding<UnsignedInteger> encoding)

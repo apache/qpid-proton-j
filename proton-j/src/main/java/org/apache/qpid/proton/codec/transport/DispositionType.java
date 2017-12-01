@@ -47,7 +47,7 @@ public final class DispositionType extends AbstractDescribedType<Disposition,Lis
 
     private static final UnsignedLong DESCRIPTOR = UnsignedLong.valueOf(0x0000000000000015L);
 
-    private DispositionType(EncoderImpl encoder)
+    DispositionType(EncoderImpl encoder)
     {
         super(encoder);
     }
