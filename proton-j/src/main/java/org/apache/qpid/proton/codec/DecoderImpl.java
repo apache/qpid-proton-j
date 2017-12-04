@@ -170,9 +170,9 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.BOOLEAN_TRUE:
-                return (Boolean) _constructors[EncodingCodes.BOOLEAN_TRUE & 0xff].readValue();
+                return Boolean.TRUE;
             case EncodingCodes.BOOLEAN_FALSE:
-                return (Boolean) _constructors[EncodingCodes.BOOLEAN_FALSE & 0xff].readValue();
+                return Boolean.FALSE;
             case EncodingCodes.BOOLEAN:
                 return (Boolean) _constructors[EncodingCodes.BOOLEAN & 0xff].readValue();
             case EncodingCodes.NULL:
@@ -189,9 +189,9 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.BOOLEAN_TRUE:
-                return (Boolean) _constructors[EncodingCodes.BOOLEAN_TRUE & 0xff].readValue();
+                return true;
             case EncodingCodes.BOOLEAN_FALSE:
-                return (Boolean) _constructors[EncodingCodes.BOOLEAN_FALSE & 0xff].readValue();
+                return false;
             case EncodingCodes.BOOLEAN:
                 return (Boolean) _constructors[EncodingCodes.BOOLEAN & 0xff].readValue();
             case EncodingCodes.NULL:
@@ -423,7 +423,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.UINT0:
-                return (UnsignedInteger) _constructors[EncodingCodes.UINT0 & 0xff].readValue();
+                return UnsignedInteger.ZERO;
             case EncodingCodes.SMALLUINT:
                 return (UnsignedInteger) _constructors[EncodingCodes.SMALLUINT & 0xff].readValue();
             case EncodingCodes.UINT:
@@ -447,7 +447,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.ULONG0:
-                return (UnsignedLong) _constructors[EncodingCodes.ULONG0 & 0xff].readValue();
+                return UnsignedLong.ZERO;
             case EncodingCodes.SMALLULONG:
                 return (UnsignedLong) _constructors[EncodingCodes.SMALLULONG & 0xff].readValue();
             case EncodingCodes.ULONG:
@@ -752,7 +752,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.LIST0:
-                return (List) _constructors[EncodingCodes.LIST0 & 0xff].readValue();
+                return Collections.EMPTY_LIST;
             case EncodingCodes.LIST8:
                 return (List) _constructors[EncodingCodes.LIST8 & 0xff].readValue();
             case EncodingCodes.LIST32:
