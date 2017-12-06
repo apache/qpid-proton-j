@@ -28,14 +28,14 @@ import java.util.Map;
 public final class ApplicationProperties
       implements Section
 {
-    private final Map _value;
+    private final Map<String, Object> _value;
 
-    public ApplicationProperties(Map value)
+    public ApplicationProperties(Map<String, Object> value)
     {
         _value = value;
     }
 
-    public Map getValue()
+    public Map<String, Object> getValue()
     {
         return _value;
     }
