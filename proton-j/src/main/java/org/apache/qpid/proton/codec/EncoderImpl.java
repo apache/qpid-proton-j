@@ -196,6 +196,8 @@ public final class EncoderImpl implements ByteBufferEncoder
                             _describedDescriptorRegistry.put(descriptor, amqpType);
                         }
                     }
+
+                    return amqpType;
                 }
             }
             _typeRegistry.put(clazz, amqpType);
