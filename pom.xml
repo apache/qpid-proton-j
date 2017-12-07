@@ -180,13 +180,14 @@
   </ciManagement>
 
   <profiles>
-    <!-- Override the apache-release profile from the parent. Skip creating
-         a source release here, we have a release module that does it.  -->
+    <!-- Override the apache-release profile from the parent pom -->
     <profile>
       <id>apache-release</id>
       <build>
         <plugins>
           <plugin>
+            <!-- Skip creating a source release here, as we
+                 have a release module that does it.  -->
             <artifactId>maven-assembly-plugin</artifactId>
             <executions>
               <execution>
@@ -199,6 +200,19 @@
           </plugin>
         </plugins>
       </build>
+      <!-- Enable the optional performance-jmh module too, so that it gets
+           the version updated by the maven-release-plugin during release.
+           The module is configured not to deploy anything. -->
+      <modules>
+        <module>tests/performance-jmh</module>
+      </modules>
+    </profile>
+
+    <profile>
+      <id>performance-jmh</id>
+      <modules>
+        <module>tests/performance-jmh</module>
+      </modules>
     </profile>
 
     <profile>
