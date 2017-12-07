@@ -168,8 +168,8 @@ public class ListType extends AbstractPrimitiveType<List>
             for (int i = 0; i < count; i++)
             {
                 boolean arrayType = false;
-                byte code = buffer.get(buffer.position());
-                switch (code)
+                byte encodingCode = buffer.get(buffer.position());
+                switch (encodingCode)
                 {
                     case EncodingCodes.ARRAY8:
                     case EncodingCodes.ARRAY32:
@@ -184,12 +184,8 @@ public class ListType extends AbstractPrimitiveType<List>
                 }
                 else
                 {
-                    buffer.mark();
-
-                    byte encodingCode = buffer.get();
                     if (encodingCode == EncodingCodes.DESCRIBED_TYPE_INDICATOR || !(typeConstructor instanceof PrimitiveTypeEncoding<?>))
                     {
-                        buffer.reset();
                         typeConstructor = getDecoder().readConstructor();
                     }
                     else
@@ -197,8 +193,12 @@ public class ListType extends AbstractPrimitiveType<List>
                         PrimitiveTypeEncoding<?> primitiveConstructor = (PrimitiveTypeEncoding<?>) typeConstructor;
                         if (encodingCode != primitiveConstructor.getEncodingCode())
                         {
-                            buffer.reset();
                             typeConstructor = getDecoder().readConstructor();
+                        }
+                        else
+                        {
+                            // consume the encoding code byte for real
+                            encodingCode = buffer.get();
                         }
                     }
                 }
@@ -307,8 +307,8 @@ public class ListType extends AbstractPrimitiveType<List>
             for (int i = 0; i < count; i++)
             {
                 boolean arrayType = false;
-                byte code = buffer.get(buffer.position());
-                switch (code)
+                byte encodingCode = buffer.get(buffer.position());
+                switch (encodingCode)
                 {
                     case EncodingCodes.ARRAY8:
                     case EncodingCodes.ARRAY32:
@@ -323,12 +323,8 @@ public class ListType extends AbstractPrimitiveType<List>
                 }
                 else
                 {
-                    buffer.mark();
-
-                    byte encodingCode = buffer.get();
                     if (encodingCode == EncodingCodes.DESCRIBED_TYPE_INDICATOR || !(typeConstructor instanceof PrimitiveTypeEncoding<?>))
                     {
-                        buffer.reset();
                         typeConstructor = getDecoder().readConstructor();
                     }
                     else
@@ -336,8 +332,12 @@ public class ListType extends AbstractPrimitiveType<List>
                         PrimitiveTypeEncoding<?> primitiveConstructor = (PrimitiveTypeEncoding<?>) typeConstructor;
                         if (encodingCode != primitiveConstructor.getEncodingCode())
                         {
-                            buffer.reset();
                             typeConstructor = getDecoder().readConstructor();
+                        }
+                        else
+                        {
+                            // consume the encoding code byte for real
+                            encodingCode = buffer.get();
                         }
                     }
                 }
