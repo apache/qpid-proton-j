@@ -73,7 +73,7 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
                 count = decoder.getByteBuffer().getInt();
                 break;
             default:
-                throw new DecodeException("Incorrect type found in Transfer encoding: " + typeCode);
+                throw new DecodeException("Incorrect type found in Properties encoding: " + typeCode);
         }
 
         Properties properties = new Properties();

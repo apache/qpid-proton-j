@@ -73,7 +73,7 @@ public class FastPathHeaderType implements AMQPType<Header>, FastPathDescribedTy
                 count = decoder.getByteBuffer().getInt();
                 break;
             default:
-                throw new DecodeException("Incorrect type found in Transfer encoding: " + typeCode);
+                throw new DecodeException("Incorrect type found in Header encoding: " + typeCode);
         }
 
         Header header = new Header();
