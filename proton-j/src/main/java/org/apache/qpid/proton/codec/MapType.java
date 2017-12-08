@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 
 public class MapType extends AbstractPrimitiveType<Map>
 {
@@ -96,18 +95,6 @@ public class MapType extends AbstractPrimitiveType<Map>
         return len;
     }
 
-    private AMQPType<?> getKeyEncoding(EncoderImpl encoder, Object key)
-    {
-        if (fixedKeyType != null)
-        {
-            return fixedKeyType;
-        }
-        else
-        {
-            return encoder.getType(key);
-        }
-    }
-
     private static TypeConstructor<?> findNextDecoder(DecoderImpl decoder, ByteBuffer buffer, TypeConstructor<?> previousConstructor)
     {
         if (previousConstructor == null)
@@ -116,12 +103,9 @@ public class MapType extends AbstractPrimitiveType<Map>
         }
         else
         {
-            buffer.mark();
-
-            byte encodingCode = buffer.get();
+            byte encodingCode = buffer.get(buffer.position());
             if (encodingCode == EncodingCodes.DESCRIBED_TYPE_INDICATOR || !(previousConstructor instanceof PrimitiveTypeEncoding<?>))
             {
-                buffer.reset();
                 return decoder.readConstructor();
             }
             else
@@ -129,8 +113,12 @@ public class MapType extends AbstractPrimitiveType<Map>
                 PrimitiveTypeEncoding<?> primitiveConstructor = (PrimitiveTypeEncoding<?>) previousConstructor;
                 if (encodingCode != primitiveConstructor.getEncodingCode())
                 {
-                    buffer.reset();
                     return decoder.readConstructor();
+                }
+                else
+                {
+                    // consume the encoding code byte for real
+                    encodingCode = buffer.get();
                 }
             }
         }
