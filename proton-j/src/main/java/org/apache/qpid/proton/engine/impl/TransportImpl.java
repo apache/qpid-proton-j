@@ -110,7 +110,7 @@ public class TransportImpl extends EndpointImpl
 
     private boolean _closeReceived;
     private Open _open;
-    private SaslImpl _sasl;
+    private Sasl _sasl;
     private SslImpl _ssl;
     private final Ref<ProtocolTracer> _protocolTracer = new Ref(null);
 
@@ -369,6 +369,28 @@ public class TransportImpl extends EndpointImpl
         }
         return _sasl;
 
+    }
+
+    @Override
+    public Sasl sasl(Sasl saslImpl)
+    {
+        if(saslImpl == null)
+        {
+            throw new IllegalArgumentException("The provided sasl implementation must not be null");
+        }
+
+        if(_processingStarted)
+        {
+            throw new IllegalStateException("Sasl can't be initiated after transport has started processing");
+        }
+
+        init();
+        this._sasl = saslImpl;
+        TransportWrapper transportWrapper = _sasl.wrap(_inputProcessor, _outputProcessor);
+        _inputProcessor = transportWrapper;
+        _outputProcessor = transportWrapper;
+
+        return this._sasl;
     }
 
     /**

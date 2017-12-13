@@ -45,7 +45,7 @@ import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
 
-public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>, SaslFrameHandler, TransportLayer
+public class SaslImpl implements Sasl
 {
     private static final Logger _logger = Logger.getLogger(SaslImpl.class.getName());
 
@@ -101,7 +101,8 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         _frameWriter = new FrameWriter(_encoder, maxFrameSize, FrameWriter.SASL_FRAME_TYPE, null, _transport);
     }
 
-    void fail() {
+    @Override
+    public void fail() {
         if (_role == null || _role == Role.CLIENT) {
             _role = Role.CLIENT;
             _initSent = true;
