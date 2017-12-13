@@ -64,8 +64,7 @@ import org.apache.qpid.proton.reactor.Reactor;
 import org.apache.qpid.proton.reactor.Selectable;
 
 public class TransportImpl extends EndpointImpl
-    implements ProtonJTransport, FrameBody.FrameBodyHandler<Integer>,
-        FrameHandler, TransportOutputWriter, TransportInternal
+    implements ProtonJTransport, TransportInternal
 {
     static final int BUFFER_RELEASE_THRESHOLD = Integer.getInteger("proton.transport_buffer_release_threshold", 2 * 1024 * 1024);
     private static final int CHANNEL_MAX_LIMIT = 65535;
@@ -1705,7 +1704,8 @@ public class TransportImpl extends EndpointImpl
     static String INCOMING = "<-";
     static String OUTGOING = "->";
 
-    void log(String event, TransportFrame frame)
+    @Override
+    public void log(String event, TransportFrame frame)
     {
         if (isTraceFramesEnabled()) {
             StringBuilder msg = new StringBuilder();
@@ -1722,7 +1722,8 @@ public class TransportImpl extends EndpointImpl
         }
     }
 
-    boolean isTraceFramesEnabled()
+    @Override
+    public boolean isTraceFramesEnabled()
     {
         return (_levels & TRACE_FRM) != 0;
     }

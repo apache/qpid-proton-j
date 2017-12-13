@@ -51,46 +51,46 @@ public class SaslImpl implements Sasl
 
     public static final byte SASL_FRAME_TYPE = (byte) 1;
 
-    private final DecoderImpl _decoder = new DecoderImpl();
-    private final EncoderImpl _encoder = new EncoderImpl(_decoder);
+    protected final DecoderImpl _decoder = new DecoderImpl();
+    protected final EncoderImpl _encoder = new EncoderImpl(_decoder);
 
-    private final TransportImpl _transport;
+    protected final Transport _transport;
 
-    private boolean _tail_closed = false;
-    private final ByteBuffer _inputBuffer;
-    private boolean _head_closed = false;
-    private final ByteBuffer _outputBuffer;
-    private final FrameWriter _frameWriter;
+    protected boolean _tail_closed = false;
+    protected final ByteBuffer _inputBuffer;
+    protected boolean _head_closed = false;
+    protected final ByteBuffer _outputBuffer;
+    protected final FrameWriter _frameWriter;
 
-    private ByteBuffer _pending;
+    protected ByteBuffer _pending;
 
-    private boolean _headerWritten;
-    private Binary _challengeResponse;
-    private SaslFrameParser _frameParser;
-    private boolean _initReceived;
-    private boolean _mechanismsSent;
-    private boolean _initSent;
+    protected boolean _headerWritten;
+    protected Binary _challengeResponse;
+    protected SaslFrameParser _frameParser;
+    protected boolean _initReceived;
+    protected boolean _mechanismsSent;
+    protected boolean _initSent;
 
-    enum Role { CLIENT, SERVER };
+    protected enum Role { CLIENT, SERVER };
 
-    private SaslOutcome _outcome = SaslOutcome.PN_SASL_NONE;
-    private SaslState _state = SaslState.PN_SASL_IDLE;
+    protected SaslOutcome _outcome = SaslOutcome.PN_SASL_NONE;
+    protected SaslState _state = SaslState.PN_SASL_IDLE;
 
-    private String _hostname;
-    private boolean _done;
-    private Symbol[] _mechanisms;
+    protected String _hostname;
+    protected boolean _done;
+    protected Symbol[] _mechanisms;
 
-    private Symbol _chosenMechanism;
+    protected Symbol _chosenMechanism;
 
-    private Role _role;
-    private boolean _allowSkip = true;
+    protected Role _role;
+    protected boolean _allowSkip = true;
 
     /**
      * @param maxFrameSize the size of the input and output buffers
      * returned by {@link SaslTransportWrapper#getInputBuffer()} and
      * {@link SaslTransportWrapper#getOutputBuffer()}.
      */
-    SaslImpl(TransportImpl transport, int maxFrameSize)
+    protected SaslImpl(Transport transport, int maxFrameSize)
     {
         _transport = transport;
         _inputBuffer = newWriteableBuffer(maxFrameSize);
@@ -196,7 +196,7 @@ public class SaslImpl implements Sasl
     }
 
     @Override
-    final public int recv(byte[] bytes, int offset, int size)
+    public int recv(byte[] bytes, int offset, int size)
     {
         if(_pending == null)
         {
@@ -211,7 +211,7 @@ public class SaslImpl implements Sasl
     }
 
     @Override
-    final public int send(byte[] bytes, int offset, int size)
+    public int send(byte[] bytes, int offset, int size)
     {
         byte[] data = new byte[size];
         System.arraycopy(bytes, offset, data, 0, size);
@@ -219,7 +219,7 @@ public class SaslImpl implements Sasl
         return size;
     }
 
-    final int processHeader()
+    protected int processHeader()
     {
         if(!_headerWritten)
         {
@@ -251,12 +251,12 @@ public class SaslImpl implements Sasl
         return _state;
     }
 
-    final Binary getChallengeResponse()
+    protected Binary getChallengeResponse()
     {
         return _challengeResponse;
     }
 
-    final void setChallengeResponse(Binary challengeResponse)
+    protected void setChallengeResponse(Binary challengeResponse)
     {
         _challengeResponse = challengeResponse;
     }
@@ -366,7 +366,7 @@ public class SaslImpl implements Sasl
         _logger.fine("SASL negotiation done: " + this);
     }
 
-    private void checkRole(Role role)
+    protected void checkRole(Role role)
     {
         if(role != _role)
         {
@@ -419,12 +419,12 @@ public class SaslImpl implements Sasl
         }
     }
 
-    private SaslState classifyStateFromOutcome(SaslOutcome outcome)
+    protected SaslState classifyStateFromOutcome(SaslOutcome outcome)
     {
         return outcome == SaslOutcome.PN_SASL_OK ? SaslState.PN_SASL_PASS : SaslState.PN_SASL_FAIL;
     }
 
-    private void processResponse()
+    protected void processResponse()
     {
         SaslResponse response = new SaslResponse();
         response.setResponse(getChallengeResponse());
@@ -432,7 +432,7 @@ public class SaslImpl implements Sasl
         writeFrame(response);
     }
 
-    private void processInit()
+    protected void processInit()
     {
         SaslInit init = new SaslInit();
         init.setHostname(_hostname);
@@ -518,7 +518,7 @@ public class SaslImpl implements Sasl
         return builder.toString();
     }
 
-    private class SaslTransportWrapper implements TransportWrapper
+    protected class SaslTransportWrapper implements TransportWrapper
     {
         private final TransportInput _underlyingInput;
         private final TransportOutput _underlyingOutput;

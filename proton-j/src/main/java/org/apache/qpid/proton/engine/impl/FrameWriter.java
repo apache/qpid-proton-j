@@ -25,6 +25,7 @@ import org.apache.qpid.proton.amqp.transport.EmptyFrame;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.WritableBuffer;
+import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.framing.TransportFrame;
 
 import java.nio.BufferOverflowException;
@@ -47,7 +48,7 @@ class FrameWriter
     private int _maxFrameSize;
     private byte _frameType;
     final private Ref<ProtocolTracer> _protocolTracer;
-    private TransportImpl _transport;
+    private Transport _transport;
 
     private int _frameStart = 0;
     private int _payloadStart;
@@ -55,7 +56,7 @@ class FrameWriter
     private long _framesOutput = 0;
 
     FrameWriter(EncoderImpl encoder, int maxFrameSize, byte frameType,
-                Ref<ProtocolTracer> protocolTracer, TransportImpl transport)
+                Ref<ProtocolTracer> protocolTracer, Transport transport)
     {
         _encoder = encoder;
         _bbuf = ByteBuffer.allocate(1024);

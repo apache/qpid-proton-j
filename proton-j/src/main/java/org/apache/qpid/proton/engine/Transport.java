@@ -23,7 +23,11 @@ package org.apache.qpid.proton.engine;
 import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
+import org.apache.qpid.proton.amqp.transport.FrameBody;
+import org.apache.qpid.proton.engine.impl.FrameHandler;
 import org.apache.qpid.proton.engine.impl.TransportImpl;
+import org.apache.qpid.proton.engine.impl.TransportOutputWriter;
+import org.apache.qpid.proton.framing.TransportFrame;
 
 
 /**
@@ -64,7 +68,7 @@ import org.apache.qpid.proton.engine.impl.TransportImpl;
  * <li> {@link ByteBuffer#mark()} </li>
  * </ol>
  */
-public interface Transport extends Endpoint
+public interface Transport extends Endpoint, FrameBody.FrameBodyHandler<Integer>, FrameHandler, TransportOutputWriter
 {
 
     public static final class Factory
@@ -103,6 +107,10 @@ public interface Transport extends Endpoint
     public void close_head();
 
     public boolean isClosed();
+
+    public boolean isTraceFramesEnabled();
+    public void log(String event, TransportFrame frame);
+
 
     /**
      * Processes the provided input.
