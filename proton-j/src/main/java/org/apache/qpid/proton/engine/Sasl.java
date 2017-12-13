@@ -21,7 +21,11 @@ package org.apache.qpid.proton.engine;
 */
 
 
-public interface Sasl
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
+import org.apache.qpid.proton.engine.impl.SaslFrameHandler;
+import org.apache.qpid.proton.engine.impl.TransportLayer;
+
+public interface Sasl extends SaslFrameBody.SaslFrameBodyHandler<Void>, TransportLayer, SaslFrameHandler
 {
     public enum SaslState
     {
@@ -177,4 +181,8 @@ public interface Sasl
      * that skip the SASL layer negotiation.
      */
     void allowSkip(boolean allowSkip);
+
+    boolean isDone();
+
+    void fail();
 }

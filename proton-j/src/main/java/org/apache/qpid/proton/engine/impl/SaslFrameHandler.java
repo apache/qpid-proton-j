@@ -24,7 +24,7 @@ import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 /**
  * Used by {@link SaslFrameParser} to handle the frames it parses
  */
-interface SaslFrameHandler
+public interface SaslFrameHandler
 {
     void handle(SaslFrameBody frameBody, Binary payload);
 

@@ -64,8 +64,7 @@ import org.apache.qpid.proton.reactor.Reactor;
 import org.apache.qpid.proton.reactor.Selectable;
 
 public class TransportImpl extends EndpointImpl
-    implements ProtonJTransport, FrameBody.FrameBodyHandler<Integer>,
-        FrameHandler, TransportOutputWriter, TransportInternal
+    implements ProtonJTransport, TransportInternal
 {
     static final int BUFFER_RELEASE_THRESHOLD = Integer.getInteger("proton.transport_buffer_release_threshold", 2 * 1024 * 1024);
     private static final int CHANNEL_MAX_LIMIT = 65535;
@@ -110,7 +109,7 @@ public class TransportImpl extends EndpointImpl
 
     private boolean _closeReceived;
     private Open _open;
-    private SaslImpl _sasl;
+    private Sasl _sasl;
     private SslImpl _ssl;
     private final Ref<ProtocolTracer> _protocolTracer = new Ref(null);
 
@@ -369,6 +368,28 @@ public class TransportImpl extends EndpointImpl
         }
         return _sasl;
 
+    }
+
+    @Override
+    public Sasl sasl(Sasl saslImpl)
+    {
+        if(saslImpl == null)
+        {
+            throw new IllegalArgumentException("The provided sasl implementation must not be null");
+        }
+
+        if(_processingStarted)
+        {
+            throw new IllegalStateException("Sasl can't be initiated after transport has started processing");
+        }
+
+        init();
+        this._sasl = saslImpl;
+        TransportWrapper transportWrapper = _sasl.wrap(_inputProcessor, _outputProcessor);
+        _inputProcessor = transportWrapper;
+        _outputProcessor = transportWrapper;
+
+        return this._sasl;
     }
 
     /**
@@ -1683,7 +1704,8 @@ public class TransportImpl extends EndpointImpl
     static String INCOMING = "<-";
     static String OUTGOING = "->";
 
-    void log(String event, TransportFrame frame)
+    @Override
+    public void log(String event, TransportFrame frame)
     {
         if (isTraceFramesEnabled()) {
             StringBuilder msg = new StringBuilder();
@@ -1700,7 +1722,8 @@ public class TransportImpl extends EndpointImpl
         }
     }
 
-    boolean isTraceFramesEnabled()
+    @Override
+    public boolean isTraceFramesEnabled()
     {
         return (_levels & TRACE_FRM) != 0;
     }

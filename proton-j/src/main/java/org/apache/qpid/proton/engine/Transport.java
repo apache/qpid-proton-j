@@ -23,7 +23,11 @@ package org.apache.qpid.proton.engine;
 import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
+import org.apache.qpid.proton.amqp.transport.FrameBody;
+import org.apache.qpid.proton.engine.impl.FrameHandler;
 import org.apache.qpid.proton.engine.impl.TransportImpl;
+import org.apache.qpid.proton.engine.impl.TransportOutputWriter;
+import org.apache.qpid.proton.framing.TransportFrame;
 
 
 /**
@@ -64,7 +68,7 @@ import org.apache.qpid.proton.engine.impl.TransportImpl;
  * <li> {@link ByteBuffer#mark()} </li>
  * </ol>
  */
-public interface Transport extends Endpoint
+public interface Transport extends Endpoint, FrameBody.FrameBodyHandler<Integer>, FrameHandler, TransportOutputWriter
 {
 
     public static final class Factory
@@ -103,6 +107,10 @@ public interface Transport extends Endpoint
     public void close_head();
 
     public boolean isClosed();
+
+    public boolean isTraceFramesEnabled();
+    public void log(String event, TransportFrame frame);
+
 
     /**
      * Processes the provided input.
@@ -186,6 +194,18 @@ public interface Transport extends Endpoint
      * @throws IllegalStateException if transport processing has already begun prior to initial invocation
      */
     Sasl sasl() throws IllegalStateException;
+
+    /**
+     * Signal the transport to expect SASL frames used to establish a SASL layer prior to
+     * performing the AMQP protocol version negotiation. This must first be performed before
+     * the transport is used for processing. Subsequent invocations will return the same
+     * {@link Sasl} object. This method shall save and use the provided {@param saslImpl} object
+     * for sasl negotiation.
+     *
+     * @param saslImpl the custom sasl implementation to be used when handling Sasl frames
+     * @throws IllegalStateException if transport processing has already begun prior to initial invocation
+     */
+    Sasl sasl(Sasl saslImpl) throws IllegalStateException;
 
     /**
      * Wrap this transport's output and input to apply SSL encryption and decryption respectively.

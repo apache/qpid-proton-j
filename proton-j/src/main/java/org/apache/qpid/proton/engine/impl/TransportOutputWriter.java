@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.engine.TransportException;
 
-interface TransportOutputWriter
+public interface TransportOutputWriter
 {
     /**
      * Writes my pending output bytes into outputBuffer. Does not
