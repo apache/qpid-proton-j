@@ -177,4 +177,9 @@ public interface Sasl
      * that skip the SASL layer negotiation.
      */
     void allowSkip(boolean allowSkip);
+
+    /**
+     * Adds a listener to receive notice of frames having arrived.
+     */
+    void setListener(SaslListener saslListener);
 }

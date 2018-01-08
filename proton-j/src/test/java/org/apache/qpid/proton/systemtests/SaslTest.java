@@ -21,17 +21,22 @@ package org.apache.qpid.proton.systemtests;
 import static org.apache.qpid.proton.systemtests.TestLoggingHelper.bold;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import org.junit.Test;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.engine.Sasl;
+import org.apache.qpid.proton.engine.SaslListener;
+import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.Sasl.SaslOutcome;
 
 public class SaslTest extends EngineTestBase
@@ -39,6 +44,7 @@ public class SaslTest extends EngineTestBase
     private static final Logger LOGGER = Logger.getLogger(SaslTest.class.getName());
     private static final String TESTMECH1 = "TESTMECH1";
     private static final String TESTMECH2 = "TESTMECH2";
+    private static final byte[] INITIAL_RESPONSE_BYTES = "initial-response-bytes".getBytes(StandardCharsets.UTF_8);
     private static final byte[] CHALLENGE_BYTES = "challenge-bytes".getBytes(StandardCharsets.UTF_8);
     private static final byte[] RESPONSE_BYTES = "response-bytes".getBytes(StandardCharsets.UTF_8);
     private static final byte[] ADDITIONAL_DATA_BYTES = "additional-data-bytes".getBytes(StandardCharsets.UTF_8);
@@ -385,5 +391,169 @@ public class SaslTest extends EngineTestBase
         }
 
         return bytes;
+    }
+
+    @Test
+    public void testSaslNegotiationUsingListener() throws Exception
+    {
+        getClient().transport = Proton.transport();
+        getServer().transport = Proton.transport();
+
+        AtomicBoolean mechanismsReceived = new AtomicBoolean();
+        AtomicBoolean challengeReceived = new AtomicBoolean();
+        AtomicBoolean outcomeReceived = new AtomicBoolean();
+
+        Sasl clientSasl = getClient().transport.sasl();
+        clientSasl.client();
+        clientSasl.setListener(new ClientSaslHandling(mechanismsReceived, challengeReceived, outcomeReceived));
+
+        AtomicBoolean initReceived = new AtomicBoolean();
+        AtomicBoolean responseReceived = new AtomicBoolean();
+
+        Sasl serverSasl = getServer().transport.sasl();
+        serverSasl.server();
+        serverSasl.setMechanisms(TESTMECH1, TESTMECH2);
+        serverSasl.setListener(new ServerSaslHandling(initReceived, responseReceived));
+
+        pumpClientToServer();
+        pumpServerToClient();
+
+        assertTrue("mechanisms were not received by client", mechanismsReceived.get());
+        assertFalse("init was received by server", initReceived.get());
+
+        pumpClientToServer();
+
+        assertTrue("init was not received by server", initReceived.get());
+        assertFalse("challenge was received by client", challengeReceived.get());
+
+        pumpServerToClient();
+
+        assertTrue("challenge was not received by client", challengeReceived.get());
+        assertFalse("response was received by server", responseReceived.get());
+
+        pumpClientToServer();
+
+        assertTrue("response was received by server", responseReceived.get());
+        assertFalse("outcome was received by client", outcomeReceived.get());
+
+        pumpServerToClient();
+
+        assertTrue("outcome was received by client", outcomeReceived.get());
+
+        assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_OK, clientSasl.getOutcome());
+    }
+
+    private static class ServerSaslHandling implements SaslListener
+    {
+        AtomicBoolean initReceived = new AtomicBoolean();
+        AtomicBoolean responseReceived = new AtomicBoolean();
+
+        public ServerSaslHandling(AtomicBoolean initReceived, AtomicBoolean responseReceived)
+        {
+            this.initReceived = initReceived;
+            this.responseReceived = responseReceived;
+        }
+
+        @Override
+        public void onSaslInit(Sasl s, Transport t)
+        {
+            assertArrayEquals("Server should now know the client's chosen mechanism.",
+                    new String[]{TESTMECH1}, s.getRemoteMechanisms());
+
+            byte[] serverReceivedInitialBytes = new byte[s.pending()];
+            s.recv(serverReceivedInitialBytes, 0, serverReceivedInitialBytes.length);
+
+            assertArrayEquals("Server should now know the client's initial response.",
+                    INITIAL_RESPONSE_BYTES, serverReceivedInitialBytes);
+
+            s.send(CHALLENGE_BYTES, 0, CHALLENGE_BYTES.length);
+
+            assertFalse("Should not have already received init", initReceived.getAndSet(true));
+        }
+
+        @Override
+        public void onSaslResponse(Sasl s, Transport t)
+        {
+            byte[] serverReceivedResponseBytes = new byte[s.pending()];
+            s.recv(serverReceivedResponseBytes, 0, serverReceivedResponseBytes.length);
+
+            assertArrayEquals("Server should now know the client's response", RESPONSE_BYTES, serverReceivedResponseBytes);
+
+            s.send(ADDITIONAL_DATA_BYTES, 0, ADDITIONAL_DATA_BYTES.length);
+            s.done(SaslOutcome.PN_SASL_OK);
+
+            assertFalse("Should not have already received response", responseReceived.getAndSet(true));
+        }
+
+        @Override
+        public void onSaslMechanisms(Sasl s, Transport t) { }
+
+        @Override
+        public void onSaslChallenge(Sasl s, Transport t) { }
+
+        @Override
+        public void onSaslOutcome(Sasl s, Transport t) { }
+    }
+
+    private static class ClientSaslHandling implements SaslListener
+    {
+        AtomicBoolean mechanismsReceived = new AtomicBoolean();
+        AtomicBoolean challengeReceived = new AtomicBoolean();
+        AtomicBoolean outcomeReceived = new AtomicBoolean();
+
+        public ClientSaslHandling(AtomicBoolean mechanismsReceived, AtomicBoolean challengeReceived, AtomicBoolean outcomeReceived)
+        {
+            this.mechanismsReceived = mechanismsReceived;
+            this.challengeReceived = challengeReceived;
+            this.outcomeReceived = outcomeReceived;
+        }
+
+        @Override
+        public void onSaslMechanisms(Sasl s, Transport t)
+        {
+            assertArrayEquals("Client should now know the server's mechanisms.",
+                    new String[]{TESTMECH1, TESTMECH2}, s.getRemoteMechanisms());
+            assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_NONE, s.getOutcome());
+
+            s.setMechanisms(TESTMECH1);
+            s.send(INITIAL_RESPONSE_BYTES, 0, INITIAL_RESPONSE_BYTES.length);
+
+            assertFalse("Should not have already received mechanisms", mechanismsReceived.getAndSet(true));
+        }
+
+        @Override
+        public void onSaslChallenge(Sasl s, Transport t)
+        {
+            byte[] clientReceivedChallengeBytes = new byte[s.pending()];
+            s.recv(clientReceivedChallengeBytes, 0, clientReceivedChallengeBytes.length);
+
+            assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_NONE, s.getOutcome());
+            assertArrayEquals("Client should now know the server's challenge",
+                              CHALLENGE_BYTES, clientReceivedChallengeBytes);
+
+            s.send(RESPONSE_BYTES, 0, RESPONSE_BYTES.length);
+
+            assertFalse("Should not have already received challenge", challengeReceived.getAndSet(true));
+        }
+
+        @Override
+        public void onSaslOutcome(Sasl s, Transport t)
+        {
+            assertEquals("Unexpected SASL outcome at client", SaslOutcome.PN_SASL_OK, s.getOutcome());
+
+            byte[] clientReceivedAdditionalBytes = new byte[s.pending()];
+            s.recv(clientReceivedAdditionalBytes, 0, clientReceivedAdditionalBytes.length);
+
+            assertArrayEquals("Client should now know the server's outcome additional data", clientReceivedAdditionalBytes,
+                    clientReceivedAdditionalBytes);
+
+            assertFalse("Should not have already received outcome", outcomeReceived.getAndSet(true));
+        }
+
+        @Override
+        public void onSaslInit(Sasl s, Transport t) { }
+
+        @Override
+        public void onSaslResponse(Sasl s, Transport t) { }
     }
 }

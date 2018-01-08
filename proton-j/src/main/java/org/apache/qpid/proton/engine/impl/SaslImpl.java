@@ -42,6 +42,7 @@ import org.apache.qpid.proton.codec.AMQPDefinedTypes;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.engine.Sasl;
+import org.apache.qpid.proton.engine.SaslListener;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
 
@@ -84,6 +85,8 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
 
     private Role _role;
     private boolean _allowSkip = true;
+
+    private SaslListener _saslListener;
 
     /**
      * @param maxFrameSize the size of the input and output buffers
@@ -346,6 +349,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         {
             setPending(saslInit.getInitialResponse().asByteBuffer());
         }
+
+        if(_saslListener != null) {
+            _saslListener.onSaslInit(this, _transport);
+        }
     }
 
     @Override
@@ -353,6 +360,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     {
         checkRole(Role.SERVER);
         setPending(saslResponse.getResponse()  == null ? null : saslResponse.getResponse().asByteBuffer());
+
+        if(_saslListener != null) {
+            _saslListener.onSaslResponse(this, _transport);
+        }
     }
 
     @Override
@@ -382,6 +393,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         }
         checkRole(Role.CLIENT);
         _mechanisms = saslMechanisms.getSaslServerMechanisms();
+
+        if(_saslListener != null) {
+            _saslListener.onSaslMechanisms(this, _transport);
+        }
     }
 
     @Override
@@ -389,6 +404,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     {
         checkRole(Role.CLIENT);
         setPending(saslChallenge.getChallenge()  == null ? null : saslChallenge.getChallenge().asByteBuffer());
+
+        if(_saslListener != null) {
+            _saslListener.onSaslChallenge(this, _transport);
+        }
     }
 
     @Override
@@ -415,6 +434,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         if(_logger.isLoggable(Level.FINE))
         {
             _logger.fine("Handled outcome: " + this);
+        }
+
+        if(_saslListener != null) {
+            _saslListener.onSaslOutcome(this, _transport);
         }
     }
 
@@ -741,5 +764,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         }
 
         _hostname = hostname;
+    }
+
+    @Override
+    public void setListener(SaslListener saslListener) {
+        _saslListener = saslListener;
     }
 }
