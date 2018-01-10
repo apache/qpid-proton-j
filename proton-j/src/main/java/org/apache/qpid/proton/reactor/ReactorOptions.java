@@ -22,6 +22,7 @@ package org.apache.qpid.proton.reactor;
 
 public class ReactorOptions {
     private boolean enableSaslByDefault = true;
+    private int maxFrameSize;
 
     /**
      * Sets whether SASL will be automatically enabled with ANONYMOUS as the mechanism,
@@ -45,5 +46,24 @@ public class ReactorOptions {
      */
     public boolean isEnableSaslByDefault() {
         return this.enableSaslByDefault;
+    }
+
+    /**
+     * Sets the maximum frame size value to announce in the Open frame.
+     *
+     * @param maxFrameSize The frame size in bytes.
+     */
+    public void setMaxFrameSize(int maxFrameSize) {
+        this.maxFrameSize = maxFrameSize;
+    }
+
+    /**
+     * Gets the maximum frame size to be announced in the Open frame.
+     *
+     * @return the frame size in bytes or 0 if none is set.
+     * @see #setMaxFrameSize(int)
+     */
+    public int getMaxFrameSize() {
+      return maxFrameSize;
     }
 }

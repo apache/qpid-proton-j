@@ -73,6 +73,12 @@ public class AcceptorImpl implements Acceptor {
                     conn_recs.set(ReactorImpl.CONNECTION_PEER_ADDRESS_KEY, Address.class, addr);
                 }
                 Transport trans = Proton.transport();
+
+                int maxFrameSizeOption = reactor.getOptions().getMaxFrameSize();
+                if (maxFrameSizeOption != 0) {
+                    trans.setMaxFrameSize(maxFrameSizeOption);
+                }
+
                 if(reactor.getOptions().isEnableSaslByDefault()) {
                     Sasl sasl = trans.sasl();
                     sasl.server();

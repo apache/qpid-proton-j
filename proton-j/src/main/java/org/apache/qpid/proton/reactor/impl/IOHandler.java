@@ -101,6 +101,11 @@ public class IOHandler extends BaseHandler {
         }
         Transport transport = Proton.transport();
 
+        int maxFrameSizeOption = reactor.getOptions().getMaxFrameSize();
+        if (maxFrameSizeOption != 0) {
+            transport.setMaxFrameSize(maxFrameSizeOption);
+        }
+
         if (reactor.getOptions().isEnableSaslByDefault()) {
             Sasl sasl = transport.sasl();
             sasl.client();
