@@ -40,7 +40,7 @@ public class SessionImpl extends EndpointImpl implements ProtonJSession
     private Map<String, ReceiverImpl>  _receivers = new LinkedHashMap<String, ReceiverImpl>();
     private List<LinkImpl> _oldLinksToFree = new ArrayList<LinkImpl>();
     private TransportSession _transportSession;
-    private int _incomingCapacity = 1024*1024;
+    private int _incomingCapacity = 0;
     private int _incomingBytes = 0;
     private int _outgoingBytes = 0;
     private int _incomingDeliveries = 0;

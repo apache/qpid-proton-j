@@ -35,6 +35,7 @@ import org.apache.qpid.proton.engine.Event;
 class TransportSession
 {
     private static final int HANDLE_MAX = 65535;
+    private static final UnsignedInteger DEFAULT_WINDOW_SIZE = UnsignedInteger.valueOf(2147483647); // biggest legal value
 
     private final TransportImpl _transport;
     private final SessionImpl _session;
@@ -181,11 +182,12 @@ class TransportSession
 
     void updateIncomingWindow()
     {
+        int incomingCapacity = _session.getIncomingCapacity();
         int size = _transport.getMaxFrameSize();
-        if (size <= 0) {
-            _incomingWindowSize = UnsignedInteger.valueOf(2147483647); // biggest legal value
+        if (incomingCapacity <= 0 || size <= 0) {
+            _incomingWindowSize = DEFAULT_WINDOW_SIZE;
         } else {
-            _incomingWindowSize = UnsignedInteger.valueOf((_session.getIncomingCapacity() - _session.getIncomingBytes())/size);
+            _incomingWindowSize = UnsignedInteger.valueOf((incomingCapacity - _session.getIncomingBytes())/size);
         }
     }
 
