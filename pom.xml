@@ -151,6 +151,7 @@
             <autoVersionSubmodules>true</autoVersionSubmodules>
             <tagNameFormat>@{project.version}</tagNameFormat>
             <arguments>-Papache-release -Dperform-release-checks=true ${arguments}</arguments>
+            <pushChanges>true</pushChanges>
           </configuration>
         </plugin>
       </plugins>
