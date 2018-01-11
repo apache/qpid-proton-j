@@ -290,6 +290,14 @@ public class TransportImplTest
 
     private class MockTransportImpl extends TransportImpl
     {
+        public MockTransportImpl() {
+            super();
+        }
+
+        public MockTransportImpl(int maxFrameSize) {
+            super(maxFrameSize);
+        }
+
         LinkedList<FrameBody> writes = new LinkedList<FrameBody>();
         @Override
         protected void writeFrame(int channel, FrameBody frameBody,
@@ -958,6 +966,139 @@ public class TransportImplTest
         pumpMockTransport(transport);
 
         assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+    }
+
+    @Test
+    public void testEmittedSessionIncomingWindow()
+    {
+        doSessionIncomingWindowTestImpl(false, false);
+        doSessionIncomingWindowTestImpl(true, false);
+        doSessionIncomingWindowTestImpl(false, true);
+        doSessionIncomingWindowTestImpl(true, true);
+    }
+
+    private void doSessionIncomingWindowTestImpl(boolean setFrameSize, boolean setSessionCapacity) {
+        MockTransportImpl transport;
+        if(setFrameSize) {
+            transport = new MockTransportImpl(5*1024);
+        } else {
+            transport = new MockTransportImpl();
+        }
+
+        Connection connection = Proton.connection();
+        transport.bind(connection);
+
+        connection.open();
+
+        Session session = connection.session();
+        int sessionCapacity = 0;
+        if(setSessionCapacity) {
+            sessionCapacity = 100*1024;
+            session.setIncomingCapacity(sessionCapacity);
+        }
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+        // Provide an Open response
+        transport.handleFrame(new TransportFrame(0, new Open(), null));
+
+        // Open session and verify emitted incoming window
+        session.open();
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(1) instanceof Begin);
+        Begin sentBegin = (Begin) transport.writes.get(1);
+
+        assertEquals("Unexpected session capacity", sessionCapacity, session.getIncomingCapacity());
+
+        int expectedWindowSize = 2147483647;
+        if(setSessionCapacity && setFrameSize) {
+            expectedWindowSize = (100*1024) / (5*1024); // capacity / frameSize
+        }
+
+        assertEquals("Unexpected session window", UnsignedInteger.valueOf(expectedWindowSize), sentBegin.getIncomingWindow());
+
+        // Open receiver
+        String linkName = "myReceiver";
+        Receiver receiver = session.receiver(linkName);
+        receiver.open();
+
+        pumpMockTransport(transport);
+
+        assertTrue("Unexpected frame type", transport.writes.get(2) instanceof Attach);
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+
+        // Provide an begin+attach response
+        Begin beginResponse = new Begin();
+        beginResponse.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        beginResponse.setNextOutgoingId(UnsignedInteger.ONE);
+        beginResponse.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        beginResponse.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, beginResponse, null));
+
+        Attach attach = new Attach();
+        attach.setHandle(UnsignedInteger.ZERO);
+        attach.setRole(Role.SENDER);
+        attach.setName(linkName);
+        attach.setInitialDeliveryCount(UnsignedInteger.ZERO);
+        transport.handleFrame(new TransportFrame(0, attach, null));
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+
+        // Flow some credit, verify emitted incoming window remains the same
+        receiver.flow(1);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(3) instanceof Flow);
+        Flow sentFlow = (Flow) transport.writes.get(3);
+
+        assertEquals("Unexpected session window", UnsignedInteger.valueOf(expectedWindowSize), sentFlow.getIncomingWindow());
+
+        // Provide a transfer, don't consume it, flow more credit, verify the emitted
+        // incoming window (should reduce 1 if capacity and frame size set)
+        String deliveryTag = "tag1";
+        String messageContent = "content1";
+        handleTransfer(transport, 1, deliveryTag, messageContent);
+
+        assertTrue("Unexpected session byte count", session.getIncomingBytes() > 0);
+
+        receiver.flow(1);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 5, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(4) instanceof Flow);
+        sentFlow = (Flow) transport.writes.get(4);
+
+        if(setSessionCapacity && setFrameSize) {
+            expectedWindowSize = expectedWindowSize -1;
+        }
+        assertEquals("Unexpected session window", UnsignedInteger.valueOf(expectedWindowSize), sentFlow.getIncomingWindow());
+
+        // Consume the transfer then flow more credit, verify the emitted
+        // incoming window (should increase 1 if capacity and frame size set)
+        verifyDelivery(receiver, deliveryTag, messageContent);
+        assertEquals("Unexpected session byte count", 0, session.getIncomingBytes());
+
+        receiver.flow(1);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 6, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(5) instanceof Flow);
+        sentFlow = (Flow) transport.writes.get(5);
+
+        if(setSessionCapacity && setFrameSize) {
+            expectedWindowSize = expectedWindowSize +1;
+        }
+        assertEquals("Unexpected session window", UnsignedInteger.valueOf(expectedWindowSize), sentFlow.getIncomingWindow());
     }
 
     /**
