@@ -142,6 +142,8 @@ public class TransportImpl extends EndpointImpl
 
     private List<TransportLayer> _additionalTransportLayers;
 
+    private final PartialTransferHandler partialTransferHandler = new PartialTransferHandler();
+
     /**
      * Application code should use {@link org.apache.qpid.proton.engine.Transport.Factory#create()} instead
      */
@@ -590,8 +592,12 @@ public class TransportImpl extends EndpointImpl
                 ByteBuffer.wrap(delivery.getData(), delivery.getDataOffset(),
                                 delivery.getDataLength());
 
-            writeFrame(tpSession.getLocalChannel(), transfer, payload,
-                       new PartialTransfer(transfer));
+            try {
+                writeFrame(tpSession.getLocalChannel(), transfer, payload, partialTransferHandler.setTransfer(transfer));
+            } finally {
+                partialTransferHandler.setTransfer(null);
+            }
+
             tpSession.incrementOutgoingId();
             tpSession.decrementRemoteIncomingWindow();
 
@@ -1655,13 +1661,14 @@ public class TransportImpl extends EndpointImpl
         return "TransportImpl [_connectionEndpoint=" + _connectionEndpoint + ", " + super.toString() + "]";
     }
 
-    private static class PartialTransfer implements Runnable
+    private static class PartialTransferHandler implements Runnable
     {
-        private final Transfer _transfer;
+        private Transfer _transfer;
 
-        public PartialTransfer(Transfer transfer)
+        PartialTransferHandler setTransfer(Transfer transfer)
         {
-            _transfer = transfer;
+            this._transfer = transfer;
+            return this;
         }
 
         @Override
