@@ -164,6 +164,73 @@ public class TransportImplTest
     }
 
     @Test
+    public void testOutputBufferIsReadOnly()
+    {
+        doTestTransportBufferReadability(true, false);
+    }
+
+    @Test
+    public void testOutputBufferNotReadOnlyWhenConfigured()
+    {
+        doTestTransportBufferReadability(false, false);
+    }
+
+    @Test
+    public void testHeadIsReadOnly()
+    {
+        doTestTransportBufferReadability(true, true);
+    }
+
+    @Test
+    public void testHeadNotReadOnlyWhenConfigured()
+    {
+        doTestTransportBufferReadability(false, true);
+    }
+
+    private void doTestTransportBufferReadability(boolean readOnly, boolean headOrOutput)
+    {
+        TransportImpl transport = new TransportImpl();
+
+        // Default should be Read-Only
+        if (!readOnly) {
+            transport.setUseReadOnlyOutputBuffer(readOnly);
+        }
+
+        final ByteBuffer outputBuffer;
+        if (headOrOutput) {
+            outputBuffer = transport.head();
+        } else {
+            outputBuffer = transport.getOutputBuffer();
+        }
+
+        assertTrue(outputBuffer.hasRemaining());
+        if (readOnly) {
+            assertTrue(outputBuffer.isReadOnly());
+        } else {
+            assertFalse(outputBuffer.isReadOnly());
+        }
+
+        byte[] outputBytes = new byte[outputBuffer.remaining()];
+        outputBuffer.get(outputBytes);
+
+        transport.outputConsumed();
+
+        final ByteBuffer emptyBuffer;
+        if (headOrOutput) {
+            emptyBuffer = transport.head();
+        } else {
+            emptyBuffer = transport.getOutputBuffer();
+        }
+
+        assertFalse(emptyBuffer.hasRemaining());
+        if (readOnly) {
+            assertTrue(emptyBuffer.isReadOnly());
+        } else {
+            assertFalse(emptyBuffer.isReadOnly());
+        }
+    }
+
+    @Test
     public void testTransportInitiallyHandlesFrames()
     {
         assertTrue(_transport.isHandlingFrames());

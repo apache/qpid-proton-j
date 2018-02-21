@@ -35,11 +35,13 @@ class TransportOutputAdaptor implements TransportOutput
     private ByteBuffer _head = null;
     private boolean _output_done = false;
     private boolean _head_closed = false;
+    private boolean _readOnlyHead = true;
 
-    TransportOutputAdaptor(TransportOutputWriter transportOutputWriter, int maxFrameSize)
+    TransportOutputAdaptor(TransportOutputWriter transportOutputWriter, int maxFrameSize, boolean readOnlyHead)
     {
         _transportOutputWriter = transportOutputWriter;
         _maxFrameSize = maxFrameSize > 0 ? maxFrameSize : 4*1024;
+        _readOnlyHead = readOnlyHead;
     }
 
     @Override
@@ -104,7 +106,11 @@ class TransportOutputAdaptor implements TransportOutput
 
     private void init_buffers() {
         _outputBuffer = newWriteableBuffer(_maxFrameSize);
-        _head = _outputBuffer.asReadOnlyBuffer();
+        if (_readOnlyHead) {
+            _head = _outputBuffer.asReadOnlyBuffer();
+        } else {
+            _head = _outputBuffer.duplicate();
+        }
         _head.limit(0);
     }
 

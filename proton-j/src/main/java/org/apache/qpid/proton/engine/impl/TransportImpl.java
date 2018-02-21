@@ -112,13 +112,14 @@ public class TransportImpl extends EndpointImpl
     private Open _open;
     private SaslImpl _sasl;
     private SslImpl _ssl;
-    private final Ref<ProtocolTracer> _protocolTracer = new Ref(null);
+    private final Ref<ProtocolTracer> _protocolTracer = new Ref<>(null);
 
     private TransportResult _lastTransportResult = TransportResultFactory.ok();
 
     private boolean _init;
     private boolean _processingStarted;
     private boolean _emitFlowEventOnSend = true;
+    private boolean _useReadOnlyOutputBuffer = true;
 
     private FrameHandler _frameHandler = this;
     private boolean _head_closed = false;
@@ -175,7 +176,7 @@ public class TransportImpl extends EndpointImpl
             _init = true;
             _frameParser = new FrameParser(_frameHandler , _decoder, _maxFrameSize);
             _inputProcessor = _frameParser;
-            _outputProcessor = new TransportOutputAdaptor(this, _maxFrameSize);
+            _outputProcessor = new TransportOutputAdaptor(this, _maxFrameSize, isUseReadOnlyOutputBuffer());
         }
     }
 
@@ -1744,6 +1745,18 @@ public class TransportImpl extends EndpointImpl
     public boolean isEmitFlowEventOnSend()
     {
         return _emitFlowEventOnSend;
+    }
+
+    @Override
+    public void setUseReadOnlyOutputBuffer(boolean value)
+    {
+        this._useReadOnlyOutputBuffer = value;
+    }
+
+    @Override
+    public boolean isUseReadOnlyOutputBuffer()
+    {
+        return _useReadOnlyOutputBuffer;
     }
 
     // From TransportInternal

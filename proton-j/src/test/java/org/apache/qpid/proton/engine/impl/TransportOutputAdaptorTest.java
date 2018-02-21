@@ -22,6 +22,7 @@ import static java.util.Arrays.copyOfRange;
 import static org.apache.qpid.proton.engine.impl.TransportTestHelper.assertByteArrayContentEquals;
 import static org.apache.qpid.proton.engine.impl.TransportTestHelper.assertByteBufferContentEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -34,12 +35,21 @@ import org.junit.Test;
 public class TransportOutputAdaptorTest
 {
     private final CannedTransportOutputWriter _transportOutputWriter = new CannedTransportOutputWriter();
-    private final TransportOutput _transportOutput = new TransportOutputAdaptor(_transportOutputWriter, 1024);
+    private final TransportOutput _transportOutput = new TransportOutputAdaptor(_transportOutputWriter, 1024, true);
 
     @Test
     public void testThatOutputBufferIsReadOnly()
     {
         assertTrue(_transportOutput.head().isReadOnly());
+    }
+
+    @Test
+    public void testThatOutputBufferCanBeMadeNotReadOnly()
+    {
+        final TransportOutput _transportOutput =
+            new TransportOutputAdaptor(_transportOutputWriter, 1024, false);
+
+        assertFalse(_transportOutput.head().isReadOnly());
     }
 
     @Test

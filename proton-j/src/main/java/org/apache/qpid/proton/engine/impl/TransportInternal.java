@@ -37,4 +37,9 @@ public interface TransportInternal extends Transport
      * @throws IllegalStateException if processing has already started.
      */
     void addTransportLayer(TransportLayer layer) throws IllegalStateException;
+
+    void setUseReadOnlyOutputBuffer(boolean value);
+
+    boolean isUseReadOnlyOutputBuffer();
+
 }
