@@ -551,7 +551,13 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         {
             _underlyingInput = input;
             _underlyingOutput = output;
-            _head = _outputBuffer.asReadOnlyBuffer();
+
+            if (_transport.isUseReadOnlyOutputBuffer()) {
+                _head = _outputBuffer.asReadOnlyBuffer();
+            } else {
+                _head = _outputBuffer.duplicate();
+            }
+
             _head.limit(0);
         }
 
