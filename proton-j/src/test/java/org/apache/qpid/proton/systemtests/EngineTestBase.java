@@ -36,6 +36,11 @@ public abstract class EngineTestBase
     private final ProtonContainer _client = new ProtonContainer("clientContainer");
     private final ProtonContainer _server = new ProtonContainer("serverContainer");
 
+    protected boolean shouldLogPumpedBytes()
+    {
+        return true;
+    }
+
     protected TestLoggingHelper getTestLoggingHelper()
     {
         return _testLoggingHelper;
@@ -61,7 +66,10 @@ public abstract class EngineTestBase
     {
         ByteBuffer serverBuffer = getServer().transport.getOutputBuffer();
 
-        getTestLoggingHelper().prettyPrint("          <<<" + TestLoggingHelper.SERVER_PREFIX + " ", serverBuffer);
+        if (shouldLogPumpedBytes())
+        {
+            getTestLoggingHelper().prettyPrint("          <<<" + TestLoggingHelper.SERVER_PREFIX + " ", serverBuffer);
+        }
         assertTrue("Server expected to produce some output", serverBuffer.hasRemaining());
 
         ByteBuffer clientBuffer = getClient().transport.getInputBuffer();
@@ -78,7 +86,10 @@ public abstract class EngineTestBase
     {
         ByteBuffer clientBuffer = getClient().transport.getOutputBuffer();
 
-        getTestLoggingHelper().prettyPrint(TestLoggingHelper.CLIENT_PREFIX + ">>> ", clientBuffer);
+        if (shouldLogPumpedBytes())
+        {
+            getTestLoggingHelper().prettyPrint(TestLoggingHelper.CLIENT_PREFIX + ">>> ", clientBuffer);
+        }
         assertTrue("Client expected to produce some output", clientBuffer.hasRemaining());
 
         ByteBuffer serverBuffer = getServer().transport.getInputBuffer();
