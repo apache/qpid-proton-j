@@ -74,8 +74,13 @@ class FrameWriter
 
     private void grow()
     {
+        grow(_bbuf.capacity());  // Double current capacity
+    }
+
+    private void grow(int amount)
+    {
         ByteBuffer old = _bbuf;
-        _bbuf = ByteBuffer.allocate(_bbuf.capacity() * 2);
+        _bbuf = ByteBuffer.allocate(old.capacity() + amount);
         _buffer = new WritableBuffer.ByteBufferWrapper(_bbuf);
         old.flip();
         _bbuf.put(old);
@@ -190,8 +195,9 @@ class FrameWriter
 
         if(payloadSize > 0)
         {
-            while (_buffer.remaining() < payloadSize) {
-                grow();
+            while (_buffer.remaining() < payloadSize)
+            {
+                grow(payloadSize - _buffer.remaining());
             }
 
             int oldLimit = payload.limit();
