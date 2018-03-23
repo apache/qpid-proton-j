@@ -45,15 +45,16 @@ public class JythonTest
     public interface PathBuilder {
         public PathBuilder append(String path);
     }
+
     private static final Logger LOGGER = Logger.getLogger(JythonTest.class.getName());
 
     /* System properties expected to be defined in test/pom.xml */
-    private static final String PROTON_JYTHON_BINDING = "protonJythonBinding";
-    private static final String PROTON_JYTHON_SHIM = "protonJythonShim";
-    private static final String PROTON_JYTHON_TEST_ROOT = "protonJythonTestRoot";
-    private static final String PROTON_JYTHON_TEST_SCRIPT = "protonJythonTestScript";
-    private static final String PROTON_JYTHON_TESTS_XML_OUTPUT_DIRECTORY = "protonJythonTestXmlOutputDirectory";
-    private static final String PROTON_JYTHON_IGNORE_FILE = "protonJythonIgnoreFile";
+    protected static final String PROTON_JYTHON_BINDING = "protonJythonBinding";
+    protected static final String PROTON_JYTHON_SHIM = "protonJythonShim";
+    protected static final String PROTON_JYTHON_TEST_ROOT = "protonJythonTestRoot";
+    protected static final String PROTON_JYTHON_TEST_SCRIPT = "protonJythonTestScript";
+    protected static final String PROTON_JYTHON_TESTS_XML_OUTPUT_DIRECTORY = "protonJythonTestXmlOutputDirectory";
+    protected static final String PROTON_JYTHON_IGNORE_FILE = "protonJythonIgnoreFile";
 
     /** Name of the junit style xml report to be written by the python test script */
     private static final String XML_REPORT_NAME = "TEST-jython-test-results.xml";
@@ -208,7 +209,6 @@ public class JythonTest
         return file.getAbsolutePath();
     }
 
-
     private String getJythonTestRoot() throws FileNotFoundException
     {
         String testRootString = getNonNullSystemProperty(PROTON_JYTHON_TEST_ROOT, "System property '%s' must provide the location of the python test root");
@@ -237,7 +237,7 @@ public class JythonTest
             }
         }
         return null;
-        
+
     }
 
     private String getOptionalXmlReportFilename()
@@ -246,11 +246,14 @@ public class JythonTest
         if (xmlOutputDirString == null)
         {
             LOGGER.info(PROTON_JYTHON_TESTS_XML_OUTPUT_DIRECTORY + " system property not set; xml output will not be written");
+            return null;
         }
-
-        File xmlOutputDir = new File(xmlOutputDirString);
-        createXmlOutputDirectoryIfNecessary(xmlOutputDirString, xmlOutputDir);
-        return new File(xmlOutputDir, XML_REPORT_NAME).getAbsolutePath();
+        else
+        {
+            File xmlOutputDir = new File(xmlOutputDirString);
+            createXmlOutputDirectoryIfNecessary(xmlOutputDirString, xmlOutputDir);
+            return new File(xmlOutputDir, XML_REPORT_NAME).getAbsolutePath();
+        }
     }
 
     private void createXmlOutputDirectoryIfNecessary(String xmlOutputDirString, File xmlOutputDir)

@@ -34,7 +34,6 @@ import java.nio.ByteBuffer;
  * FrameWriter
  *
  */
-
 class FrameWriter
 {
 
@@ -97,7 +96,7 @@ class FrameWriter
         _frameStart = _buffer.position();
     }
 
-    private void writePerformative(Object frameBody)
+    private void writePerformative(Object frameBody, ByteBuffer payload, Runnable onPayloadTooLarge)
     {
         while (_buffer.remaining() < 8) {
             grow();
@@ -109,16 +108,30 @@ class FrameWriter
             {
                 _buffer.position(_frameStart + 8);
                 if (frameBody != null) _encoder.writeObject(frameBody);
-                break;
+
+                _payloadStart = _buffer.position();
+                _performativeSize = _payloadStart - _frameStart;
+
+                if (onPayloadTooLarge == null)
+                {
+                    break;
+                }
+
+                if (_maxFrameSize > 0 && payload != null && (payload.remaining() + _performativeSize) > _maxFrameSize)
+                {
+                    onPayloadTooLarge.run();
+                    onPayloadTooLarge = null;
+                }
+                else
+                {
+                    break;
+                }
             }
             catch (BufferOverflowException e)
             {
                 grow();
             }
         }
-
-        _payloadStart = _buffer.position();
-        _performativeSize = _payloadStart - _frameStart;
     }
 
     private void endFrame(int channel)
@@ -138,16 +151,7 @@ class FrameWriter
     {
         startFrame();
 
-        writePerformative(frameBody);
-
-        if(_maxFrameSize > 0 && payload != null && (payload.remaining() + _performativeSize) > _maxFrameSize)
-        {
-            if(onPayloadTooLarge != null)
-            {
-                onPayloadTooLarge.run();
-            }
-            writePerformative(frameBody);
-        }
+        writePerformative(frameBody, payload, onPayloadTooLarge);
 
         int capacity;
         if (_maxFrameSize > 0) {
@@ -158,39 +162,9 @@ class FrameWriter
         int payloadSize = Math.min(payload == null ? 0 : payload.remaining(), capacity);
 
         ProtocolTracer tracer = _protocolTracer == null ? null : _protocolTracer.get();
-        if( tracer != null || _transport.isTraceFramesEnabled())
+        if(tracer != null || _transport.isTraceFramesEnabled())
         {
-            // XXX: this is a bit of a hack but it eliminates duplicate
-            // code, further refactor will fix this
-            if (_frameType == AMQP_FRAME_TYPE)
-            {
-                ByteBuffer originalPayload = null;
-                if( payload!=null )
-                {
-                    originalPayload = payload.duplicate();
-                    originalPayload.limit(payload.position() + payloadSize);
-                }
-
-                Binary payloadBin = Binary.create(originalPayload);
-                FrameBody body = null;
-                if (frameBody == null)
-                {
-                    body = new EmptyFrame();
-                }
-                else
-                {
-                    body = (FrameBody) frameBody;
-                }
-
-                TransportFrame frame = new TransportFrame(channel, body, payloadBin);
-
-                _transport.log(TransportImpl.OUTGOING, frame);
-
-                if(tracer != null)
-                {
-                    tracer.sentFrame(frame);
-                }
-            }
+            logFrame(tracer, channel, frameBody, payload, payloadSize);
         }
 
         if(payloadSize > 0)
@@ -209,6 +183,41 @@ class FrameWriter
         endFrame(channel);
 
         _framesOutput += 1;
+    }
+
+    private void logFrame(ProtocolTracer tracer, int channel, Object frameBody, ByteBuffer payload, int payloadSize)
+    {
+        // XXX: this is a bit of a hack but it eliminates duplicate
+        // code, further refactor will fix this
+        if (_frameType == AMQP_FRAME_TYPE)
+        {
+            ByteBuffer originalPayload = null;
+            if (payload!=null)
+            {
+                originalPayload = payload.duplicate();
+                originalPayload.limit(payload.position() + payloadSize);
+            }
+
+            Binary payloadBin = Binary.create(originalPayload);
+            FrameBody body = null;
+            if (frameBody == null)
+            {
+                body = EmptyFrame.INSTANCE;
+            }
+            else
+            {
+                body = (FrameBody) frameBody;
+            }
+
+            TransportFrame frame = new TransportFrame(channel, body, payloadBin);
+
+            _transport.log(TransportImpl.OUTGOING, frame);
+
+            if (tracer != null)
+            {
+                tracer.sentFrame(frame);
+            }
+        }
     }
 
     void writeFrame(Object frameBody)

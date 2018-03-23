@@ -24,6 +24,8 @@ import org.apache.qpid.proton.amqp.Binary;
 
 public final class EmptyFrame implements FrameBody
 {
+    public static final EmptyFrame INSTANCE = new EmptyFrame();
+
     @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {

@@ -401,7 +401,7 @@ class FrameParser implements TransportInput
                         }
                         else
                         {
-                            val = new EmptyFrame();
+                            val = EmptyFrame.INSTANCE;
                         }
 
                         if(val instanceof FrameBody)
