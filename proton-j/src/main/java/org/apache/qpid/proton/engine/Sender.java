@@ -64,6 +64,22 @@ public interface Sender extends Link
     public int send(ReadableBuffer buffer);
 
     /**
+     * Sends data to the current delivery attempting not to copy the data unless a previous
+     * send has already added data to the Delivery in which case a copy may occur depending on
+     * the implementation.
+     * <p>
+     * Care should be taken when passing ReadableBuffer instances that wrapped pooled bytes
+     * as the send does not mean the data will be sent immediately when the transport is
+     * flushed so the pooled bytes could be held for longer than expected.
+     *
+     * @param buffer
+     *      An immutable ReadableBuffer that can be held until the next transport flush.
+     *
+     * @return the number of bytes read from the provided buffer.
+     */
+    public int sendNoCopy(ReadableBuffer buffer);
+
+    /**
      * Abort the current delivery.
      *
      * Note "pn_link_abort" is commented out in the .h

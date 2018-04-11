@@ -21,6 +21,7 @@
 package org.apache.qpid.proton.engine.impl;
 
 import org.apache.qpid.proton.amqp.UnsignedInteger;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.engine.Receiver;
 
@@ -106,6 +107,23 @@ public class ReceiverImpl extends LinkImpl implements Receiver
         int consumed = _current.recv(buffer);
         if (consumed > 0) {
             getSession().incrementIncomingBytes(-consumed);
+            if (getSession().getTransportSession().getIncomingWindowSize().equals(UnsignedInteger.ZERO)) {
+                modified();
+            }
+        }
+        return consumed;
+    }
+
+    @Override
+    public ReadableBuffer recv()
+    {
+        if (_current == null) {
+            throw new IllegalStateException("no current delivery");
+        }
+
+        ReadableBuffer consumed = _current.recv();
+        if (consumed.remaining() > 0) {
+            getSession().incrementIncomingBytes(-consumed.remaining());
             if (getSession().getTransportSession().getIncomingWindowSize().equals(UnsignedInteger.ZERO)) {
                 modified();
             }

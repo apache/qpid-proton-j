@@ -23,6 +23,8 @@ package org.apache.qpid.proton.amqp;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 
+import org.apache.qpid.proton.codec.ReadableBuffer;
+
 public final class Binary
 {
 
@@ -167,7 +169,26 @@ public final class Binary
         return new Binary(_data, _offset+offset, length);
     }
 
-    public static Binary create(ByteBuffer buffer) 
+    public static Binary create(ReadableBuffer buffer)
+    {
+        if (buffer == null)
+        {
+            return null;
+        }
+        else if (!buffer.hasArray())
+        {
+            byte data[] = new byte [buffer.remaining()];
+            ReadableBuffer dup = buffer.duplicate();
+            dup.get(data);
+            return new Binary(data);
+        }
+        else
+        {
+            return new Binary(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+        }
+    }
+
+    public static Binary create(ByteBuffer buffer)
     {
         if( buffer == null )
             return null;
@@ -178,7 +199,7 @@ public final class Binary
             dup.get(data);
             return new Binary(data);
         }
-        else 
+        else
         {
             return new Binary(buffer.array(), buffer.arrayOffset()+buffer.position(), buffer.remaining());
         }

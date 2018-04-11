@@ -80,18 +80,18 @@ public class FastPathAcceptedType implements AMQPType<Accepted>, FastPathDescrib
     @Override
     public Accepted readValue() {
         DecoderImpl decoder = getDecoder();
-        byte typeCode = decoder.getByteBuffer().get();
+        byte typeCode = decoder.getBuffer().get();
 
         switch (typeCode) {
             case EncodingCodes.LIST0:
                 break;
             case EncodingCodes.LIST8:
-                decoder.getByteBuffer().get();
-                decoder.getByteBuffer().get();
+                decoder.getBuffer().get();
+                decoder.getBuffer().get();
                 break;
             case EncodingCodes.LIST32:
-                decoder.getByteBuffer().getInt();
-                decoder.getByteBuffer().getInt();
+                decoder.getBuffer().getInt();
+                decoder.getBuffer().getInt();
                 break;
             default:
                 throw new DecodeException("Incorrect type found in Accepted type encoding: " + typeCode);

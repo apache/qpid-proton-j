@@ -42,6 +42,10 @@
 
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>3.2.0</maven-bundle-plugin-version>
+    <jacoco-plugin-version>0.7.9</jacoco-plugin-version>
+
+    <!-- surefire forked jvm arguments -->
+    <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
   </properties>
 
   <dependencyManagement>
@@ -116,6 +120,20 @@
           </excludes>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <propertyName>jacoco-config</propertyName>
+        </configuration>
+      </plugin>
     </plugins>
     <pluginManagement>
       <plugins>
@@ -154,6 +172,11 @@
             <pushChanges>true</pushChanges>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-plugin-version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
   </build>
@@ -180,6 +203,16 @@
   <ciManagement>
     <url>https://builds.apache.org/view/M-R/view/Qpid/job/Qpid-proton-j/</url>
   </ciManagement>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco-plugin-version}</version>
+      </plugin>
+    </plugins>
+  </reporting>
 
   <profiles>
     <!-- Override the apache-release profile from the parent pom -->

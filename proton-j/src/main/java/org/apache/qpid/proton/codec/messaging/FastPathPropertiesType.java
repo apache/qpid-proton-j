@@ -55,7 +55,7 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
     @Override
     public Properties readValue() {
         DecoderImpl decoder = getDecoder();
-        byte typeCode = decoder.getByteBuffer().get();
+        byte typeCode = decoder.getBuffer().get();
 
         @SuppressWarnings("unused")
         int size = 0;
@@ -65,12 +65,12 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
             case EncodingCodes.LIST0:
                 break;
             case EncodingCodes.LIST8:
-                size = ((int)decoder.getByteBuffer().get()) & 0xff;
-                count = ((int)decoder.getByteBuffer().get()) & 0xff;
+                size = ((int)decoder.getBuffer().get()) & 0xff;
+                count = ((int)decoder.getBuffer().get()) & 0xff;
                 break;
             case EncodingCodes.LIST32:
-                size = decoder.getByteBuffer().getInt();
-                count = decoder.getByteBuffer().getInt();
+                size = decoder.getBuffer().getInt();
+                count = decoder.getBuffer().getInt();
                 break;
             default:
                 throw new DecodeException("Incorrect type found in Properties encoding: " + typeCode);

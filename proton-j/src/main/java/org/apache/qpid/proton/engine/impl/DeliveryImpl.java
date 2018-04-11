@@ -22,7 +22,9 @@ package org.apache.qpid.proton.engine.impl;
 
 import java.util.Arrays;
 
+import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.DeliveryState;
+import org.apache.qpid.proton.codec.CompositeReadableBuffer;
 import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.engine.Delivery;
@@ -32,6 +34,8 @@ import org.apache.qpid.proton.engine.Transport;
 public class DeliveryImpl implements Delivery
 {
     public static final int DEFAULT_MESSAGE_FORMAT = 0;
+
+    private static final ReadableBuffer EMPTY_BUFFER = ReadableBuffer.ByteBufferReader.allocate(0);
 
     private DeliveryImpl _linkPrevious;
     private DeliveryImpl _linkNext;
@@ -63,12 +67,12 @@ public class DeliveryImpl implements Delivery
     private int _flags = (byte) 0;
 
     private TransportDelivery _transportDelivery;
-    private byte[] _data;
-    private int _dataSize;
     private boolean _complete;
     private boolean _updated;
     private boolean _done;
-    private int _offset;
+
+    private CompositeReadableBuffer _dataBuffer;
+    private ReadableBuffer _dataView;
 
     DeliveryImpl(final byte[] tag, final LinkImpl link, DeliveryImpl previous)
     {
@@ -76,7 +80,7 @@ public class DeliveryImpl implements Delivery
         _link = link;
         _link.incrementUnsettled();
         _linkPrevious = previous;
-        if(previous != null)
+        if (previous != null)
         {
             previous._linkNext = this;
         }
@@ -212,7 +216,6 @@ public class DeliveryImpl implements Delivery
         return _workPrev;
     }
 
-
     void setWorkNext(DeliveryImpl workNext)
     {
         _workNext = workNext;
@@ -226,39 +229,51 @@ public class DeliveryImpl implements Delivery
     int recv(final byte[] bytes, int offset, int size)
     {
         final int consumed;
-        if (_data != null)
+        if (_dataBuffer != null && _dataBuffer.hasRemaining())
         {
-            //TODO - should only be if no bytes left
-            consumed = Math.min(size, _dataSize);
+            consumed = Math.min(size, _dataBuffer.remaining());
 
-            System.arraycopy(_data, _offset, bytes, offset, consumed);
-            _offset += consumed;
-            _dataSize -= consumed;
+            _dataBuffer.get(bytes, offset, consumed);
+            _dataBuffer.reclaimRead();
         }
         else
         {
-            _dataSize = consumed = 0;
+            consumed = 0;
         }
 
         return (_complete && consumed == 0) ? Transport.END_OF_STREAM : consumed;  //TODO - Implement
     }
 
-    int recv(final WritableBuffer buffer) {
+    int recv(final WritableBuffer buffer)
+    {
         final int consumed;
-        if (_data != null)
+        if (_dataBuffer != null && _dataBuffer.hasRemaining())
         {
-            consumed = Math.min(buffer.remaining(), _dataSize);
-
-            buffer.put(_data, _offset, consumed);
-            _offset += consumed;
-            _dataSize -= consumed;
+            consumed = Math.min(buffer.remaining(), _dataBuffer.remaining());
+            buffer.put(_dataBuffer);
+            _dataBuffer.reclaimRead();
         }
         else
         {
-            _dataSize = consumed = 0;
+            consumed = 0;
         }
 
         return (_complete && consumed == 0) ? Transport.END_OF_STREAM : consumed;
+    }
+
+    ReadableBuffer recv()
+    {
+        ReadableBuffer result = _dataView;
+        if (_dataView != null)
+        {
+            _dataView = _dataBuffer = null;
+        }
+        else
+        {
+            result = EMPTY_BUFFER;
+        }
+
+        return result;
     }
 
     void updateWork()
@@ -278,12 +293,10 @@ public class DeliveryImpl implements Delivery
         getLink().getConnectionImpl().addTransportWork(this);
     }
 
-
     DeliveryImpl getTransportWorkNext()
     {
         return _transportWorkNext;
     }
-
 
     DeliveryImpl getTransportWorkPrev()
     {
@@ -318,78 +331,132 @@ public class DeliveryImpl implements Delivery
 
     int send(byte[] bytes, int offset, int length)
     {
-        if(_data == null)
-        {
-            _data = new byte[length];
-        }
-        else if(_data.length - _dataSize < length)
-        {
-            byte[] oldData = _data;
-            _data = new byte[oldData.length + _dataSize];
-            System.arraycopy(oldData, _offset, _data, 0, _dataSize);
-            _offset = 0;
-        }
-        System.arraycopy(bytes, offset, _data, _dataSize + _offset, length);
-        _dataSize += length;
+        byte[] copy = new byte[length];
+        System.arraycopy(bytes, offset, copy, 0, length);
+        getOrCreateDataBuffer().append(copy);
         addToTransportWorkList();
-        return length;  //TODO - Implement.
+        return length;
     }
 
     int send(final ReadableBuffer buffer)
     {
         int length = buffer.remaining();
-
-        if(_data == null)
-        {
-            _data = new byte[length];
-        }
-        else if(_data.length - _dataSize < length)
-        {
-            byte[] oldData = _data;
-            _data = new byte[oldData.length + _dataSize];
-            System.arraycopy(oldData, _offset, _data, 0, _dataSize);
-            _offset = 0;
-        }
-        buffer.get(_data, _offset, length);
-        _dataSize+=length;
+        getOrCreateDataBuffer().append(copyContents(buffer));
         addToTransportWorkList();
         return length;
     }
 
-    byte[] getData()
+    int sendNoCopy(ReadableBuffer buffer)
     {
-        return _data;
+        int length = buffer.remaining();
+
+        if (_dataView == null || !_dataView.hasRemaining())
+        {
+            _dataView = buffer;
+        }
+        else
+        {
+            consolidateSendBuffers(buffer);
+        }
+
+        addToTransportWorkList();
+        return length;
     }
 
-    int getDataOffset()
+    private byte[] copyContents(ReadableBuffer buffer)
     {
-        return _offset;
+        byte[] copy = new byte[buffer.remaining()];
+
+        if (buffer.hasArray())
+        {
+            System.arraycopy(buffer.array(), buffer.arrayOffset(), copy, 0, buffer.remaining());
+            buffer.position(buffer.limit());
+        }
+        else
+        {
+            buffer.get(copy, 0, buffer.remaining());
+        }
+
+        return copy;
+    }
+
+    private void consolidateSendBuffers(ReadableBuffer buffer)
+    {
+        if (_dataView == _dataBuffer)
+        {
+            getOrCreateDataBuffer().append(copyContents(buffer));
+        }
+        else
+        {
+            ReadableBuffer oldView = _dataView;
+
+            CompositeReadableBuffer dataBuffer = getOrCreateDataBuffer();
+            dataBuffer.append(copyContents(oldView));
+            dataBuffer.append(copyContents(buffer));
+
+            oldView.reclaimRead();
+        }
+
+        buffer.reclaimRead();  // A pooled buffer could release now.
+    }
+
+    void append(Binary payload)
+    {
+        byte[] data = payload.getArray();
+
+        // The Composite buffer cannot handle composites where the array
+        // is a view of a larger array so we must copy the payload into
+        // an array of the exact size
+        if (payload.getArrayOffset() > 0 || payload.getLength() < data.length)
+        {
+            data = new byte[payload.getLength()];
+            System.arraycopy(payload.getArray(), payload.getArrayOffset(), data, 0, payload.getLength());
+        }
+
+        getOrCreateDataBuffer().append(data);
+    }
+
+    private CompositeReadableBuffer getOrCreateDataBuffer()
+    {
+        if (_dataBuffer == null)
+        {
+            _dataView = _dataBuffer = new CompositeReadableBuffer();
+        }
+
+        return _dataBuffer;
+    }
+
+    void append(byte[] data)
+    {
+        getOrCreateDataBuffer().append(data);
+    }
+
+    void afterSend()
+    {
+        if (_dataView != null)
+        {
+            _dataView.reclaimRead();
+            if (!_dataView.hasRemaining())
+            {
+                _dataView = _dataBuffer;
+            }
+        }
+    }
+
+    ReadableBuffer getData()
+    {
+        return _dataView == null ? EMPTY_BUFFER : _dataView;
     }
 
     int getDataLength()
     {
-        return _dataSize;  //TODO - Implement.
-    }
-
-    void setData(byte[] data)
-    {
-        _data = data;
-    }
-
-    void setDataLength(int length)
-    {
-        _dataSize = length;
-    }
-
-    public void setDataOffset(int arrayOffset)
-    {
-        _offset = arrayOffset;
+        return _dataView == null ? 0 : _dataView.remaining();
     }
 
     @Override
     public int available()
     {
-        return _dataSize;
+        return _dataView == null ? 0 : _dataView.remaining();
     }
 
     @Override
@@ -437,7 +504,6 @@ public class DeliveryImpl implements Delivery
         getLink().getConnectionImpl().workUpdate(this);
     }
 
-
     void setDone()
     {
         _done = true;
@@ -462,7 +528,12 @@ public class DeliveryImpl implements Delivery
             if (isDone()) {
                 return false;
             } else {
-                return _complete || _dataSize > 0;
+                boolean hasRemaining = false;
+                if (_dataView != null) {
+                    hasRemaining = _dataView.hasRemaining();
+                }
+
+                return _complete || hasRemaining;
             }
         } else {
             return false;
@@ -505,18 +576,18 @@ public class DeliveryImpl implements Delivery
             .append(", _flags=").append(_flags)
             .append(", _defaultDeliveryState=").append(_defaultDeliveryState)
             .append(", _transportDelivery=").append(_transportDelivery)
-            .append(", _dataSize=").append(_dataSize)
+            .append(", _data Size=").append(getDataLength())
             .append(", _complete=").append(_complete)
             .append(", _updated=").append(_updated)
             .append(", _done=").append(_done)
-            .append(", _offset=").append(_offset).append("]");
+            .append("]");
         return builder.toString();
     }
 
     @Override
     public int pending()
     {
-        return _dataSize;
+        return _dataView == null ? 0 : _dataView.remaining();
     }
 
     @Override
@@ -530,5 +601,4 @@ public class DeliveryImpl implements Delivery
     {
         return _defaultDeliveryState;
     }
-
 }

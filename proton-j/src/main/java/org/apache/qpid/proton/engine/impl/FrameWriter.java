@@ -24,6 +24,7 @@ import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.EmptyFrame;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.codec.EncoderImpl;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.framing.TransportFrame;
 
@@ -96,7 +97,7 @@ class FrameWriter
         _frameStart = _buffer.position();
     }
 
-    private void writePerformative(Object frameBody, ByteBuffer payload, Runnable onPayloadTooLarge)
+    private void writePerformative(Object frameBody, ReadableBuffer payload, Runnable onPayloadTooLarge)
     {
         while (_buffer.remaining() < 8) {
             grow();
@@ -146,7 +147,7 @@ class FrameWriter
         _buffer.position(limit);
     }
 
-    void writeFrame(int channel, Object frameBody, ByteBuffer payload,
+    void writeFrame(int channel, Object frameBody, ReadableBuffer payload,
                     Runnable onPayloadTooLarge)
     {
         startFrame();
@@ -162,7 +163,7 @@ class FrameWriter
         int payloadSize = Math.min(payload == null ? 0 : payload.remaining(), capacity);
 
         ProtocolTracer tracer = _protocolTracer == null ? null : _protocolTracer.get();
-        if(tracer != null || _transport.isTraceFramesEnabled())
+        if (tracer != null || _transport.isTraceFramesEnabled())
         {
             logFrame(tracer, channel, frameBody, payload, payloadSize);
         }
@@ -185,13 +186,11 @@ class FrameWriter
         _framesOutput += 1;
     }
 
-    private void logFrame(ProtocolTracer tracer, int channel, Object frameBody, ByteBuffer payload, int payloadSize)
+    private void logFrame(ProtocolTracer tracer, int channel, Object frameBody, ReadableBuffer payload, int payloadSize)
     {
-        // XXX: this is a bit of a hack but it eliminates duplicate
-        // code, further refactor will fix this
         if (_frameType == AMQP_FRAME_TYPE)
         {
-            ByteBuffer originalPayload = null;
+            ReadableBuffer originalPayload = null;
             if (payload!=null)
             {
                 originalPayload = payload.duplicate();

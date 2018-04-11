@@ -79,6 +79,25 @@ public class SenderImpl  extends LinkImpl implements Sender
     }
 
     @Override
+    public int sendNoCopy(final ReadableBuffer buffer)
+    {
+        if (getLocalState() == EndpointState.CLOSED)
+        {
+            throw new IllegalStateException("send not allowed after the sender is closed.");
+        }
+        DeliveryImpl current = current();
+        if (current == null || current.getLink() != this)
+        {
+            throw new IllegalArgumentException();
+        }
+        int sent = current.sendNoCopy(buffer);
+        if (sent > 0) {
+            getSession().incrementOutgoingBytes(sent);
+        }
+        return sent;
+    }
+
+    @Override
     public void abort()
     {
         //TODO.

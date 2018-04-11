@@ -188,4 +188,25 @@ public class CompositeWritableBuffer implements WritableBuffer
     {
         return _first.toString() + " + "+_second.toString();
     }
+
+    @Override
+    public void put(ReadableBuffer payload) {
+        int firstRemaining = _first.remaining();
+        if(firstRemaining > 0)
+        {
+            if(firstRemaining >= payload.remaining())
+            {
+                _first.put(payload);
+                return;
+            }
+            else
+            {
+                int limit = payload.limit();
+                payload.limit(payload.position()+firstRemaining);
+                _first.put(payload);
+                payload.limit(limit);
+            }
+        }
+        _second.put(payload);
+    }
 }

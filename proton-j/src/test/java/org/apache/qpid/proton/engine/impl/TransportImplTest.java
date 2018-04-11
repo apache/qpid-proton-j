@@ -51,6 +51,7 @@ import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.amqp.transport.Open;
 import org.apache.qpid.proton.amqp.transport.Role;
 import org.apache.qpid.proton.amqp.transport.Transfer;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
 import org.apache.qpid.proton.engine.Delivery;
@@ -366,9 +367,10 @@ public class TransportImplTest
         }
 
         LinkedList<FrameBody> writes = new LinkedList<FrameBody>();
+
         @Override
         protected void writeFrame(int channel, FrameBody frameBody,
-                                  ByteBuffer payload, Runnable onPayloadTooLarge) {
+                                  ReadableBuffer payload, Runnable onPayloadTooLarge) {
             super.writeFrame(channel, frameBody, payload, onPayloadTooLarge);
             writes.addLast(frameBody);
         }

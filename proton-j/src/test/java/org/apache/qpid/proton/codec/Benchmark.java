@@ -22,7 +22,6 @@ package org.apache.qpid.proton.codec;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -44,12 +43,13 @@ import org.apache.qpid.proton.amqp.transport.Disposition;
 import org.apache.qpid.proton.amqp.transport.Flow;
 import org.apache.qpid.proton.amqp.transport.Role;
 import org.apache.qpid.proton.amqp.transport.Transfer;
+import org.apache.qpid.proton.codec.WritableBuffer.ByteBufferWrapper;
 
 public class Benchmark implements Runnable {
 
     private static final int ITERATIONS = 10 * 1024 * 1024;
 
-    private ByteBuffer byteBuf = ByteBuffer.allocate(8192);
+    private ByteBufferWrapper outputBuf = WritableBuffer.ByteBufferWrapper.allocate(8192);
     private BenchmarkResult resultSet = new BenchmarkResult();
     private boolean warming = true;
 
@@ -66,8 +66,7 @@ public class Benchmark implements Runnable {
     public void run() {
         AMQPDefinedTypes.registerAllTypes(decoder, encoder);
 
-        encoder.setByteBuffer(byteBuf);
-        decoder.setByteBuffer(byteBuf);
+        encoder.setByteBuffer(outputBuf);
 
         try {
             doBenchmarks();
@@ -102,6 +101,16 @@ public class Benchmark implements Runnable {
         warming = false;
     }
 
+    private CompositeReadableBuffer convertToComposite(WritableBuffer buffer) {
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        ReadableBuffer readableView = outputBuf.toReadableBuffer();
+
+        byte[] copy = new byte[readableView.remaining()];
+        readableView.get(copy);
+
+        return composite.append(copy);
+    }
+
     private void benchmarkListOfInts() throws IOException {
         ArrayList<Object> list = new ArrayList<>(10);
         for (int j = 0; j < 10; j++) {
@@ -110,15 +119,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeList(list);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readList();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -130,15 +142,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeUUID(uuid);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readUUID();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -152,15 +167,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(header);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -175,15 +193,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(transfer);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -202,15 +223,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(flow);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -225,15 +249,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(properties);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -248,22 +275,24 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(annotations);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
         time("MessageAnnotations", resultSet);
     }
 
-    @SuppressWarnings("unchecked")
     private void benchmarkApplicationProperties() throws IOException {
         ApplicationProperties properties = new ApplicationProperties(new HashMap<String, Object>());
         properties.getValue().put("test1", UnsignedByte.valueOf((byte) 128));
@@ -272,15 +301,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(properties);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -294,19 +326,22 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeSymbol(symbol1);
             encoder.writeSymbol(symbol2);
             encoder.writeSymbol(symbol3);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readSymbol();
             decoder.readSymbol();
             decoder.readSymbol();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -323,15 +358,18 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(disposition);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -345,19 +383,22 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeString(string1);
             encoder.writeString(string2);
             encoder.writeString(string3);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readString();
             decoder.readString();
             decoder.readString();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 
@@ -371,19 +412,22 @@ public class Benchmark implements Runnable {
 
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.clear();
+            outputBuf.byteBuffer().clear();
             encoder.writeObject(data1);
             encoder.writeObject(data2);
             encoder.writeObject(data3);
         }
         resultSet.encodesComplete();
 
+        CompositeReadableBuffer inputBuf = convertToComposite(outputBuf);
+        decoder.setBuffer(inputBuf);
+
         resultSet.start();
         for (int i = 0; i < ITERATIONS; i++) {
-            byteBuf.flip();
             decoder.readObject();
             decoder.readObject();
             decoder.readObject();
+            inputBuf.flip();
         }
         resultSet.decodesComplete();
 

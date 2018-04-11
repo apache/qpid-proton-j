@@ -20,6 +20,7 @@
  */
 package org.apache.qpid.proton.engine;
 
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 /**
@@ -68,6 +69,17 @@ public interface Receiver extends Link
      * @return number of bytes written. -1 if there are no more bytes for the current delivery.
      */
     public int recv(WritableBuffer buffer);
+
+    /**
+     * Receive message data for the current delivery returning the data in a Readable buffer.
+     *
+     * The delivery will return an empty buffer if there is no pending data to be read or if all
+     * data has been read either by a previous call to this method or by a call to one of the other
+     * receive methods.
+     *
+     * @return a ReadableBuffer that contains the currently available data for the current delivery.
+     */
+    public ReadableBuffer recv();
 
     public void drain(int credit);
 

@@ -22,7 +22,6 @@ package org.apache.qpid.proton.codec;
 
 import org.apache.qpid.proton.amqp.Symbol;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,27 +34,27 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
     private final SymbolEncoding _symbolEncoding;
     private final SymbolEncoding _shortSymbolEncoding;
 
-    private final Map<ByteBuffer, Symbol> _symbolCache = new HashMap<ByteBuffer, Symbol>();
+    private final Map<ReadableBuffer, Symbol> _symbolCache = new HashMap<ReadableBuffer, Symbol>();
     private DecoderImpl.TypeDecoder<Symbol> _symbolCreator =
-            new DecoderImpl.TypeDecoder<Symbol>()
+        new DecoderImpl.TypeDecoder<Symbol>()
+        {
+            @Override
+            public Symbol decode(DecoderImpl decoder, ReadableBuffer buffer)
             {
-                @Override
-                public Symbol decode(DecoderImpl decoder, ByteBuffer buf)
+                Symbol symbol = _symbolCache.get(buffer);
+                if (symbol == null)
                 {
-                    Symbol symbol = _symbolCache.get(buf);
-                    if(symbol == null)
-                    {
-                        byte[] bytes = new byte[buf.limit()];
-                        buf.get(bytes);
+                    byte[] bytes = new byte[buffer.limit()];
+                    buffer.get(bytes);
 
-                        String str = new String(bytes, ASCII_CHARSET);
-                        symbol = Symbol.getSymbol(str);
+                    String str = new String(bytes, ASCII_CHARSET);
+                    symbol = Symbol.getSymbol(str);
 
-                        _symbolCache.put(ByteBuffer.wrap(bytes), symbol);
-                    }
-                    return symbol;
+                    _symbolCache.put(ReadableBuffer.ByteBufferReader.wrap(bytes), symbol);
                 }
-            };
+                return symbol;
+            }
+        };
 
     public static interface SymbolEncoding extends PrimitiveTypeEncoding<Symbol>
     {
@@ -155,7 +154,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
-            ByteBuffer buffer = decoder.getByteBuffer();
+            ReadableBuffer buffer = decoder.getBuffer();
             int size = decoder.readRawInt();
             buffer.position(buffer.position() + size);
         }
@@ -210,7 +209,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
-            ByteBuffer buffer = decoder.getByteBuffer();
+            ReadableBuffer buffer = decoder.getBuffer();
             int size = ((int)decoder.readRawByte()) & 0xff;
             buffer.position(buffer.position() + size);
         }

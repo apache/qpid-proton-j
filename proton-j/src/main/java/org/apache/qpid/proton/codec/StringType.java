@@ -20,7 +20,6 @@
  */
 package org.apache.qpid.proton.codec;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.util.Arrays;
@@ -31,13 +30,12 @@ public class StringType extends AbstractPrimitiveType<String>
     private static final DecoderImpl.TypeDecoder<String> _stringCreator =
         new DecoderImpl.TypeDecoder<String>()
         {
-
-            public String decode(DecoderImpl decoder, final ByteBuffer buf)
+            public String decode(DecoderImpl decoder, final ReadableBuffer buffer)
             {
                 CharsetDecoder charsetDecoder = decoder.getCharsetDecoder();
                 try
                 {
-                    return decoder.getCharsetDecoder().decode(buf).toString();
+                    return buffer.readString(charsetDecoder);
                 }
                 catch (CharacterCodingException e)
                 {
@@ -49,7 +47,6 @@ public class StringType extends AbstractPrimitiveType<String>
                 }
             }
         };
-
 
     public static interface StringEncoding extends PrimitiveTypeEncoding<String>
     {
@@ -106,7 +103,6 @@ public class StringType extends AbstractPrimitiveType<String>
         return len;
     }
 
-
     public StringEncoding getCanonicalEncoding()
     {
         return _stringEncoding;
@@ -121,10 +117,8 @@ public class StringType extends AbstractPrimitiveType<String>
             extends LargeFloatingSizePrimitiveTypeEncoding<String>
             implements StringEncoding
     {
-
         private String _value;
         private int _length;
-
 
         public AllStringEncoding(final EncoderImpl encoder, final DecoderImpl decoder)
         {
@@ -142,7 +136,6 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             return (val == _value) ? _length : calculateUTF8Length(val);
         }
-
 
         @Override
         public byte getEncodingCode()
@@ -162,7 +155,6 @@ public class StringType extends AbstractPrimitiveType<String>
 
         public String readValue()
         {
-
             DecoderImpl decoder = getDecoder();
             int size = decoder.readRawInt();
             return decoder.readRaw(_stringCreator, size);
@@ -177,7 +169,7 @@ public class StringType extends AbstractPrimitiveType<String>
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
-            ByteBuffer buffer = decoder.getByteBuffer();
+            ReadableBuffer buffer = decoder.getBuffer();
             int size = decoder.readRawInt();
             buffer.position(buffer.position() + size);
         }
@@ -187,7 +179,6 @@ public class StringType extends AbstractPrimitiveType<String>
             extends SmallFloatingSizePrimitiveTypeEncoding<String>
             implements StringEncoding
     {
-
         private String _value;
         private int _length;
 
@@ -195,7 +186,6 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             super(encoder, decoder);
         }
-
 
         @Override
         protected void writeEncodedValue(final String val)
@@ -208,7 +198,6 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             return (val == _value) ? _length : calculateUTF8Length(val);
         }
-
 
         @Override
         public byte getEncodingCode()
@@ -228,7 +217,6 @@ public class StringType extends AbstractPrimitiveType<String>
 
         public String readValue()
         {
-
             DecoderImpl decoder = getDecoder();
             int size = ((int)decoder.readRawByte()) & 0xff;
             return decoder.readRaw(_stringCreator, size);
@@ -243,10 +231,9 @@ public class StringType extends AbstractPrimitiveType<String>
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
-            ByteBuffer buffer = decoder.getByteBuffer();
+            ReadableBuffer buffer = decoder.getBuffer();
             int size = ((int)decoder.readRawByte()) & 0xff;
             buffer.position(buffer.position() + size);
         }
     }
-
 }

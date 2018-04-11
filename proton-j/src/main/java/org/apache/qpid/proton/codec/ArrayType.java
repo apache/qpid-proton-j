@@ -21,7 +21,6 @@
 package org.apache.qpid.proton.codec;
 
 import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -48,7 +47,7 @@ public class ArrayType implements PrimitiveType<Object[]>
         void writeValue(double[] a);
         void writeValue(char[] a);
 
-        void setValue(Object[] val, TypeEncoding encoder, int size);
+        void setValue(Object[] val, TypeEncoding<?> encoder, int size);
 
         int getSizeBytes();
 
@@ -92,7 +91,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     public ArrayEncoding getEncoding(final Object[] val)
     {
-        TypeEncoding encoder = calculateEncoder(val,_encoder);
+        TypeEncoding<?> encoder = calculateEncoder(val,_encoder);
         int size = calculateSize(val, encoder);
         ArrayEncoding arrayEncoding = (val.length > 255 || size > 254)
                                       ? _arrayEncoding
@@ -101,7 +100,7 @@ public class ArrayType implements PrimitiveType<Object[]>
         return arrayEncoding;
     }
 
-    private static TypeEncoding calculateEncoder(final Object[] val, final EncoderImpl encoder)
+    private static TypeEncoding<?> calculateEncoder(final Object[] val, final EncoderImpl encoder)
     {
 
         if(val.length == 0)
@@ -156,7 +155,6 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
             else
             {
-
                 if(underlyingType == null)
                 {
                     checkTypes = true;
@@ -172,7 +170,6 @@ public class ArrayType implements PrimitiveType<Object[]>
                         throw new IllegalArgumentException("Non matching types " + underlyingType + " and " + encoder
                                 .getType(val[i]) + " in array");
                     }
-
 
                     TypeEncoding elementEncoding = underlyingType.getEncoding(val[i]);
                     if(elementEncoding != underlyingEncoding && !underlyingEncoding.encodesSuperset(elementEncoding))
@@ -438,7 +435,6 @@ public class ArrayType implements PrimitiveType<Object[]>
             extends LargeFloatingSizePrimitiveTypeEncoding<Object[]>
             implements ArrayEncoding
     {
-
         private Object[] _val;
         private TypeEncoding _underlyingEncoder;
         private int _size;
@@ -635,7 +631,7 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
-            ByteBuffer buffer = decoder.getByteBuffer();
+            ReadableBuffer buffer = decoder.getBuffer();
             int size = decoder.readRawInt();
             buffer.position(buffer.position() + size);
         }
@@ -900,7 +896,7 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
-            ByteBuffer buffer = decoder.getByteBuffer();
+            ReadableBuffer buffer = decoder.getBuffer();
             int size = ((int)decoder.readRawByte()) & 0xFF;
             buffer.position(buffer.position() + size);
         }

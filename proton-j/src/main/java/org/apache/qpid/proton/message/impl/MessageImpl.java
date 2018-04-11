@@ -40,7 +40,7 @@ public class MessageImpl implements ProtonJMessage
     private ApplicationProperties _applicationProperties;
     private Section _body;
     private Footer _footer;
-    
+
     private static class EncoderDecoderPair {
       DecoderImpl decoder = new DecoderImpl();
       EncoderImpl encoder = new EncoderImpl(decoder);
@@ -576,8 +576,13 @@ public class MessageImpl implements ProtonJMessage
 
     public void decode(ByteBuffer buffer)
     {
+        decode(ReadableBuffer.ByteBufferReader.wrap(buffer));
+    }
+
+    public void decode(ReadableBuffer buffer)
+    {
         DecoderImpl decoder = tlsCodec.get().decoder;
-        decoder.setByteBuffer(buffer);
+        decoder.setBuffer(buffer);
 
         _header = null;
         _deliveryAnnotations = null;
@@ -681,7 +686,7 @@ public class MessageImpl implements ProtonJMessage
 
         }
 
-        decoder.setByteBuffer(null);
+        decoder.setBuffer(null);
     }
 
     @Override

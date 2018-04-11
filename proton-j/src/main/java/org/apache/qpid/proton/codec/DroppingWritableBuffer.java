@@ -27,7 +27,7 @@ public class DroppingWritableBuffer implements WritableBuffer
     private int _pos = 0;
 
     @Override
-    public boolean hasRemaining() 
+    public boolean hasRemaining()
     {
         return true;
     }
@@ -103,5 +103,11 @@ public class DroppingWritableBuffer implements WritableBuffer
     public int limit()
     {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public void put(ReadableBuffer payload) {
+        _pos += payload.remaining();
+        payload.position(payload.limit());
     }
 }

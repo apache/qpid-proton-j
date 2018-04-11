@@ -32,7 +32,6 @@ import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.UnsignedShort;
 
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharsetDecoder;
@@ -41,7 +40,7 @@ import java.util.*;
 
 public class DecoderImpl implements ByteBufferDecoder
 {
-    private ByteBuffer _buffer;
+    private ReadableBuffer _buffer;
 
     private final CharsetDecoder _charsetDecoder = StandardCharsets.UTF_8.newDecoder();
 
@@ -58,7 +57,7 @@ public class DecoderImpl implements ByteBufferDecoder
 
     DecoderImpl(final ByteBuffer buffer)
     {
-        _buffer = buffer;
+        _buffer = new ReadableBuffer.ByteBufferReader(buffer);
     }
 
     public TypeConstructor<?> peekConstructor()
@@ -998,20 +997,29 @@ public class DecoderImpl implements ByteBufferDecoder
         _buffer.get(data, offset, length);
     }
 
-
     <V> V readRaw(TypeDecoder<V> decoder, int size)
     {
-        V decode = decoder.decode(this, (ByteBuffer) _buffer.slice().limit(size));
+        V decode = decoder.decode(this, _buffer.slice().limit(size));
         _buffer.position(_buffer.position()+size);
         return decode;
     }
 
     public void setByteBuffer(final ByteBuffer buffer)
     {
-        _buffer = buffer;
+        _buffer = new ReadableBuffer.ByteBufferReader(buffer);
     }
 
     public ByteBuffer getByteBuffer()
+    {
+        return _buffer.byteBuffer();
+    }
+
+    public void setBuffer(final ReadableBuffer buffer)
+    {
+        _buffer = buffer;
+    }
+
+    public ReadableBuffer getBuffer()
     {
         return _buffer;
     }
@@ -1023,7 +1031,7 @@ public class DecoderImpl implements ByteBufferDecoder
 
     interface TypeDecoder<V>
     {
-        V decode(DecoderImpl decoder, ByteBuffer buf);
+        V decode(DecoderImpl decoder, ReadableBuffer buf);
     }
 
     private static class UnknownDescribedType implements DescribedType
