@@ -39,6 +39,10 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     private static final CompositeReadableBuffer EMPTY_SLICE = new CompositeReadableBuffer(true);
     private static int UNSET_MARK = -1;
 
+    private static final int SHORT_BYTES = 2;
+    private static final int INT_BYTES = 4;
+    private static final int LONG_BYTES = 8;
+
     private ArrayList<byte[]> contents;
 
     // Track active array and our offset into it.
@@ -181,7 +185,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
 
     @Override
     public int getInt() {
-        if (remaining() < Integer.BYTES) {
+        if (remaining() < INT_BYTES) {
             throw new BufferUnderflowException();
         }
 
@@ -193,7 +197,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
                      (int)(currentArray[currentOffset++] & 0xFF) << 8 |
                      (int)(currentArray[currentOffset++] & 0xFF) << 0;
         } else {
-            for (int i = Integer.BYTES - 1; i >= 0; --i) {
+            for (int i = INT_BYTES - 1; i >= 0; --i) {
                 result |= (int)(currentArray[currentOffset++] & 0xFF) << (i * Byte.SIZE);
                 maybeMoveToNextArray();
             }
@@ -206,7 +210,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
 
     @Override
     public long getLong() {
-        if (remaining() < Long.BYTES) {
+        if (remaining() < LONG_BYTES) {
             throw new BufferUnderflowException();
         }
 
@@ -222,7 +226,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
                      (long)(currentArray[currentOffset++] & 0xFF) << 8 |
                      (long)(currentArray[currentOffset++] & 0xFF) << 0;
         } else {
-            for (int i = Long.BYTES - 1; i >= 0; --i) {
+            for (int i = LONG_BYTES - 1; i >= 0; --i) {
                 result |= (long)(currentArray[currentOffset++] & 0xFF) << (i * Byte.SIZE);
                 maybeMoveToNextArray();
             }
@@ -235,13 +239,13 @@ public class CompositeReadableBuffer implements ReadableBuffer {
 
     @Override
     public short getShort() {
-        if (remaining() < Short.BYTES) {
+        if (remaining() < SHORT_BYTES) {
             throw new BufferUnderflowException();
         }
 
         short result = 0;
 
-        for (int i = Short.BYTES - 1; i >= 0; --i) {
+        for (int i = SHORT_BYTES - 1; i >= 0; --i) {
             result |= (currentArray[currentOffset++] & 0xFF) << (i * Byte.SIZE);
             maybeMoveToNextArray();
         }
