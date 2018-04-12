@@ -2268,7 +2268,7 @@ public class CompositeReadableBufferTest {
     }
 
     private byte[] int2bytes(int value) {
-        byte bytes[] = new byte[Integer.BYTES];
+        byte bytes[] = new byte[4];
         int index = 0;
 
         bytes[index++] = (byte) (value >>> 24);
@@ -2280,7 +2280,7 @@ public class CompositeReadableBufferTest {
     }
 
     private byte[] long2bytes(long value) {
-        byte bytes[] = new byte[Long.BYTES];
+        byte bytes[] = new byte[8];
         int index = 0;
 
         bytes[index++] = (byte) (value >>> 56);
