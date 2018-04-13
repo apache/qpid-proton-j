@@ -94,7 +94,7 @@ class FrameParser implements TransportInput
         _frameHandler = frameHandler;
         _decoder = decoder;
         _localMaxFrameSize = localMaxFrameSize;
-        _inputBufferSize = _localMaxFrameSize > 0 ? _localMaxFrameSize : 4*1024;
+        _inputBufferSize = _localMaxFrameSize > 0 ? _localMaxFrameSize : 16*1024;
     }
 
     private void input(ByteBuffer in) throws TransportException

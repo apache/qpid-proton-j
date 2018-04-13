@@ -40,7 +40,7 @@ class TransportOutputAdaptor implements TransportOutput
     TransportOutputAdaptor(TransportOutputWriter transportOutputWriter, int maxFrameSize, boolean readOnlyHead)
     {
         _transportOutputWriter = transportOutputWriter;
-        _maxFrameSize = maxFrameSize > 0 ? maxFrameSize : 4*1024;
+        _maxFrameSize = maxFrameSize > 0 ? maxFrameSize : 16*1024;
         _readOnlyHead = readOnlyHead;
     }
 
