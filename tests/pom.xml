@@ -45,6 +45,7 @@ mvn test \
 
   <properties>
     <testReportOutputDirectory>${basedir}/target/surefire-reports</testReportOutputDirectory>
+    <jacoco.skip>true</jacoco.skip>
   </properties>
 
   <build>
