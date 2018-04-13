@@ -308,4 +308,17 @@ public interface Transport extends Endpoint
     void setEmitFlowEventOnSend(boolean emitFlowEventOnSend);
 
     boolean isEmitFlowEventOnSend();
+
+    /**
+     * Set an upper limit on the size of outgoing frames that will be sent
+     * to the peer. Allows constraining the transport not to emit Transfer
+     * frames over a given size even when the peers max frame size allows it.
+     *
+     * Must be set before receiving the peers Open frame to have effect.
+     *
+     * @param size the size limit to apply
+     */
+    void setOutboundFrameSizeLimit(int size);
+
+    int getOutboundFrameSizeLimit();
 }

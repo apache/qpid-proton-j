@@ -104,6 +104,7 @@ public class TransportImpl extends EndpointImpl
 
     private int _maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
     private int _remoteMaxFrameSize = MIN_MAX_FRAME_SIZE;
+    private int _outboundFrameSizeLimit = 0;
     private int _channelMax       = CHANNEL_MAX_LIMIT;
     private int _remoteChannelMax = CHANNEL_MAX_LIMIT;
 
@@ -1105,11 +1106,18 @@ public class TransportImpl extends EndpointImpl
             _open = open;
         }
 
+        int effectiveMaxFrameSize = _remoteMaxFrameSize;
         if(open.getMaxFrameSize().longValue() > 0)
         {
             _remoteMaxFrameSize = (int) open.getMaxFrameSize().longValue();
-            _frameWriter.setMaxFrameSize(_remoteMaxFrameSize);
+            effectiveMaxFrameSize = (int) Math.min(open.getMaxFrameSize().longValue(), Integer.MAX_VALUE);
         }
+
+        if(_outboundFrameSizeLimit > 0) {
+            effectiveMaxFrameSize = (int) Math.min(open.getMaxFrameSize().longValue(), _outboundFrameSizeLimit);
+        }
+
+        _frameWriter.setMaxFrameSize(effectiveMaxFrameSize);
 
         if (open.getChannelMax().longValue() > 0)
         {
@@ -1778,5 +1786,15 @@ public class TransportImpl extends EndpointImpl
             _outputProcessor = transportWrapper;
             _additionalTransportLayers.add(layer);
         }
+    }
+
+    @Override
+    public void setOutboundFrameSizeLimit(int limit) {
+        _outboundFrameSizeLimit = limit;
+    }
+
+    @Override
+    public int getOutboundFrameSizeLimit() {
+        return _outboundFrameSizeLimit;
     }
 }
