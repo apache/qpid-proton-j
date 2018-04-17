@@ -723,6 +723,21 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         return true;
     }
 
+    @Override
+    public String toString() {
+        StringBuffer builder = new StringBuffer();
+        builder.append("CompositeReadableBuffer");
+        builder.append("{ pos=");
+        builder.append(position());
+        builder.append(" limit=");
+        builder.append(limit());
+        builder.append(" capacity=");
+        builder.append(capacity());
+        builder.append(" }");
+
+        return builder.toString();
+    }
+
     private static boolean equals(byte x, byte y) {
         return x == y;
     }

@@ -193,8 +193,8 @@ class FrameWriter
             ReadableBuffer originalPayload = null;
             if (payload!=null)
             {
-                originalPayload = payload.duplicate();
-                originalPayload.limit(payload.position() + payloadSize);
+                originalPayload = payload.slice();
+                originalPayload.limit(payloadSize);
             }
 
             Binary payloadBin = Binary.create(originalPayload);
