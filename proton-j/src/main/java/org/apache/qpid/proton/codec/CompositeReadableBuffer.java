@@ -103,7 +103,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     @Override
     public int arrayOffset() {
         if (hasArray()) {
-            return currentOffset;
+            return currentOffset - position;
         }
 
         throw new UnsupportedOperationException("Buffer not backed by a single array");

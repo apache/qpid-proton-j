@@ -989,6 +989,63 @@ public class CompositeReadableBufferTest {
         }
     }
 
+    //----- Test arrayOffset method ------------------------------------------//
+
+    @Test
+    public void testArrayOffsetIsZeroRegardlessOfPositionOnNonSlicedBuffer() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        byte[] data = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+        buffer.append(data);
+
+        assertTrue(buffer.hasArray());
+        assertEquals(0, buffer.arrayOffset());
+
+        buffer.position(1);
+
+        assertEquals(0, buffer.arrayOffset());
+
+        buffer.position(buffer.limit());
+
+        assertEquals(0, buffer.arrayOffset());
+
+        buffer.position(0);
+
+        assertEquals(0, buffer.arrayOffset());
+    }
+
+    @Test
+    public void testArrayOffsetIsFixedOnSliceRegardlessOfPosition() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        byte[] data = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+        buffer.append(data);
+
+        assertTrue(buffer.hasArray());
+        assertEquals(0, buffer.arrayOffset());
+
+        buffer.position(1);
+        ReadableBuffer slice = buffer.slice();
+
+        assertEquals(1, slice.arrayOffset());
+
+        slice.position(slice.limit());
+
+        assertEquals(1, slice.arrayOffset());
+
+        slice.position(0);
+
+        assertEquals(1, slice.arrayOffset());
+
+        slice.position(1);
+
+        ReadableBuffer anotherSlice = slice.slice();
+
+        assertEquals(2, anotherSlice.arrayOffset());
+    }
+
     //----- Test appending data to the buffer --------------------------------//
 
     @Test
