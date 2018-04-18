@@ -1046,6 +1046,65 @@ public class CompositeReadableBufferTest {
         assertEquals(2, anotherSlice.arrayOffset());
     }
 
+    @Test
+    public void testArrayOffset() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+        assertFalse(buffer.hasArray());
+        try {
+            buffer.arrayOffset();
+            fail("Should throw UnsupportedOperationException");
+        } catch (UnsupportedOperationException e) {
+            // Expected
+        }
+
+        buffer.append(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+
+        assertTrue(buffer.hasArray());
+        assertEquals("Unexpected array offset", 0, buffer.arrayOffset());
+    }
+
+    @Test
+    public void testArrayOffsetAfterDuplicate() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+        buffer.append(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+
+        assertEquals("Unexpected get result", 0, buffer.get());
+
+        CompositeReadableBuffer duplicate = buffer.duplicate();
+
+        assertTrue(duplicate.hasArray());
+        assertEquals("Unexpected array offset after duplication", 0, duplicate.arrayOffset());
+
+        assertEquals("Unexpected get result", 1, duplicate.get());
+
+        assertEquals("Unexpected array offset after duplicate use", 0, duplicate.arrayOffset());
+        assertEquals("Unexpected get result", 2, duplicate.get());
+
+        assertEquals("Unexpected array offset on original", 0, buffer.arrayOffset());
+    }
+
+    @Test
+    public void testArrayOffsetAfterSliceDuplicated() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+        buffer.append(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+
+        assertEquals("Unexpected get result", 0, buffer.get());
+
+        CompositeReadableBuffer slice = buffer.slice();
+        CompositeReadableBuffer sliceDuplicated = slice.duplicate();
+
+        assertTrue(sliceDuplicated.hasArray());
+        assertEquals("Unexpected array offset after duplication", 1, sliceDuplicated.arrayOffset());
+
+        assertEquals("Unexpected get result", 1, sliceDuplicated.get());
+
+        assertEquals("Unexpected array offset after duplicate use", 1, sliceDuplicated.arrayOffset());
+        assertEquals("Unexpected get result", 2, sliceDuplicated.get());
+
+        assertEquals("Unexpected array offset on original", 0, buffer.arrayOffset());
+        assertEquals("Unexpected array offset on slice", 1, slice.arrayOffset());
+    }
+
     //----- Test appending data to the buffer --------------------------------//
 
     @Test

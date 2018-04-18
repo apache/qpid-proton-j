@@ -369,7 +369,7 @@ public class DeliveryImpl implements Delivery
 
         if (buffer.hasArray())
         {
-            System.arraycopy(buffer.array(), buffer.arrayOffset(), copy, 0, buffer.remaining());
+            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), copy, 0, buffer.remaining());
             buffer.position(buffer.limit());
         }
         else

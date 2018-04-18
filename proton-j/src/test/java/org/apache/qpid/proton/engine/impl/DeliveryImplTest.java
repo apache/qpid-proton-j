@@ -440,7 +440,7 @@ public class DeliveryImplTest
         assertArrayEquals(data2, composite.getArrays().get(1));
     }
 
-    //----- Test send with WritableBuffer ------------------------------------//
+    //----- Test send with ReadableBuffer ------------------------------------//
 
     @Test
     public void testSendSingleReadableBuffer() throws Exception
@@ -459,6 +459,60 @@ public class DeliveryImplTest
 
         assertNotSame(data, composite.array());
         assertArrayEquals(data, composite.array());
+    }
+
+    @Test
+    public void testSendSingleReadableBufferWithPartialContent() throws Exception
+    {
+        DeliveryImpl delivery = createSenderDelivery();
+
+        byte[] data = new byte[] { 0, 1, 2, 3, 4, 5 };
+        byte[] expected = new byte[] { 3, 4, 5 };
+        ReadableBuffer buffer = ReadableBuffer.ByteBufferReader.wrap(data);
+        // Now move the position forward so we only send some of the data
+        buffer.position(3);
+
+        delivery.send(buffer);
+
+        assertEquals(expected.length, delivery.pending());
+        assertEquals(expected.length, delivery.getData().remaining());
+
+        CompositeReadableBuffer composite = (CompositeReadableBuffer) delivery.getData();
+
+        assertNotSame(data, composite.array());
+        assertNotSame(expected, composite.array());
+        assertArrayEquals(expected, composite.array());
+    }
+
+    @Test
+    public void testSendSingleReadableBufferWithOffsetAndPartialContent() throws Exception
+    {
+        DeliveryImpl delivery = createSenderDelivery();
+
+        byte[] bytes = new byte[] { 0, 1, 2, 3, 4, 5 };
+        ByteBuffer data = ByteBuffer.wrap(bytes, 0, 5); // Wrap, miss out the last byte from array
+        data.position(1); // Now move the position forward
+        ByteBuffer dataSlice = data.slice(); // Now slice, causing us to have an array offset at start of array
+
+        byte[] expected = new byte[] { 2, 3, 4 };
+
+        ReadableBuffer buffer = ReadableBuffer.ByteBufferReader.wrap(dataSlice);
+        // Now move the position forward so we only send some of the data
+        buffer.position(1);
+
+        assertEquals("Unexpected array offset", 1, buffer.arrayOffset());
+        assertEquals("Unexpected remaining", 3, buffer.remaining());
+
+        delivery.send(buffer);
+
+        assertEquals(expected.length, delivery.pending());
+        assertEquals(expected.length, delivery.getData().remaining());
+
+        CompositeReadableBuffer composite = (CompositeReadableBuffer) delivery.getData();
+
+        assertNotSame(bytes, composite.array());
+        assertNotSame(expected, composite.array());
+        assertArrayEquals(expected, composite.array());
     }
 
     @Test
@@ -489,7 +543,7 @@ public class DeliveryImplTest
         assertArrayEquals(data2, composite.getArrays().get(1));
     }
 
-    //----- Test send with WritableBuffer ------------------------------------//
+    //----- Test send with ReadableBuffer ------------------------------------//
 
     @Test
     public void testSendNoCopySingleReadableBuffer() throws Exception
