@@ -177,16 +177,16 @@ public class StringTypeTest
     }
 
     @Test
-    public void testEmptyShortStringEncod() {
-        doTestEmptyStringEncodAsGivenType(EncodingCodes.STR8);
+    public void testEmptyShortStringEncode() {
+        doTestEmptyStringEncodeAsGivenType(EncodingCodes.STR8);
     }
 
     @Test
-    public void testEmptyLargeStringEncod() {
-        doTestEmptyStringEncodAsGivenType(EncodingCodes.STR32);
+    public void testEmptyLargeStringEncode() {
+        doTestEmptyStringEncodeAsGivenType(EncodingCodes.STR32);
     }
 
-    public void doTestEmptyStringEncodAsGivenType(byte encodingCode) {
+    public void doTestEmptyStringEncodeAsGivenType(byte encodingCode) {
         final DecoderImpl decoder = new DecoderImpl();
         final EncoderImpl encoder = new EncoderImpl(decoder);
         AMQPDefinedTypes.registerAllTypes(decoder, encoder);
