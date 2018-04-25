@@ -157,7 +157,7 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             DecoderImpl decoder = getDecoder();
             int size = decoder.readRawInt();
-            return decoder.readRaw(_stringCreator, size);
+            return size == 0 ? "" : decoder.readRaw(_stringCreator, size);
         }
 
         public void setValue(final String val, final int length)
@@ -219,7 +219,7 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             DecoderImpl decoder = getDecoder();
             int size = ((int)decoder.readRawByte()) & 0xff;
-            return decoder.readRaw(_stringCreator, size);
+            return size == 0 ? "" : decoder.readRaw(_stringCreator, size);
         }
 
         public void setValue(final String val, final int length)

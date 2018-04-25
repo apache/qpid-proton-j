@@ -2079,7 +2079,7 @@ public class CompositeReadableBufferTest {
     public void testReadStringFromEmptyBuffer() throws CharacterCodingException {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
-        assertNull(buffer.readString(StandardCharsets.UTF_8.newDecoder()));
+        assertEquals("", buffer.readString(StandardCharsets.UTF_8.newDecoder()));
     }
 
     @Test

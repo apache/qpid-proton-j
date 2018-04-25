@@ -149,6 +149,69 @@ public class StringTypeTest
         assertEquals("read", result);
     }
 
+    @Test
+    public void testEncodeAndDecodeEmptyString() {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        encoder.setByteBuffer(buffer);
+        decoder.setByteBuffer(buffer);
+
+        encoder.writeString("a");
+        encoder.writeString("");
+        encoder.writeString("b");
+
+        buffer.clear();
+
+        TypeConstructor<?> stringType = decoder.readConstructor();
+        assertEquals(String.class, stringType.getTypeClass());
+        stringType.skipValue();
+
+        String result = decoder.readString();
+        assertEquals("", result);
+        result = decoder.readString();
+        assertEquals("b", result);
+    }
+
+    @Test
+    public void testEmptyShortStringEncod() {
+        doTestEmptyStringEncodAsGivenType(EncodingCodes.STR8);
+    }
+
+    @Test
+    public void testEmptyLargeStringEncod() {
+        doTestEmptyStringEncodAsGivenType(EncodingCodes.STR32);
+    }
+
+    public void doTestEmptyStringEncodAsGivenType(byte encodingCode) {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        buffer.put(encodingCode);
+        buffer.putInt(0);
+        buffer.clear();
+
+        byte[] copy = new byte[buffer.remaining()];
+        buffer.get(copy);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(copy);
+
+        decoder.setBuffer(composite);
+
+        TypeConstructor<?> stringType = decoder.readConstructor();
+        assertEquals(String.class, stringType.getTypeClass());
+
+        String result = (String) stringType.readValue();
+        assertEquals("", result);
+    }
+
     // build up some test data with a set of suitable Unicode characters
     private static List<String> generateTestData()
     {

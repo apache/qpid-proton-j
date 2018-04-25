@@ -531,7 +531,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     @Override
     public String readString(CharsetDecoder decoder) throws CharacterCodingException {
         if (!hasRemaining()) {
-            return null;
+            return "";
         }
 
         CharBuffer decoded = null;
