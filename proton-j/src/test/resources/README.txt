@@ -26,12 +26,12 @@ rm -f *.crt *.csr *.keystore *.truststore
 
 # Create a key and self-signed certificate for the CA, to sign certificate requests and use for trust:
 # ----------------------------------------------------------------------------------------------------
-keytool -storetype jks -keystore ca-jks.keystore -storepass password -keypass password -alias ca -genkey -dname "O=My Trusted Inc.,CN=my-ca.org" -validity 9999 -ext bc:c=ca:true
+keytool -storetype jks -keystore ca-jks.keystore -storepass password -keypass password -alias ca -genkey -keyalg "RSA" -keysize 2048 -dname "O=My Trusted Inc.,CN=my-ca.org" -validity 9999 -ext bc:c=ca:true
 keytool -storetype jks -keystore ca-jks.keystore -storepass password -alias ca -exportcert -rfc > ca.crt
 
 # Create a key pair for the server, and sign it with the CA:
 # ----------------------------------------------------------
-keytool -storetype jks -keystore server-jks.keystore -storepass password -keypass password -alias server -genkey -dname "O=Server,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
+keytool -storetype jks -keystore server-jks.keystore -storepass password -keypass password -alias server -genkey -keyalg "RSA" -keysize 2048 -dname "O=Server,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
 
 keytool -storetype jks -keystore server-jks.keystore -storepass password -alias server -certreq -file server.csr
 keytool -storetype jks -keystore ca-jks.keystore -storepass password -alias ca -gencert -rfc -infile server.csr -outfile server.crt -validity 9999 -ext bc=ca:false -ext eku=sA
@@ -45,7 +45,7 @@ keytool -storetype jks -keystore server-jks.truststore -storepass password -keyp
 
 # Create a key pair for a client, and sign it with the CA:
 # ----------------------------------------------------------
-keytool -storetype jks -keystore client-jks.keystore -storepass password -keypass password -alias client -genkey -dname "O=Client,CN=client" -validity 9999 -ext bc=ca:false -ext eku=cA
+keytool -storetype jks -keystore client-jks.keystore -storepass password -keypass password -alias client -genkey -keyalg "RSA" -keysize 2048 -dname "O=Client,CN=client" -validity 9999 -ext bc=ca:false -ext eku=cA
 
 keytool -storetype jks -keystore client-jks.keystore -storepass password -alias client -certreq -file client.csr
 keytool -storetype jks -keystore ca-jks.keystore -storepass password -alias ca -gencert -rfc -infile client.csr -outfile client.crt -validity 9999 -ext bc=ca:false -ext eku=cA
@@ -61,12 +61,12 @@ keytool -storetype jks -keystore client-jks.truststore -storepass password -keyp
 # Create a key and self-signed certificate for a second CA, to sign certificate requests and use for trust:
 # ---------------------------------------------------------------------------------------------------------
 
-keytool -storetype jks -keystore ca2-jks.keystore -storepass password -keypass password -alias ca2 -genkey -dname "O=My Other Trusted Inc.,CN=my-ca2.org" -validity 9999 -ext bc:c=ca:true
+keytool -storetype jks -keystore ca2-jks.keystore -storepass password -keypass password -alias ca2 -genkey -keyalg "RSA" -keysize 2048 -dname "O=My Other Trusted Inc.,CN=my-ca2.org" -validity 9999 -ext bc:c=ca:true
 keytool -storetype jks -keystore ca2-jks.keystore -storepass password -alias ca2 -exportcert -rfc > ca2.crt
 
 # Create a key pair for a second server, and sign it with the second CA:
 # ----------------------------------------------------------------------
-keytool -storetype jks -keystore server2-jks.keystore -storepass password -keypass password -alias server2 -genkey -dname "O=Server2,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
+keytool -storetype jks -keystore server2-jks.keystore -storepass password -keypass password -alias server2 -genkey -keyalg "RSA" -keysize 2048 -dname "O=Server2,CN=localhost" -validity 9999 -ext bc=ca:false -ext eku=sA
 
 keytool -storetype jks -keystore server2-jks.keystore -storepass password -alias server2 -certreq -file server2.csr
 keytool -storetype jks -keystore ca2-jks.keystore -storepass password -alias ca2 -gencert -rfc -infile server2.csr -outfile server2.crt -validity 9999 -ext bc=ca:false -ext eku=sA
