@@ -27,6 +27,8 @@ import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.messaging.Data;
+import org.apache.qpid.proton.codec.WritableBuffer;
+import org.apache.qpid.proton.codec.WritableBuffer.ByteBufferWrapper;
 import org.apache.qpid.proton.message.Message;
 import org.junit.Test;
 
@@ -60,6 +62,34 @@ public class MessageImplTest
 
         assertArrayEquals("Encoded bytes do not match expectation", expectedBytes, encodedBytes);
         assertEquals("Encoded length different than expected length", encodedLength, encodedBytes.length);
+    }
+
+    @Test
+    public void testEncodeOfMessageWithSmallDataBodyOnlyUsingWritableBuffer()
+    {
+        doMessageEncodingWithDataBodySectionTestImpl(5);
+    }
+
+    @Test
+    public void testEncodeOfMessageWithLargerDataBodyOnlyUsingWritableBuffer()
+    {
+        doMessageEncodingWithDataBodySectionTestImpl(1024);
+    }
+
+    void doMessageEncodingWithDataBodySectionTestImplUsingWritableBuffer(int bytesLength)
+    {
+        byte[] bytes = generateByteArray(bytesLength);
+
+        byte[] expectedBytes = generateExpectedDataSectionBytes(bytes);
+        ByteBufferWrapper encodedBytes = WritableBuffer.ByteBufferWrapper.allocate(expectedBytes.length);
+
+        Message msg = Message.Factory.create();
+        msg.setBody(new Data(new Binary(bytes)));
+
+        int encodedLength = msg.encode(encodedBytes);
+
+        assertArrayEquals("Encoded bytes do not match expectation", expectedBytes, encodedBytes.byteBuffer().array());
+        assertEquals("Encoded length different than expected length", encodedLength, encodedBytes.position());
     }
 
     private byte[] generateByteArray(int bytesLength)

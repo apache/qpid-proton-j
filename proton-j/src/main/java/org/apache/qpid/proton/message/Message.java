@@ -27,7 +27,8 @@ import org.apache.qpid.proton.amqp.messaging.Header;
 import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
 import org.apache.qpid.proton.amqp.messaging.Properties;
 import org.apache.qpid.proton.amqp.messaging.Section;
-
+import org.apache.qpid.proton.codec.ReadableBuffer;
+import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.message.impl.MessageImpl;
 
 /**
@@ -169,6 +170,18 @@ public interface Message
     int decode(byte[] data, int offset, int length);
 
     /**
+     * Decodes the Message from the given {@link ReadableBuffer}.
+     * <p>
+     * If the buffer given does not contain the fully encoded Message bytes for decode
+     * this method will throw an exception to indicate the buffer underflow condition and
+     * the message object will be left in an undefined state.
+     *
+     * @param buffer
+     *      A {@link ReadableBuffer} that contains the complete message bytes.
+     */
+    void decode(ReadableBuffer buffer);
+
+    /**
      * Encodes up to {@code length} bytes of the message into the provided byte array,
      * starting at position {@code offset}.
      *
@@ -178,6 +191,21 @@ public interface Message
      * @return the number of bytes written to the byte array
      */
     int encode(byte[] data, int offset, int length);
+
+    /**
+     * Encodes the current Message contents into the given {@link WritableBuffer} instance.
+     * <p>
+     * This method attempts to encode all message data into the {@link WritableBuffer} and
+     * if the buffer has insufficient space it will throw an exception to indicate the buffer
+     * overflow condition.  If successful the method returns the number of bytes written to
+     * the provided buffer to fully encode the message.
+     *
+     * @param buffer
+     *      The {@link WritableBuffer} instance to encode the message contents into.
+     *
+     * @return the number of bytes written to fully encode the message.
+     */
+    int encode(WritableBuffer buffer);
 
     void clear();
 
