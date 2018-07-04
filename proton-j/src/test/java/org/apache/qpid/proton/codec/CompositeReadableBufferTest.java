@@ -1192,7 +1192,7 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
-    public void testCompactSignleArrayBuffer() {
+    public void testCompactSingleArrayBuffer() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
         byte[] source = new byte[] { 0, 1, 2, 3 };
@@ -2073,7 +2073,7 @@ public class CompositeReadableBufferTest {
         }
     }
 
-    //----- Test put ReadableBuffer ------------------------------------------//
+    //----- Test readString ------------------------------------------//
 
     @Test
     public void testReadStringFromEmptyBuffer() throws CharacterCodingException {
