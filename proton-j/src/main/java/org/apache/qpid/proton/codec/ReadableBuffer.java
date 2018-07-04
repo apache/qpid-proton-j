@@ -58,10 +58,10 @@ public interface ReadableBuffer {
     byte[] array();
 
     /**
-     * Returns the offset into the backing array where data should be read from.  The caller
+     * Returns the offset into the backing array of the first element in the buffer. The caller
      * should have checked the {@link #hasArray()} method before calling this method.
      *
-     * @return the offset into the backing array to start reading from.
+     * @return the offset into the backing array of the first element in the buffer.
      *
      * @throws UnsupportedOperationException if this {@link ReadableBuffer} doesn't support array access.
      * @throws ReadOnlyBufferException if the ReadableBuffer is read-only.
