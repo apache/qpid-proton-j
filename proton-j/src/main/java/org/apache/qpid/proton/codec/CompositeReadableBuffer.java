@@ -666,8 +666,12 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             contents.add(currentArray);
             contents.add(array);
             currentArrayIndex = 0;
+            // If we exhausted the array previously then it should move to the new one now.
+            maybeMoveToNextArray();
         } else {
             contents.add(array);
+            // If we exhausted the list previously then it didn't move onward at the time, so it should now.
+            maybeMoveToNextArray();
         }
 
         capacity += array.length;

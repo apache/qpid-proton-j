@@ -1108,6 +1108,78 @@ public class CompositeReadableBufferTest {
     //----- Test appending data to the buffer --------------------------------//
 
     @Test
+    public void testAppendToBufferAtEndOfContentArray() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        byte[] source1 = new byte[] { 0, 1, 2, 3 };
+
+        buffer.append(source1);
+
+        assertTrue(buffer.hasArray());
+        assertEquals(0, buffer.getArrays().size());
+        assertEquals(-1, buffer.getCurrentIndex());
+
+        buffer.position(source1.length);
+
+        assertFalse(buffer.hasRemaining());
+        assertEquals(0, buffer.remaining());
+        assertEquals(-1, buffer.getCurrentIndex());
+
+        byte[] source2 = new byte[] { 4, 5, 6, 7 };
+        buffer.append(source2);
+
+        assertTrue(buffer.hasRemaining());
+        assertEquals(source2.length, buffer.remaining());
+        assertFalse(buffer.hasArray());
+        assertEquals(2, buffer.getArrays().size());
+        assertEquals(1, buffer.getCurrentIndex());
+        assertEquals(source1.length, buffer.position());
+
+        // Check each position in the array is read
+        for(int i = 0; i < source2.length; i++) {
+            assertEquals(1, buffer.getCurrentIndex());
+            assertEquals(source1.length + i, buffer.get());
+        }
+    }
+
+    @Test
+    public void testAppendToBufferAtEndOfContentList() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        byte[] source1 = new byte[] { 0, 1, 2, 3 };
+        byte[] source2 = new byte[] { 4, 5, 6, 7 };
+
+        buffer.append(source1);
+        buffer.append(source2);
+
+        assertFalse(buffer.hasArray());
+        assertEquals(2, buffer.getArrays().size());
+        assertEquals(0, buffer.getCurrentIndex());
+
+        buffer.position(source1.length + source2.length);
+
+        assertFalse(buffer.hasRemaining());
+        assertEquals(0, buffer.remaining());
+        assertEquals(1, buffer.getCurrentIndex());
+
+        byte[] source3 = new byte[] { 8, 9, 10, 11 };
+        buffer.append(source3);
+
+        assertTrue(buffer.hasRemaining());
+        assertEquals(source3.length, buffer.remaining());
+        assertFalse(buffer.hasArray());
+        assertEquals(3, buffer.getArrays().size());
+        assertEquals(2, buffer.getCurrentIndex());
+        assertEquals(source1.length + source2.length, buffer.position());
+
+        // Check each position in the array is read
+        for(int i = 0; i < source3.length; i++) {
+            assertEquals(2, buffer.getCurrentIndex());
+            assertEquals(source1.length + source2.length + i, buffer.get());
+        }
+    }
+
+    @Test
     public void testAppendOne() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
