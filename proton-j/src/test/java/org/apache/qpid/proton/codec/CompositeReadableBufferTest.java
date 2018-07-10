@@ -1940,7 +1940,42 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
-    public void testSliceIgnoresAppends() {
+    public void testSliceWithNoRemainderRefusesAppends() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+        buffer.append(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+
+        // Empty slice at end of buffer
+        assertEquals(10, buffer.remaining());
+        buffer.position(10);
+        assertEquals(0, buffer.remaining());
+
+        CompositeReadableBuffer emptySlice = buffer.slice();
+        assertNotSame(buffer, emptySlice);
+        assertEquals(0, emptySlice.remaining());
+
+        try {
+            emptySlice.append(new byte[] { 10 });
+            fail("Should not be allowed to append to empty slice, must throw IllegalStateException");
+        } catch (IllegalStateException ise) {}
+
+        // Empty slice at start of buffer
+        buffer.position(0);
+        assertEquals(10, buffer.remaining());
+        buffer.limit(0);
+        assertEquals(0, buffer.remaining());
+
+        emptySlice = buffer.slice();
+        assertNotSame(buffer, emptySlice);
+        assertEquals(0, emptySlice.remaining());
+
+        try {
+            emptySlice.append(new byte[] { 10 });
+            fail("Should not be allowed to append to empty slice, must throw IllegalStateException");
+        } catch (IllegalStateException ise) {}
+    }
+
+    @Test
+    public void testSliceRefusesAppends() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
         buffer.append(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
 
@@ -1950,7 +1985,7 @@ public class CompositeReadableBufferTest {
 
         try {
             slice.append(new byte[] { 10 });
-            fail("Should not be allowed to append to a slice, must throw ReadOnlyBufferException");
+            fail("Should not be allowed to append to a slice, must throw IllegalStateException");
         } catch (IllegalStateException ise) {}
     }
 
