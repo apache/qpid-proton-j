@@ -36,7 +36,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
 
     private static final List<byte[]> EMPTY_LIST = Collections.unmodifiableList(new ArrayList<byte[]>());
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.wrap(new byte[0]);
-    private static final CompositeReadableBuffer EMPTY_SLICE = new CompositeReadableBuffer(true);
+    private static final CompositeReadableBuffer EMPTY_SLICE = new CompositeReadableBuffer(false);
     private static int UNSET_MARK = -1;
 
     private static final int SHORT_BYTES = 2;
