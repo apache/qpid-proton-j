@@ -556,8 +556,15 @@ public class TransportImpl extends EndpointImpl
                 }
             }
 
-            UnsignedInteger deliveryId = tpSession.getOutgoingDeliveryId();
-            TransportDelivery tpDelivery = new TransportDelivery(deliveryId, delivery, tpLink);
+            TransportDelivery tpDelivery = delivery.getTransportDelivery();
+            UnsignedInteger deliveryId;
+            if (tpDelivery != null) {
+                deliveryId = tpDelivery.getDeliveryId();
+            } else {
+                deliveryId = tpSession.getOutgoingDeliveryId();
+                tpSession.incrementOutgoingDeliveryId();
+            }
+            tpDelivery = new TransportDelivery(deliveryId, delivery, tpLink);
             delivery.setTransportDelivery(tpDelivery);
 
             final Transfer transfer = new Transfer();
@@ -616,7 +623,6 @@ public class TransportImpl extends EndpointImpl
                     delivery.setDone();
                     tpLink.setDeliveryCount(tpLink.getDeliveryCount().add(UnsignedInteger.ONE));
                     tpLink.setLinkCredit(tpLink.getLinkCredit().subtract(UnsignedInteger.ONE));
-                    tpSession.incrementOutgoingDeliveryId();
                     session.incrementOutgoingDeliveries(-1);
                     snd.decrementQueued();
                 }
