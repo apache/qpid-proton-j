@@ -26,7 +26,7 @@
 
   <groupId>org.apache.qpid</groupId>
   <artifactId>proton-j-parent</artifactId>
-  <version>0.27.2</version>
+  <version>0.27.3-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Proton-J Parent</name>
@@ -194,7 +194,7 @@
     <connection>scm:git:http://git-wip-us.apache.org/repos/asf/qpid-proton-j.git</connection>
     <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/qpid-proton-j.git</developerConnection>
     <url>https://git-wip-us.apache.org/repos/asf?p=qpid-proton-j.git</url>
-    <tag>0.27.2</tag>
+    <tag>0.27.x</tag>
   </scm>
   <issueManagement>
     <url>https://issues.apache.org/jira/browse/PROTON</url>
