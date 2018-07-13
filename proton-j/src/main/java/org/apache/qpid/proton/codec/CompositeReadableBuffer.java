@@ -664,9 +664,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
      * @return a reference to this {@link CompositeReadableBuffer}.
      */
     public CompositeReadableBuffer append(byte[] array) {
-        if (!compactable) {
-            throw new IllegalStateException();
-        }
+        validateAppendable();
 
         if (array == null || array.length == 0) {
             throw new IllegalArgumentException("Array must not be empty or null");
@@ -690,6 +688,117 @@ public class CompositeReadableBuffer implements ReadableBuffer {
 
         capacity += array.length;
         limit = capacity;
+
+        return this;
+    }
+
+    private void validateAppendable() {
+        if (!compactable) {
+            throw new IllegalStateException();
+        }
+    }
+
+    private void validateBuffer(ReadableBuffer buffer) {
+        if(buffer == null) {
+            throw new IllegalArgumentException("A non-null buffer must be provided");
+        }
+
+        if(!buffer.hasRemaining()) {
+            throw new IllegalArgumentException("Buffer has no remaining content to append");
+        }
+    }
+
+    /**
+     * Adds the given composite buffer contents (from current position, up to the limit) into this
+     * composite buffer at the end. The source buffer position will be set to its limit.
+     * <p>
+     * The appended buffer contents are not copied wherever possible, so changes to the source
+     * arrays are typically visible in this buffer and vice versa. Exceptions include where the
+     * source buffer position is not located at the start of its current backing array, or where the
+     * given buffer has a limit that doesn't encompass all of the last array used, and
+     * so the remainder of that arrays contents must be copied first to append here.
+     * <p>
+     * Calling this method resets the limit to the new capacity.
+     *
+     * @param buffer
+     *      the buffer with contents to append into this composite buffer.
+     *
+     * @throws IllegalArgumentException if the given buffer is null or has zero remainder.
+     * @throws IllegalStateException if the buffer does not allow appends.
+     *
+     * @return a reference to this {@link CompositeReadableBuffer}.
+     */
+    public CompositeReadableBuffer append(CompositeReadableBuffer buffer) {
+        validateAppendable();
+        validateBuffer(buffer);
+
+        byte[] chunk;
+        do {
+            int bufferRemaining = buffer.remaining();
+            int arrayRemaining = buffer.currentArray.length - buffer.currentOffset;
+            if (buffer.currentOffset > 0 || bufferRemaining < arrayRemaining)
+            {
+                int length = Math.min(arrayRemaining, bufferRemaining);
+                chunk = new byte[length];
+                System.arraycopy(buffer.currentArray, buffer.currentOffset, chunk, 0, length);
+            } else {
+                chunk = buffer.currentArray;
+            }
+
+            append(chunk);
+
+            buffer.position(buffer.position() + chunk.length);
+        } while (buffer.hasRemaining());
+
+        return this;
+    }
+
+    /**
+     * Adds the given readable buffer contents (from current position, up to the limit) into this
+     * composite buffer at the end. The source buffer position will be set to its limit.
+     * <p>
+     * The appended buffer contents are not copied wherever possible, so changes to the source
+     * arrays are typically visible in this buffer and vice versa. Exceptions are where the
+     * source buffer is not backed by an array, or where the source buffer position is not
+     * located at the start of its backing array, and so the remainder of the contents must
+     * be copied first to append here.
+     * <p>
+     * Calling this method resets the limit to the new capacity.
+     *
+     * @param buffer
+     *      the buffer with contents to append into this composite buffer.
+     *
+     * @throws IllegalArgumentException if the given buffer is null or has zero remainder.
+     * @throws IllegalStateException if the buffer does not allow appends.
+     *
+     * @return a reference to this {@link CompositeReadableBuffer}.
+     */
+    public CompositeReadableBuffer append(ReadableBuffer buffer) {
+        if(buffer instanceof CompositeReadableBuffer) {
+            append((CompositeReadableBuffer) buffer);
+        } else {
+            validateAppendable();
+            validateBuffer(buffer);
+
+            if(buffer.hasArray()) {
+                byte[] chunk = buffer.array();
+
+                int bufferRemaining = buffer.remaining();
+                if (buffer.arrayOffset() > 0 || bufferRemaining < chunk.length) {
+                    chunk = new byte[bufferRemaining];
+                    System.arraycopy(buffer.array(), buffer.arrayOffset(), chunk, 0, bufferRemaining);
+                }
+
+                append(chunk);
+
+                buffer.position(buffer.position() + chunk.length);
+            } else {
+                byte[] chunk = new byte[buffer.remaining()];
+                buffer.get(chunk);
+
+                append(chunk);
+            }
+        }
 
         return this;
     }

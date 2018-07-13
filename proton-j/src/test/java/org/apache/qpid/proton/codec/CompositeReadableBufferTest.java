@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.InvalidMarkException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.junit.Test;
 
@@ -1184,12 +1185,14 @@ public class CompositeReadableBufferTest {
         assertTrue(buffer.hasArray());
         assertEquals(0, buffer.getArrays().size());
         assertEquals(-1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         buffer.position(source1.length);
 
         assertFalse(buffer.hasRemaining());
         assertEquals(0, buffer.remaining());
         assertEquals(-1, buffer.getCurrentIndex());
+        assertEquals(source1.length, buffer.getCurrentArrayPosition());
 
         byte[] source2 = new byte[] { 4, 5, 6, 7 };
         buffer.append(source2);
@@ -1199,12 +1202,15 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(2, buffer.getArrays().size());
         assertEquals(1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(source1.length, buffer.position());
 
         // Check each position in the array is read
         for(int i = 0; i < source2.length; i++) {
+            assertEquals(i, buffer.getCurrentArrayPosition());
             assertEquals(1, buffer.getCurrentIndex());
             assertEquals(source1.length + i, buffer.get());
+            assertEquals(i + 1, buffer.getCurrentArrayPosition());
         }
     }
 
@@ -1221,12 +1227,14 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(2, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         buffer.position(source1.length + source2.length);
 
         assertFalse(buffer.hasRemaining());
         assertEquals(0, buffer.remaining());
         assertEquals(1, buffer.getCurrentIndex());
+        assertEquals(source2.length, buffer.getCurrentArrayPosition());
 
         byte[] source3 = new byte[] { 8, 9, 10, 11 };
         buffer.append(source3);
@@ -1236,17 +1244,20 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(3, buffer.getArrays().size());
         assertEquals(2, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(source1.length + source2.length, buffer.position());
 
         // Check each position in the array is read
         for(int i = 0; i < source3.length; i++) {
+            assertEquals(i, buffer.getCurrentArrayPosition());
             assertEquals(2, buffer.getCurrentIndex());
             assertEquals(source1.length + source2.length + i, buffer.get());
+            assertEquals(i + 1, buffer.getCurrentArrayPosition());
         }
     }
 
     @Test
-    public void testAppendOne() {
+    public void testAppendOneArray() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
         byte[] source = new byte[] { 0, 1, 2, 3 };
@@ -1266,7 +1277,7 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
-    public void testAppendMoreThanOne() {
+    public void testAppendMoreThanOneArray() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
         byte[] source1 = new byte[] { 0, 1, 2, 3 };
@@ -1292,22 +1303,945 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
-    public void testAppendNull() {
+    public void testAppendOneComposite() {
+        doAppendOneCompositeTestImpl(false);
+    }
+
+    @Test
+    public void testAppendOneCompositeAsReadableBuffer() {
+        doAppendOneCompositeTestImpl(true);
+    }
+
+    private void doAppendOneCompositeTestImpl(boolean castToReadableBuffer) {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create a buffer to append
+        byte[] sourceBufferArray1 = new byte[] { 4, 5, 6 };
+        CompositeReadableBuffer source = new CompositeReadableBuffer();
+        source.append(sourceBufferArray1);
+
+        assertEquals(3, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+        assertTrue(source.hasArray());
+        assertSame(sourceBufferArray1, source.array());
+        assertEquals(-1, source.getCurrentIndex());
+
+        // Append the buffer, check state of source+target buffers
+        if(castToReadableBuffer) {
+            target.append((ReadableBuffer) source);
+        } else {
+            target.append(source);
+        }
+
+        assertTrue(target.hasRemaining());
+        assertEquals(7, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(3, source.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray()); // Now composite, must answer false
+        List<byte[]> arrays = target.getArrays();
+        assertEquals(2, arrays.size());
+        assertSame(targetBufferArray1, arrays.get(0));
+        assertSame(sourceBufferArray1, arrays.get(1));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+
+        // Check each position in the second array
+        for(int i = 0; i < sourceBufferArray1.length; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertFalse(target.hasRemaining());
+    }
+
+    @Test
+    public void testAppendOneCompositeWithMultipleArrays() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create a buffer to append
+        byte[] sourceBufferArray1 = new byte[] { 4, 5, 6 };
+        byte[] sourceBufferArray2 = new byte[] { 7, 8, 9, 10 };
+
+        CompositeReadableBuffer source = new CompositeReadableBuffer();
+        source.append(sourceBufferArray1);
+        source.append(sourceBufferArray2);
+
+        assertEquals(7, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+        assertFalse(source.hasArray());
+        assertEquals(0, source.getCurrentIndex());
+        assertEquals(0, source.getCurrentArrayPosition());
+        List<byte[]> sourceArrays = source.getArrays();
+        assertEquals(2, sourceArrays.size());
+        assertSame(sourceBufferArray1, sourceArrays.get(0));
+        assertSame(sourceBufferArray2, sourceArrays.get(1));
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(11, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(7, source.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray());
+        List<byte[]> targetArrays = target.getArrays();
+        assertEquals(3, targetArrays.size());
+        assertSame(targetBufferArray1, targetArrays.get(0));
+        assertSame(sourceBufferArray1, targetArrays.get(1));
+        assertSame(sourceBufferArray2, targetArrays.get(2));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(0, target.getCurrentArrayPosition());
+
+        // Check each position in the second array
+        int secondChunkLength = sourceBufferArray1.length;
+        for(int i = 0; i < secondChunkLength; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertEquals(2, target.getCurrentIndex());
+        assertEquals(0, target.getCurrentArrayPosition());
+
+        // Check each position in the third array
+        for(int i = 0; i < sourceBufferArray2.length; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(initialChunkLength + secondChunkLength + i, target.get());
+            assertEquals(2, target.getCurrentIndex());
+        }
+
+        assertFalse(target.hasRemaining());
+    }
+
+    @Test
+    public void testAppendOneCompositeWithMultipleArraysPartiallyUsed() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create a buffer to append. We wont use the first and last bytes so set them -1.
+        byte[] sourceBufferArray1 = new byte[] { -1, -1, 4 };
+        byte[] sourceBufferArray2 = new byte[] { 5, 6 };
+        byte[] sourceBufferArray3 = new byte[] { 7, 8, 9, -1 , -1, -1 };
+
+        CompositeReadableBuffer source = new CompositeReadableBuffer();
+        source.append(sourceBufferArray1);
+        source.append(sourceBufferArray2);
+        source.append(sourceBufferArray3);
+
+        assertEquals(11, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+        assertFalse(source.hasArray());
+        assertEquals(0, source.getCurrentIndex());
+        assertEquals(0, source.getCurrentArrayPosition());
+        List<byte[]> sourceArrays = source.getArrays();
+        assertEquals(3, sourceArrays.size());
+        assertSame(sourceBufferArray1, sourceArrays.get(0));
+        assertSame(sourceBufferArray2, sourceArrays.get(1));
+        assertSame(sourceBufferArray3, sourceArrays.get(2));
+
+        // Skip a couple bytes at start
+        source.position(2);
+
+        // Miss a few bytes at end
+        source.limit(8);
+
+        assertEquals(6, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(2, source.position());
+        assertFalse(source.hasArray());
+        assertEquals(0, source.getCurrentIndex());
+        assertEquals(2, source.getCurrentArrayPosition());
+        sourceArrays = source.getArrays();
+        assertEquals(3, sourceArrays.size());
+        assertSame(sourceBufferArray1, sourceArrays.get(0));
+        assertSame(sourceBufferArray2, sourceArrays.get(1));
+        assertSame(sourceBufferArray3, sourceArrays.get(2));
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(8, source.position());
+        assertEquals(2, source.getCurrentIndex());
+        assertEquals(3, source.getCurrentArrayPosition());
+
+        assertTrue(target.hasRemaining());
+        assertEquals(targetBufferArray1.length + 6, target.remaining());
+        assertEquals(0, target.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray());
+        List<byte[]> targetArrays = target.getArrays();
+        assertEquals(4, targetArrays.size());
+
+        // Expect it to contain the original target array, a new array containing the partial bytes
+        // from the first source buffer array, then the original middle array, then a new array
+        // containing the partial bytes from the third source buffer array.
+        assertSame(targetBufferArray1, targetArrays.get(0));
+        assertNotSame(sourceBufferArray1, targetArrays.get(1));
+        assertSame(sourceBufferArray2, targetArrays.get(2));
+        assertNotSame(sourceBufferArray3, targetArrays.get(3));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(0, target.getCurrentArrayPosition());
+
+        // Check sole byte in the second array
+        assertEquals(initialChunkLength, target.get());
+
+        assertEquals(2, target.getCurrentIndex());
+        assertEquals(0, target.getCurrentArrayPosition());
+
+        // Check each position in the third array
+        int thirdChunkLength = sourceBufferArray2.length;
+        for(int i = 0; i < thirdChunkLength; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(2, target.getCurrentIndex());
+            assertEquals(initialChunkLength + 1 + i, target.get());
+        }
+
+        assertEquals(3, target.getCurrentIndex());
+        assertEquals(0, target.getCurrentArrayPosition());
+
+        // Check each position in the 4th array
+        for(int i = 0; i < 3; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(initialChunkLength + 1 + thirdChunkLength + i, target.get());
+            assertEquals(3, target.getCurrentIndex());
+        }
+
+        assertFalse(target.hasRemaining());
+    }
+
+    @Test
+    public void testAppendOneCompositeWithMultipleArraysOnlySomeUsed() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create a buffer to append. We wont use the first and last arrays so set them -1.
+        byte[] sourceBufferArray1 = new byte[] { -1, -1, -1 };
+        byte[] sourceBufferArray2 = new byte[] { 4, 5 };
+        byte[] sourceBufferArray3 = new byte[] { -1 };
+
+        CompositeReadableBuffer source = new CompositeReadableBuffer();
+        source.append(sourceBufferArray1);
+        source.append(sourceBufferArray2);
+        source.append(sourceBufferArray3);
+
+        assertEquals(6, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+        assertFalse(source.hasArray());
+        assertEquals(0, source.getCurrentIndex());
+        assertEquals(0, source.getCurrentArrayPosition());
+        List<byte[]> sourceArrays = source.getArrays();
+        assertEquals(3, sourceArrays.size());
+        assertSame(sourceBufferArray1, sourceArrays.get(0));
+        assertSame(sourceBufferArray2, sourceArrays.get(1));
+        assertSame(sourceBufferArray3, sourceArrays.get(2));
+
+        // Skip array at start
+        source.position(sourceBufferArray1.length);
+
+        // Skip array at end
+        source.limit(sourceBufferArray1.length + sourceBufferArray2.length);
+
+        assertEquals(2, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(3, source.position());
+        assertFalse(source.hasArray());
+        assertEquals(1, source.getCurrentIndex());
+        assertEquals(0, source.getCurrentArrayPosition());
+        sourceArrays = source.getArrays();
+        assertEquals(3, sourceArrays.size());
+        assertSame(sourceBufferArray1, sourceArrays.get(0));
+        assertSame(sourceBufferArray2, sourceArrays.get(1));
+        assertSame(sourceBufferArray3, sourceArrays.get(2));
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(5, source.position());
+        assertEquals(2, source.getCurrentIndex());
+        assertEquals(0, source.getCurrentArrayPosition());
+
+        assertTrue(target.hasRemaining());
+        assertEquals(targetBufferArray1.length + 2, target.remaining());
+        assertEquals(0, target.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray());
+        List<byte[]> targetArrays = target.getArrays();
+        assertEquals(2, targetArrays.size());
+
+        // Expect it to contain the original target array, then
+        // the middle array from the source buffer
+        assertSame(targetBufferArray1, targetArrays.get(0));
+        assertSame(sourceBufferArray2, targetArrays.get(1));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(0, target.getCurrentArrayPosition());
+
+        // Check each position in the second array
+        int secondChunkLength = sourceBufferArray2.length;
+        for(int i = 0; i < secondChunkLength; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertFalse(target.hasRemaining());
+    }
+
+    @Test
+    public void testAppendMoreThanOneComposite() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create buffers to append
+        byte[] sourceBufferArray1 = new byte[] { 4, 5, 6 };
+        CompositeReadableBuffer source1 = new CompositeReadableBuffer();
+        source1.append(sourceBufferArray1);
+
+        byte[] sourceBufferArray2 = new byte[] { 7, 8, 9, 10 };
+        CompositeReadableBuffer source2 = new CompositeReadableBuffer();
+        source2.append(sourceBufferArray2);
+
+        // Check their state another buffer to append
+        assertEquals(3, source1.remaining());
+        assertTrue(source1.hasRemaining());
+        assertEquals(0, source1.position());
+        assertTrue(source1.hasArray());
+        assertSame(sourceBufferArray1, source1.array());
+        assertEquals(-1, source1.getCurrentIndex());
+
+        assertEquals(4, source2.remaining());
+        assertTrue(source2.hasRemaining());
+        assertEquals(0, source2.position());
+        assertTrue(source2.hasArray());
+        assertSame(sourceBufferArray2, source2.array());
+        assertEquals(-1, source2.getCurrentIndex());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source1);
+        target.append(source2);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(11, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source1.hasRemaining());
+        assertEquals(0, source1.remaining());
+        assertEquals(3, source1.position());
+
+        assertFalse(source2.hasRemaining());
+        assertEquals(0, source2.remaining());
+        assertEquals(4, source2.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray()); // Now composite, must answer false
+        List<byte[]> arrays = target.getArrays();
+        assertEquals(3, arrays.size());
+        assertSame(targetBufferArray1, arrays.get(0));
+        assertSame(sourceBufferArray1, arrays.get(1));
+        assertSame(sourceBufferArray2, arrays.get(2));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+
+        // Check each position in the second array
+        for(int i = 0; i < sourceBufferArray1.length; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertEquals(2, target.getCurrentIndex());
+
+        // Check each position in the third array
+        int secondChunkLength = sourceBufferArray1.length;
+        for(int i = 0; i < sourceBufferArray2.length; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(initialChunkLength + secondChunkLength + i, target.get());
+            assertEquals(2, target.getCurrentIndex());
+        }
+    }
+
+    @Test
+    public void testAppendReadableBufferWithLimitPartialArray() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create buffer to append, with a limit before array end
+        byte[] sourceBufferArray1 = new byte[] { 4, 5, 6, -1};
+        ReadableBuffer source = ReadableBuffer.ByteBufferReader.wrap(sourceBufferArray1);
+        int limitRemainder  = 1;
+        source.limit(source.remaining() - limitRemainder);
+        source = source.slice();
+
+        assertTrue(source.hasArray());
+        assertEquals(0, source.arrayOffset());
+        assertSame(sourceBufferArray1, source.array());
+        assertEquals(3, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(7, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(3, source.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray()); // Now composite, must answer false
+        List<byte[]> arrays = target.getArrays();
+        assertEquals(2, arrays.size());
+        assertSame(targetBufferArray1, arrays.get(0));
+        assertNotSame(sourceBufferArray1, arrays.get(1));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+
+        // Check each position in the second array
+        for(int i = 0; i < sourceBufferArray1.length - limitRemainder; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(sourceBufferArray1.length - limitRemainder, target.getCurrentArrayPosition());
+
+        assertFalse(source.hasRemaining());
+    }
+
+    @Test
+    public void testAppendReadableBufferWithOffsetPartialArray() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create buffer to append, with an offset
+        byte[] sourceBufferArray1 = new byte[] { -1, 4, 5, 6 };
+        ReadableBuffer source = ReadableBuffer.ByteBufferReader.wrap(sourceBufferArray1);
+        int offset  = 1;
+        source.position(offset);
+        source = source.slice();
+
+        assertTrue(source.hasArray());
+        assertEquals(1, source.arrayOffset());
+        assertSame(sourceBufferArray1, source.array());
+        assertEquals(3, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(7, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(3, source.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray()); // Now composite, must answer false
+        List<byte[]> arrays = target.getArrays();
+        assertEquals(2, arrays.size());
+        assertSame(targetBufferArray1, arrays.get(0));
+        assertNotSame(sourceBufferArray1, arrays.get(1));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+
+        // Check each position in the second array
+        for(int i = 0; i < sourceBufferArray1.length - offset; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(sourceBufferArray1.length - offset, target.getCurrentArrayPosition());
+
+        assertFalse(source.hasRemaining());
+    }
+
+    @Test
+    public void testAppendReadableBufferWithArray() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create buffer to append
+        byte[] sourceBufferArray1 = new byte[] { 4, 5, 6 };
+        ReadableBuffer source = ReadableBuffer.ByteBufferReader.wrap(sourceBufferArray1);
+
+        assertTrue(source.hasArray());
+        assertSame(sourceBufferArray1, source.array());
+        assertEquals(3, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(7, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(3, source.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray()); // Now composite, must answer false
+        List<byte[]> arrays = target.getArrays();
+        assertEquals(2, arrays.size());
+        assertSame(targetBufferArray1, arrays.get(0));
+        assertSame(sourceBufferArray1, arrays.get(1));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+
+        // Check each position in the second array
+        for(int i = 0; i < sourceBufferArray1.length; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(sourceBufferArray1.length, target.getCurrentArrayPosition());
+
+        assertFalse(source.hasRemaining());
+    }
+
+    @Test
+    public void testAppendReadableBufferWithoutArray() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+
+        assertEquals(4, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertTrue(target.hasArray());
+        assertSame(targetBufferArray1, target.array());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create buffer to append, 'without an array' (read only bt=ye buffer)
+        byte[] sourceBufferArray1 = new byte[] { 4, 5, 6 };
+        ByteBuffer readOnly = ByteBuffer.wrap(sourceBufferArray1).asReadOnlyBuffer();
+        assertFalse(readOnly.hasArray());
+
+        ReadableBuffer source = ReadableBuffer.ByteBufferReader.wrap(readOnly);
+
+        assertFalse(source.hasArray());
+        assertEquals(3, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(7, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(3, source.position());
+
+        assertEquals(0, target.getCurrentIndex());
+        assertFalse(target.hasArray()); // Now composite, must answer false
+        List<byte[]> arrays = target.getArrays();
+        assertEquals(2, arrays.size());
+        assertSame(targetBufferArray1, arrays.get(0));
+        assertNotSame(sourceBufferArray1, arrays.get(1));
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = targetBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(0, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+
+        // Check each position in the second array
+        for(int i = 0; i < sourceBufferArray1.length; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(1, target.getCurrentIndex());
+            assertEquals(initialChunkLength + i, target.get());
+        }
+
+        assertEquals(1, target.getCurrentIndex());
+        assertEquals(sourceBufferArray1.length, target.getCurrentArrayPosition());
+
+        assertFalse(source.hasRemaining());
+    }
+
+    @Test
+    public void testAppendOneCompositeToEmpty() {
+        // Create an empty buffer to append into
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+
+        assertEquals(0, target.remaining());
+        assertFalse(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertFalse(target.hasArray());
+        assertEquals(-1, target.getCurrentIndex());
+
+        // Create a buffer to append
+        byte[] sourceBufferArray1 = new byte[] { 0, 1, 2 };
+        CompositeReadableBuffer source = new CompositeReadableBuffer();
+        source.append(sourceBufferArray1);
+
+        assertEquals(3, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+        assertTrue(source.hasArray());
+        assertSame(sourceBufferArray1, source.array());
+        assertEquals(-1, source.getCurrentIndex());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(3, target.remaining());
+        assertEquals(0, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(3, source.position());
+
+        assertEquals(-1, target.getCurrentIndex());
+        assertTrue(target.hasArray());
+        assertEquals(0, target.getArrays().size());
+        assertSame(sourceBufferArray1, target.array());
+
+        // Now read the data back and verify behaviour.
+
+        // Check each position in the first array
+        int initialChunkLength = sourceBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(-1, target.getCurrentIndex());
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i, target.get());
+        }
+
+        assertEquals(-1, target.getCurrentIndex());
+    }
+
+    @Test
+    public void testAppendOneCompositeToBufferWithListButNothingRemaining() {
+        // Create a buffer to append into
+        byte[] targetBufferArray1 = new byte[] { 0, 1, 2, 3 };
+        byte[] targetBufferArray2 = new byte[] { 4, 5, 6 };
+
+        CompositeReadableBuffer target = new CompositeReadableBuffer();
+        target.append(targetBufferArray1);
+        target.append(targetBufferArray2);
+
+        assertEquals(7, target.remaining());
+        assertTrue(target.hasRemaining());
+        assertEquals(0, target.position());
+        assertFalse(target.hasArray());
+        assertEquals(0, target.getCurrentIndex());
+
+        // Move position to the end
+        target.position(7);
+        assertFalse(target.hasRemaining());
+        assertEquals(0, target.remaining());
+        assertEquals(1, target.getCurrentIndex());
+
+        // Create buffer to append
+        byte[] sourceBufferArray1 = new byte[] { 7, 8, 9, 10 };
+        CompositeReadableBuffer source = new CompositeReadableBuffer();
+        source.append(sourceBufferArray1);
+
+        assertEquals(4, source.remaining());
+        assertTrue(source.hasRemaining());
+        assertEquals(0, source.position());
+        assertTrue(source.hasArray());
+        assertSame(sourceBufferArray1, source.array());
+        assertEquals(-1, source.getCurrentIndex());
+
+        // Append the buffer, check state of source+target buffers
+        target.append(source);
+
+        assertTrue(target.hasRemaining());
+        assertEquals(4, target.remaining());
+        assertEquals(7, target.position());
+
+        assertFalse(source.hasRemaining());
+        assertEquals(0, source.remaining());
+        assertEquals(4, source.position());
+
+        assertFalse(target.hasArray());
+        assertEquals(3, target.getArrays().size());
+        assertEquals(2, target.getCurrentIndex());
+
+        // Now read the data back and verify behaviour.
+        int initialChunkLength = sourceBufferArray1.length;
+        for(int i = 0; i < initialChunkLength; i++) {
+            assertEquals(i, target.getCurrentArrayPosition());
+            assertEquals(i + targetBufferArray1.length + targetBufferArray2.length, target.get());
+            assertEquals(i+1, target.getCurrentArrayPosition());
+            assertEquals(2, target.getCurrentIndex());
+            assertSame(sourceBufferArray1, target.getArrays().get(2));
+        }
+
+        assertEquals(2, target.getCurrentIndex());
+    }
+
+    @Test
+    public void testAppendNullByteArray() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
         try {
-            buffer.append(null);
+            buffer.append((byte[]) null);
             fail("Should not be able to add a null array");
         } catch (IllegalArgumentException iae) {}
     }
 
     @Test
-    public void testAppendEmpty() {
+    public void testAppendNullCompositeBuffer() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        try {
+            buffer.append((CompositeReadableBuffer) null);
+            fail("Should not be able to add a null composite");
+        } catch (IllegalArgumentException iae) {}
+    }
+
+    @Test
+    public void testAppendNullReadableBuffer() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        try {
+            buffer.append((ReadableBuffer) null);
+            fail("Should not be able to add a null readable");
+        } catch (IllegalArgumentException iae) {}
+    }
+
+    @Test
+    public void testAppendEmptyByteArray() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
         try {
             buffer.append(new byte[0]);
             fail("Should not be able to add a empty array");
+        } catch (IllegalArgumentException iae) {}
+    }
+
+    @Test
+    public void testAppendEmptyCompositeBuffer() {
+        CompositeReadableBuffer empty = new CompositeReadableBuffer();
+
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        try {
+            buffer.append(empty);
+            fail("Should not be able to append an empty composite");
+        } catch (IllegalArgumentException iae) {}
+    }
+
+    @Test
+    public void testAppendEmptyReadableBuffer() {
+        ReadableBuffer empty = ReadableBuffer.ByteBufferReader.allocate(0);
+
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        try {
+            buffer.append(empty);
+            fail("Should not be able to append an empty readable");
         } catch (IllegalArgumentException iae) {}
     }
 
@@ -2074,6 +3008,19 @@ public class CompositeReadableBufferTest {
 
         try {
             slice.append(new byte[] { 10 });
+            fail("Should not be allowed to append to a slice, must throw IllegalStateException");
+        } catch (IllegalStateException ise) {}
+
+        CompositeReadableBuffer crb = new CompositeReadableBuffer();
+        crb.append(new byte[] { 10 });
+        try {
+            slice.append(crb);
+            fail("Should not be allowed to append to a slice, must throw IllegalStateException");
+        } catch (IllegalStateException ise) {}
+
+        ReadableBuffer rb = ReadableBuffer.ByteBufferReader.wrap(new byte[] { 10 });
+        try {
+            slice.append(rb);
             fail("Should not be allowed to append to a slice, must throw IllegalStateException");
         } catch (IllegalStateException ise) {}
     }
