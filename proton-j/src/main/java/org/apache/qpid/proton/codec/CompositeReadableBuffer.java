@@ -82,6 +82,20 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         return currentArrayIndex;
     }
 
+    /**
+     * Gets the current position index in the current backing array, which represents the current buffer position.
+     *
+     * This value includes any buffer position movement, and resets when moving across array segments, so it only
+     * gives the starting offset for the first array if the buffer position is 0.
+     *
+     * Value may be out of array bounds if the the buffer currently has no content remaining.
+     *
+     * @return the position index in the current array representing the current buffer position.
+     */
+    public int getCurrentArrayPosition() {
+        return currentOffset;
+    }
+
     @Override
     public boolean hasArray() {
         return currentArray != null && (contents == null || contents.size() == 1);

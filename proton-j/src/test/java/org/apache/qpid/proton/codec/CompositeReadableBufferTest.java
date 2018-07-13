@@ -1105,6 +1105,72 @@ public class CompositeReadableBufferTest {
         assertEquals("Unexpected array offset on slice", 1, slice.arrayOffset());
     }
 
+    //----- Test getCurrentArrayPosition method ------------------------------------------//
+
+    @Test
+    public void testGetCurrentArrayPosition() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        byte[] source1 = new byte[] { 0, 1, 2 };
+        byte[] source2 = new byte[] { 3, 4, 5, 6 };
+        byte[] source3 = new byte[] { 7, 8, 9, 10, 11 };
+
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        buffer.append(source1);
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        buffer.append(source2);
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        buffer.append(source3);
+
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        assertEquals(0, buffer.getCurrentIndex());
+        assertFalse(buffer.hasArray());
+        assertEquals(3, buffer.getArrays().size());
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        assertEquals(12, buffer.limit());
+        assertEquals(12, buffer.capacity());
+
+        // Check each position in the first array
+        for(int i = 0; i < source1.length; i++) {
+            assertEquals(i, buffer.getCurrentArrayPosition());
+            assertEquals(i, buffer.get());
+        }
+
+        // Should have moved into second array, verify array position reset
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        assertEquals(1, buffer.getCurrentIndex());
+
+        assertFalse(buffer.hasArray());
+        assertEquals(3, buffer.getArrays().size());
+        assertEquals(12, buffer.limit());
+        assertEquals(12, buffer.capacity());
+
+        // Check each position in the second array
+        for(int i = 0; i < source2.length; i++) {
+            assertEquals(i, buffer.getCurrentArrayPosition());
+            assertEquals(i + source1.length, buffer.get());
+        }
+
+        // Should have moved into third array, verify array position reset
+        assertEquals(0, buffer.getCurrentArrayPosition());
+        assertEquals(2, buffer.getCurrentIndex());
+
+        assertFalse(buffer.hasArray());
+        assertEquals(3, buffer.getArrays().size());
+        assertEquals(12, buffer.limit());
+        assertEquals(12, buffer.capacity());
+
+        // Check each position in the third array
+        for(int i = 0; i < source3.length; i++) {
+            assertEquals(i, buffer.getCurrentArrayPosition());
+            assertEquals(i + source1.length + source2.length, buffer.get());
+        }
+
+        // Should have reached end, verify index is now out of bounds
+        assertEquals(source3.length, buffer.getCurrentArrayPosition());
+        assertEquals(2, buffer.getCurrentIndex());
+    }
+
     //----- Test appending data to the buffer --------------------------------//
 
     @Test
@@ -1196,6 +1262,7 @@ public class CompositeReadableBufferTest {
         assertEquals(0, buffer.getArrays().size());
 
         assertEquals(-1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
     }
 
     @Test
@@ -1209,11 +1276,13 @@ public class CompositeReadableBufferTest {
         assertTrue(buffer.hasArray());
         assertSame(source1, buffer.array());
         assertEquals(-1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         buffer.append(source2);
         assertFalse(buffer.hasArray());
         assertEquals(2, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         byte[] source3 = new byte[] { 9, 10, 11, 12 };
         buffer.append(source3);
@@ -1272,6 +1341,7 @@ public class CompositeReadableBufferTest {
         buffer.append(source);
 
         assertEquals(4, buffer.remaining());
+        assertEquals(4, buffer.limit());
         assertTrue(buffer.hasRemaining());
         assertEquals(0, buffer.position());
         assertTrue(buffer.hasArray());
@@ -1282,29 +1352,36 @@ public class CompositeReadableBufferTest {
         buffer.reclaimRead();
 
         assertEquals(4, buffer.remaining());
+        assertEquals(4, buffer.limit());
         assertTrue(buffer.hasRemaining());
         assertEquals(0, buffer.position());
         assertTrue(buffer.hasArray());
         assertSame(source, buffer.array());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         // Should not have any affect on buffer that is not consumed
         buffer.position(1);
+        assertEquals(1, buffer.getCurrentArrayPosition());
         buffer.reclaimRead();
 
         assertEquals(3, buffer.remaining());
+        assertEquals(4, buffer.limit());
         assertTrue(buffer.hasRemaining());
         assertEquals(1, buffer.position());
+        assertEquals(1, buffer.getCurrentArrayPosition());
         assertTrue(buffer.hasArray());
         assertSame(source, buffer.array());
 
         // Should clear array from buffer as it is now consumed.
         buffer.position(source.length);
+        assertEquals(source.length, buffer.getCurrentArrayPosition());
         buffer.reclaimRead();
 
         assertEquals(0, buffer.remaining());
         assertFalse(buffer.hasRemaining());
         assertEquals(0, buffer.position());
         assertFalse(buffer.hasArray());
+        assertEquals(0, buffer.getCurrentArrayPosition());
     }
 
     @Test
@@ -1420,6 +1497,7 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(3, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(12, buffer.limit());
         assertEquals(12, buffer.capacity());
 
@@ -1429,6 +1507,7 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(2, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(8, buffer.limit());
         assertEquals(8, buffer.capacity());
 
@@ -1439,6 +1518,7 @@ public class CompositeReadableBufferTest {
         assertTrue(buffer.hasArray());
         assertEquals(1, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(4, buffer.limit());
         assertEquals(4, buffer.capacity());
 
@@ -1448,6 +1528,7 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(0, buffer.getArrays().size());
         assertEquals(-1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(0, buffer.limit());
         assertEquals(0, buffer.capacity());
     }
@@ -1468,15 +1549,18 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(4, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(size, buffer.limit());
         assertEquals(size, buffer.capacity());
 
         buffer.position(buffer.limit());
+        assertEquals(4, buffer.getCurrentArrayPosition());
         buffer.reclaimRead();
 
         assertFalse(buffer.hasArray());
         assertEquals(0, buffer.getArrays().size());
         assertEquals(-1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
         assertEquals(0, buffer.limit());
         assertEquals(0, buffer.capacity());
     }
@@ -1493,14 +1577,19 @@ public class CompositeReadableBufferTest {
         assertFalse(buffer.hasArray());
         assertEquals(2, buffer.getArrays().size());
         assertEquals(0, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         buffer.position(4);
+        assertEquals(1, buffer.getCurrentIndex());
+        assertEquals(0, buffer.getCurrentArrayPosition());
+
         buffer.reclaimRead();
 
         assertEquals(0, buffer.position());
         assertEquals(4, buffer.limit());
         assertEquals(4, buffer.capacity());
         assertEquals(1, buffer.getArrays().size());
+        assertEquals(0, buffer.getCurrentArrayPosition());
 
         byte[] source3 = new byte[] { 8, 9, 10, 11 };
 
