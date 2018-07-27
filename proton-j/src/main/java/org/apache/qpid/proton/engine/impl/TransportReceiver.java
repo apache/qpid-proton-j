@@ -21,11 +21,12 @@
 
 package org.apache.qpid.proton.engine.impl;
 
+import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.transport.Flow;
 
 class TransportReceiver extends TransportLink<ReceiverImpl>
 {
-
+    private UnsignedInteger _incomingDeliveryId;
 
     TransportReceiver(ReceiverImpl link)
     {
@@ -52,7 +53,14 @@ class TransportReceiver extends TransportLink<ReceiverImpl>
             setDeliveryCount(getRemoteDeliveryCount());
             getLink().setDrained(getLink().getDrained() + delta);
         }
-
-
     }
+
+    UnsignedInteger getIncomingDeliveryId() {
+        return _incomingDeliveryId;
+    }
+
+    void setIncomingDeliveryId(UnsignedInteger _incomingDeliveryId) {
+        this._incomingDeliveryId = _incomingDeliveryId;
+    }
+
 }
