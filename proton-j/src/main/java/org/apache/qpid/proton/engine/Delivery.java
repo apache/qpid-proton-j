@@ -99,7 +99,29 @@ public interface Delivery extends Extendable
 
     public void clear();
 
+    /**
+     * Check for whether the delivery is still partial.
+     *
+     * For a receiving Delivery, this means the delivery does not hold
+     * a complete message payload as all the content hasn't been
+     * received yet. Note that an {@link #isAborted() aborted} delivery
+     * will also be considered partial and the full payload won't
+     * be received.
+     *
+     * For a sending Delivery, this means the sender link has not been
+     * {@link Sender#advance() advanced} to complete the delivery yet.
+     *
+     * @return true if the delivery is partial
+     * @see #isAborted()
+     */
     public boolean isPartial();
+
+    /**
+     * Check for whether the delivery was aborted.
+     *
+     * @return true if the delivery was aborted.
+     */
+    boolean isAborted();
 
     public int pending();
 
