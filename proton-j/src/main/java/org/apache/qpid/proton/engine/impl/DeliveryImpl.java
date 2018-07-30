@@ -70,6 +70,7 @@ public class DeliveryImpl implements Delivery
     private boolean _complete;
     private boolean _updated;
     private boolean _done;
+    private boolean _aborted;
 
     private CompositeReadableBuffer _dataBuffer;
     private ReadableBuffer _dataView;
@@ -477,6 +478,17 @@ public class DeliveryImpl implements Delivery
     void setComplete()
     {
         _complete = true;
+    }
+
+    void setAborted()
+    {
+        _aborted = true;
+    }
+
+    @Override
+    public boolean isAborted()
+    {
+        return _aborted;
     }
 
     @Override

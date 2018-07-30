@@ -2975,6 +2975,11 @@ public class TransportImplTest
 
     private void handlePartialTransfer(TransportImpl transport, UnsignedInteger handle, UnsignedInteger deliveryId, String deliveryTag, byte[] partialPayload, boolean more, boolean aborted)
     {
+        handlePartialTransfer(transport, handle, deliveryId, deliveryTag, partialPayload, more, aborted, null);
+    }
+
+    private void handlePartialTransfer(TransportImpl transport, UnsignedInteger handle, UnsignedInteger deliveryId, String deliveryTag, byte[] partialPayload, boolean more, boolean aborted, Boolean settled)
+    {
         byte[] tag = deliveryTag.getBytes(StandardCharsets.UTF_8);
 
         Transfer transfer = new Transfer();
@@ -2986,6 +2991,9 @@ public class TransportImplTest
         if(deliveryId != null) {
             // Can be omitted in continuation frames for a given delivery.
             transfer.setDeliveryId(deliveryId);
+        }
+        if(settled != null) {
+            transfer.setSettled(settled);
         }
 
         transport.handleFrame(new TransportFrame(0, transfer, new Binary(partialPayload, 0, partialPayload.length)));
@@ -3382,5 +3390,144 @@ public class TransportImplTest
         verifyDeliveryRawPayload(receiver1, deliveryTag1, new byte[] { 1 });
         verifyDeliveryRawPayload(receiver1, deliveryTag2, new byte[] { 2 });
         verifyDeliveryRawPayload(receiver1, deliveryTag3, new byte[] { 3 });
+    }
+
+    @Test
+    public void testAbortedDelivery() {
+        // Check aborted=true, more=false, settled=true.
+        doAbortedDeliveryTestImpl(false, true);
+        // Check aborted=true, more=false, settled=unset(false)
+        // Aborted overrides settled not being set.
+        doAbortedDeliveryTestImpl(false, null);
+        // Check aborted=true, more=false, settled=false
+        // Aborted overrides settled being explicitly false.
+        doAbortedDeliveryTestImpl(false, false);
+
+        // Check aborted=true, more=true, settled=true
+        // Aborted overrides the more=true.
+        doAbortedDeliveryTestImpl(true, true);
+        // Check aborted=true, more=true, settled=unset(false)
+        // Aborted overrides the more=true, and settled being unset.
+        doAbortedDeliveryTestImpl(true, null);
+        // Check aborted=true, more=true, settled=false
+        // Aborted overrides the more=true, and settled explicitly false.
+        doAbortedDeliveryTestImpl(true, false);
+    }
+
+    private void doAbortedDeliveryTestImpl(boolean setMoreOnAbortedTransfer, Boolean setSettledOnAbortedTransfer) {
+        MockTransportImpl transport = new MockTransportImpl();
+        transport.setEmitFlowEventOnSend(false);
+        Connection connection = Proton.connection();
+        transport.bind(connection);
+
+        connection.open();
+
+        Session session = connection.session();
+        session.open();
+
+        String linkName1 = "myReceiver1";
+        Receiver receiver1 = session.receiver(linkName1);
+        receiver1.flow(3);
+        receiver1.open();
+
+        pumpMockTransport(transport);
+
+        final UnsignedInteger r1handle = UnsignedInteger.ZERO;
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
+
+        // Give the necessary responses to open/begin/attach
+        transport.handleFrame(new TransportFrame(0, new Open(), null));
+
+        Begin begin = new Begin();
+        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        begin.setNextOutgoingId(UnsignedInteger.ONE);
+        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, begin, null));
+
+        Attach attach1 = new Attach();
+        attach1.setHandle(r1handle);
+        attach1.setRole(Role.SENDER);
+        attach1.setName(linkName1);
+        attach1.setInitialDeliveryCount(UnsignedInteger.ZERO);
+        transport.handleFrame(new TransportFrame(0, attach1, null));
+
+        String deliveryTag1 = "tag1";
+        String deliveryTag2 = "tag2";
+        String deliveryTag3 = "tag3";
+
+        // Receive first delivery
+        handlePartialTransfer(transport, r1handle, UnsignedInteger.ZERO, deliveryTag1, new byte[]{ 1 }, true);
+        assertEquals("Unexpected incoming bytes count", 1, session.getIncomingBytes());
+        handlePartialTransfer(transport, r1handle, UnsignedInteger.ZERO, deliveryTag1, new byte[]{ 2 }, false);
+
+        assertEquals("Unexpected queued count", 1, receiver1.getQueued());
+        assertEquals("Unexpected incoming bytes count", 2, session.getIncomingBytes());
+        assertEquals("Unexpected credit", 3, receiver1.getCredit());
+
+        // Receive first transfer for a multi-frame delivery
+        handlePartialTransfer(transport, r1handle, UnsignedInteger.ONE, deliveryTag2, new byte[]{ 3 }, true);
+        assertEquals("Unexpected queued count", 2, receiver1.getQueued());
+        assertEquals("Unexpected credit", 3, receiver1.getCredit());
+        assertEquals("Unexpected incoming bytes count", 3, session.getIncomingBytes());
+        // Receive second transfer for a multi-frame delivery, indicating it is aborted
+        handlePartialTransfer(transport, r1handle, UnsignedInteger.ONE, deliveryTag2, new byte[]{ 4 }, setMoreOnAbortedTransfer, true, setSettledOnAbortedTransfer);
+        assertEquals("Unexpected queued count", 2, receiver1.getQueued());
+        assertEquals("Unexpected credit", 3, receiver1.getCredit());
+        // The aborted frame payload, if any, is dropped. Earlier payload could have already been read, was
+        // previously accounted for, and is incomplete, leaving alone for regular cleanup accounting handling.
+        assertEquals("Unexpected incoming bytes count", 3, session.getIncomingBytes());
+
+        // Receive transfers for ANOTHER delivery, expect it not to fail, since the earlier delivery aborted
+        handlePartialTransfer(transport, r1handle, UnsignedInteger.valueOf(2), deliveryTag3, new byte[]{ 5 }, true);
+        handlePartialTransfer(transport, r1handle, UnsignedInteger.valueOf(2), deliveryTag3, new byte[]{ 6 }, false);
+        assertEquals("Unexpected queued count", 3, receiver1.getQueued());
+        assertEquals("Unexpected credit", 3, receiver1.getCredit());
+        assertEquals("Unexpected incoming bytes count", 5, session.getIncomingBytes());
+
+        // Check the first delivery
+        verifyDeliveryRawPayload(receiver1, deliveryTag1, new byte[] { 1, 2 });
+        assertEquals("Unexpected queued count", 2, receiver1.getQueued());
+        assertEquals("Unexpected credit", 2, receiver1.getCredit());
+        assertEquals("Unexpected incoming bytes count", 3, session.getIncomingBytes());
+
+        // Check the aborted delivery
+        Delivery delivery = receiver1.current();
+        assertTrue(Arrays.equals(deliveryTag2.getBytes(StandardCharsets.UTF_8), delivery.getTag()));
+
+        assertTrue(delivery.isAborted());
+        assertTrue(delivery.remotelySettled()); // Since aborted implicitly means it is settled.
+        assertTrue(delivery.isPartial());
+        assertTrue(delivery.isReadable());
+
+        byte[] received = new byte[delivery.pending()];
+        int len = receiver1.recv(received, 0, BUFFER_SIZE);
+        assertEquals("unexpected length", len, received.length);
+
+        assertArrayEquals("Received delivery payload not as expected", new byte[] { 3 }, received);
+
+        assertTrue("receiver did not advance", receiver1.advance());
+
+        assertEquals("Unexpected queued count", 1, receiver1.getQueued());
+        assertEquals("Unexpected credit", 1, receiver1.getCredit());
+        assertEquals("Unexpected incoming bytes count", 2, session.getIncomingBytes());
+
+        // Check the third delivery
+        verifyDeliveryRawPayload(receiver1, deliveryTag3, new byte[] { 5, 6 });
+        assertEquals("Unexpected queued count", 0, receiver1.getQueued());
+        assertEquals("Unexpected credit", 0, receiver1.getCredit());
+        assertEquals("Unexpected incoming bytes count", 0, session.getIncomingBytes());
+
+        // Flow new credit and check delivery-count + credit on wire are as expected.
+        receiver1.flow(123);
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 5, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(4) instanceof Flow);
+        Flow sentFlow = (Flow) transport.writes.get(4);
+
+        assertEquals("Unexpected delivery count", UnsignedInteger.valueOf(3), sentFlow.getDeliveryCount());
+        assertEquals("Unexpected credit", UnsignedInteger.valueOf(123), sentFlow.getLinkCredit());
     }
 }

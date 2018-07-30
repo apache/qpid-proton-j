@@ -302,7 +302,8 @@ class TransportSession
         }
         _unsettledIncomingSize++;
 
-        if (payload != null)
+        boolean aborted = transfer.getAborted();
+        if (payload != null && !aborted)
         {
             delivery.append(payload);
             getSession().incrementIncomingBytes(payload.getLength());
@@ -310,19 +311,20 @@ class TransportSession
 
         delivery.updateWork();
 
-        if(!transfer.getMore() || transfer.getAborted())
+        if(!transfer.getMore() || aborted)
         {
             transportReceiver.setIncomingDeliveryId(null);
-        }
+            if(aborted) {
+                delivery.setAborted();
+            } else {
+                delivery.setComplete();
+            }
 
-        if(!(transfer.getMore() || transfer.getAborted()))
-        {
-            delivery.setComplete();
             delivery.getLink().getTransportLink().decrementLinkCredit();
             delivery.getLink().getTransportLink().incrementDeliveryCount();
         }
 
-        if(Boolean.TRUE.equals(transfer.getSettled()))
+        if(Boolean.TRUE.equals(transfer.getSettled()) || aborted)
         {
             delivery.setRemoteSettled(true);
         }
