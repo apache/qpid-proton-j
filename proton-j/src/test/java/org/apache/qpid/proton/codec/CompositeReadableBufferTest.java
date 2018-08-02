@@ -2786,6 +2786,27 @@ public class CompositeReadableBufferTest {
     //----- Test various cases of Duplicate ----------------------------------//
 
     @Test
+    public void testDuplicateOnEmptyBuffer() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+        CompositeReadableBuffer dup = buffer.duplicate();
+
+        assertNotSame(buffer, dup);
+        assertEquals(0, dup.capacity());
+        assertEquals(0, buffer.capacity());
+        assertEquals(0, dup.position());
+        assertEquals(0, buffer.position());
+        assertEquals(0, dup.limit());
+        assertEquals(0, buffer.limit());
+        assertContentEquals(buffer, dup);
+
+        try {
+            dup.reclaimRead();
+        } catch (Throwable t) {
+            fail("Compacting an empty duplicate should not fail");
+        }
+    }
+
+    @Test
     public void testDuplicateWithSingleArrayContent() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 

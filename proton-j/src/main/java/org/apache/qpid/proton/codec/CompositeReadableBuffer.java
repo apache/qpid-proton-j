@@ -66,7 +66,9 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     private CompositeReadableBuffer(byte[] array, int offset) {
         this.currentArray = array;
         this.currentOffset = offset;
-        this.capacity = array.length;
+        if(array != null) {
+            this.capacity = array.length;
+        }
         this.limit = capacity;
     }
 
