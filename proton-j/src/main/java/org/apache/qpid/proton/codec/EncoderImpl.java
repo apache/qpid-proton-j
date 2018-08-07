@@ -42,6 +42,12 @@ public final class EncoderImpl implements ByteBufferEncoder
 {
     private static final byte DESCRIBED_TYPE_OP = (byte)0;
 
+    private static final ThreadLocal<byte[]> STRING_ENCODER_BUFFER_POOL = new ThreadLocal<byte[]>() {
+        protected byte[] initialValue() {
+            return new byte[4096];
+        }
+    };
+
     private WritableBuffer _buffer;
 
     private final DecoderImpl _decoder;
@@ -802,28 +808,36 @@ public final class EncoderImpl implements ByteBufferEncoder
         _buffer.put(src, offset, length);
     }
 
-    void writeRaw(String string)
+    void writeRaw(final String string)
     {
         final int length = string.length();
-        int c;
+
+        final byte buffer[] = STRING_ENCODER_BUFFER_POOL.get();
+        int pos = 0;
 
         for (int i = 0; i < length; i++)
         {
-            c = string.charAt(i);
+            if ( pos > buffer.length - 4 )
+            {
+                _buffer.put(buffer, 0, pos);
+                pos = 0;
+            }
+
+            int c = string.charAt(i);
             if ((c & 0xFF80) == 0)          /* U+0000..U+007F */
             {
-                _buffer.put((byte) c);
+                buffer[pos++] = (byte)c;
             }
             else if ((c & 0xF800) == 0)     /* U+0080..U+07FF */
             {
-                _buffer.put((byte)(0xC0 | ((c >> 6) & 0x1F)));
-                _buffer.put((byte)(0x80 | (c & 0x3F)));
+                buffer[pos++] = ((byte)(0xC0 | ((c >> 6) & 0x1F)));
+                buffer[pos++] = ((byte)(0x80 | (c & 0x3F)));
             }
             else if ((c & 0xD800) != 0xD800 || (c > 0xDBFF))     /* U+0800..U+FFFF - excluding surrogate pairs */
             {
-                _buffer.put((byte)(0xE0 | ((c >> 12) & 0x0F)));
-                _buffer.put((byte)(0x80 | ((c >> 6) & 0x3F)));
-                _buffer.put((byte)(0x80 | (c & 0x3F)));
+                buffer[pos++] = ((byte)(0xE0 | ((c >> 12) & 0x0F)));
+                buffer[pos++] = ((byte)(0x80 | ((c >> 6) & 0x3F)));
+                buffer[pos++] = ((byte)(0x80 | (c & 0x3F)));
             }
             else
             {
@@ -836,11 +850,16 @@ public final class EncoderImpl implements ByteBufferEncoder
 
                 c = 0x010000 + ((c & 0x03FF) << 10) + (low & 0x03FF);
 
-                _buffer.put((byte)(0xF0 | ((c >> 18) & 0x07)));
-                _buffer.put((byte)(0x80 | ((c >> 12) & 0x3F)));
-                _buffer.put((byte)(0x80 | ((c >> 6) & 0x3F)));
-                _buffer.put((byte)(0x80 | (c & 0x3F)));
+                buffer[pos++] = ((byte)(0xF0 | ((c >> 18) & 0x07)));
+                buffer[pos++] = ((byte)(0x80 | ((c >> 12) & 0x3F)));
+                buffer[pos++] = ((byte)(0x80 | ((c >> 6) & 0x3F)));
+                buffer[pos++] = ((byte)(0x80 | (c & 0x3F)));
             }
+        }
+
+        if ( pos > 0 )
+        {
+            _buffer.put(buffer, 0, pos);
         }
     }
 
