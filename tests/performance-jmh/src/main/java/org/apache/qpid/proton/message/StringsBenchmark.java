@@ -17,6 +17,7 @@
 
 package org.apache.qpid.proton.message;
 
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.infra.Blackhole;
@@ -26,11 +27,19 @@ import java.nio.ByteBuffer;
 
 public class StringsBenchmark extends MessageBenchmark
 {
+    private static final String PAYLOAD = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                                        + "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                                        + "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                                        + "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                                        + "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
     private Blackhole blackhole;
     private String string1;
     private String string2;
     private String string3;
+
+    private Message message;
+    private byte[] buffer = new byte[8096];
 
     @Setup
     public void init(Blackhole blackhole)
@@ -38,6 +47,7 @@ public class StringsBenchmark extends MessageBenchmark
         this.blackhole = blackhole;
         super.init();
         initStrings();
+        initStringMessage();
         encode();
     }
 
@@ -46,6 +56,15 @@ public class StringsBenchmark extends MessageBenchmark
         string1 = new String("String-1");
         string2 = new String("String-2");
         string3 = new String("String-3");
+    }
+
+    private void initStringMessage()
+    {
+        message = Message.Factory.create();
+        message.setAddress("destination");
+        message.setMessageId("my-message-id");
+        message.setReplyTo("reply-destination");
+        message.setBody(new AmqpValue(PAYLOAD));
     }
 
     @Benchmark
@@ -68,6 +87,13 @@ public class StringsBenchmark extends MessageBenchmark
         blackhole.consume(decoder.readString());
         blackhole.consume(decoder.readString());
         return byteBuf;
+    }
+
+    @Benchmark
+    public byte[] encodeStringMessage()
+    {
+        message.encode(buffer, 0, buffer.length);
+        return buffer;
     }
 
     public static void main(String[] args) throws RunnerException
