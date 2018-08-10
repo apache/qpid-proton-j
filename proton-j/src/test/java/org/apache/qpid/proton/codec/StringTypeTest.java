@@ -21,8 +21,10 @@
 package org.apache.qpid.proton.codec;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.lang.Character.UnicodeBlock;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
@@ -247,10 +249,14 @@ public class StringTypeTest
     }
 
     @Test
-    public void testEncodeAndDecodeUsingWritableBufferDefaultPutString() {
+    public void testEncodeAndDecodeUsingWritableBufferDefaultPutString() throws Exception {
         final DecoderImpl decoder = new DecoderImpl();
         final EncoderImpl encoder = new EncoderImpl(decoder);
         AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        // Verify that the default put(String) impl is being used by the buffers
+        Method m = WritableBufferWithoutPutStringOverride.class.getMethod("put", String.class);
+        assertTrue("Expected method to be default", m.isDefault());
 
         for (final String input : TEST_DATA) {
             final WritableBufferWithoutPutStringOverride sink = new WritableBufferWithoutPutStringOverride(16);
