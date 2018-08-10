@@ -21,6 +21,7 @@
 
 package org.apache.qpid.proton.codec;
 
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
 public interface WritableBuffer {
@@ -166,31 +167,36 @@ public interface WritableBuffer {
 
             for (int i = 0; i < length; i++) {
                 int c = value.charAt(i);
-                if ((c & 0xFF80) == 0) {
-                    // U+0000..U+007F
-                    put(pos++, (byte) c);
-                } else if ((c & 0xF800) == 0)  {
-                    // U+0080..U+07FF
-                    put(pos++, (byte) (0xC0 | ((c >> 6) & 0x1F)));
-                    put(pos++, (byte) (0x80 | (c & 0x3F)));
-                } else if ((c & 0xD800) != 0xD800 || (c > 0xDBFF))  {
-                    // U+0800..U+FFFF - excluding surrogate pairs
-                    put(pos++, (byte) (0xE0 | ((c >> 12) & 0x0F)));
-                    put(pos++, (byte) (0x80 | ((c >> 6) & 0x3F)));
-                    put(pos++, (byte) (0x80 | (c & 0x3F)));
-                } else {
-                    int low;
+                try {
+                    if ((c & 0xFF80) == 0) {
+                        // U+0000..U+007F
+                        put(pos++, (byte) c);
+                    } else if ((c & 0xF800) == 0)  {
+                        // U+0080..U+07FF
+                        put(pos++, (byte) (0xC0 | ((c >> 6) & 0x1F)));
+                        put(pos++, (byte) (0x80 | (c & 0x3F)));
+                    } else if ((c & 0xD800) != 0xD800 || (c > 0xDBFF))  {
+                        // U+0800..U+FFFF - excluding surrogate pairs
+                        put(pos++, (byte) (0xE0 | ((c >> 12) & 0x0F)));
+                        put(pos++, (byte) (0x80 | ((c >> 6) & 0x3F)));
+                        put(pos++, (byte) (0x80 | (c & 0x3F)));
+                    } else {
+                        int low;
 
-                    if ((++i == length) || ((low = value.charAt(i)) & 0xDC00) != 0xDC00) {
-                        throw new IllegalArgumentException("String contains invalid Unicode code points");
+                        if ((++i == length) || ((low = value.charAt(i)) & 0xDC00) != 0xDC00) {
+                            throw new IllegalArgumentException("String contains invalid Unicode code points");
+                        }
+
+                        c = 0x010000 + ((c & 0x03FF) << 10) + (low & 0x03FF);
+
+                        put(pos++, (byte) (0xF0 | ((c >> 18) & 0x07)));
+                        put(pos++, (byte) (0x80 | ((c >> 12) & 0x3F)));
+                        put(pos++, (byte) (0x80 | ((c >> 6) & 0x3F)));
+                        put(pos++, (byte) (0x80 | (c & 0x3F)));
                     }
-
-                    c = 0x010000 + ((c & 0x03FF) << 10) + (low & 0x03FF);
-
-                    put(pos++, (byte) (0xF0 | ((c >> 18) & 0x07)));
-                    put(pos++, (byte) (0x80 | ((c >> 12) & 0x3F)));
-                    put(pos++, (byte) (0x80 | ((c >> 6) & 0x3F)));
-                    put(pos++, (byte) (0x80 | (c & 0x3F)));
+                }
+                catch(IndexOutOfBoundsException ioobe) {
+                    throw new BufferOverflowException();
                 }
             }
 
