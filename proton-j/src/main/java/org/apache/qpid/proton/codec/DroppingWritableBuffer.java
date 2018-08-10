@@ -21,6 +21,7 @@
 package org.apache.qpid.proton.codec;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 public class DroppingWritableBuffer implements WritableBuffer
 {
@@ -106,8 +107,15 @@ public class DroppingWritableBuffer implements WritableBuffer
     }
 
     @Override
-    public void put(ReadableBuffer payload) {
+    public void put(ReadableBuffer payload)
+    {
         _pos += payload.remaining();
         payload.position(payload.limit());
+    }
+
+    @Override
+    public void put(String value)
+    {
+        _pos += value.getBytes(StandardCharsets.UTF_8).length;
     }
 }

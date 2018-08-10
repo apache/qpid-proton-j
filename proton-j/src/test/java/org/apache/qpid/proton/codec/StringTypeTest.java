@@ -44,13 +44,13 @@ public class StringTypeTest
     private static final List<String> TEST_DATA = generateTestData();
 
     /**
-     * Loop over all the chars in given {@link UnicodeBlock}s and return a
-     * {@link Set <String>} containing all the possible values as their
-     * {@link String} values.
+     * Loop over all the chars in given {@link UnicodeBlock}s and return a {@link Set <String>}
+     * containing all the possible values as their {@link String} values.
      *
-     * @param blocks the {@link UnicodeBlock}s to loop over
-     * @return a {@link Set <String>} containing all the possible values as
-     * {@link String} values
+     * @param blocks
+     *        the {@link UnicodeBlock}s to loop over
+     * @return a {@link Set <String>} containing all the possible values as {@link String}
+     *         values
      */
     private static Set<String> getAllStringsFromUnicodeBlocks(final UnicodeBlock... blocks)
     {
@@ -87,10 +87,9 @@ public class StringTypeTest
         return strings;
     }
 
-
     /**
-     * Test the encoding and decoding of various complicated Unicode characters
-     * which will end up as "surrogate pairs" when encoded to UTF-8
+     * Test the encoding and decoding of various complicated Unicode characters which will end
+     * up as "surrogate pairs" when encoded to UTF-8
      */
     @Test
     public void calculateUTF8Length()
@@ -102,7 +101,7 @@ public class StringTypeTest
     }
 
     /**
-     * Test the encoding and decoding of various  Unicode characters
+     * Test the encoding and decoding of various Unicode characters
      */
     @Test
     public void encodeDecodeStrings()
@@ -225,7 +224,7 @@ public class StringTypeTest
                                                      UnicodeBlock.GREEK,
                                                      UnicodeBlock.LETTERLIKE_SYMBOLS));
                 // blocks with surrogate pairs
-                //TODO: restore others when Java 7 is baseline
+                // TODO: restore others when Java 7 is baseline
                 addAll(getAllStringsFromUnicodeBlocks(UnicodeBlock.LINEAR_B_SYLLABARY,
                                                      /*UnicodeBlock.MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS,*/
                                                      UnicodeBlock.MUSICAL_SYMBOLS,
@@ -245,5 +244,114 @@ public class StringTypeTest
                 }
             }
         };
+    }
+
+    @Test
+    public void testEncodeAndDecodeUsingWritableBufferDefaultPutString() {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        for (final String input : TEST_DATA) {
+            final WritableBufferWithoutPutStringOverride sink = new WritableBufferWithoutPutStringOverride(16);
+            final AmqpValue inputValue = new AmqpValue(input);
+            encoder.setByteBuffer(sink);
+            encoder.writeObject(inputValue);
+            ReadableBuffer source = new ReadableBuffer.ByteBufferReader(ByteBuffer.wrap(sink.getArray(), 0, sink.getArrayLength()));
+            decoder.setBuffer(source);
+            final AmqpValue outputValue = (AmqpValue) decoder.readObject();
+            assertEquals("Failed to round trip String correctly: ", input, outputValue.getValue());
+        }
+    }
+
+    /**
+     * Test class which implements WritableBuffer but does not override the default put(String)
+     * method, used to verify the default method is in place and works.
+     */
+    private static final class WritableBufferWithoutPutStringOverride implements WritableBuffer {
+
+        private final ByteBufferWrapper delegate;
+
+        public WritableBufferWithoutPutStringOverride(int capacity) {
+            delegate = WritableBuffer.ByteBufferWrapper.allocate(capacity);
+        }
+
+        public byte[] getArray() {
+            return delegate.byteBuffer().array();
+        }
+
+        public int getArrayLength() {
+            return delegate.byteBuffer().position();
+        }
+
+        @Override
+        public void put(byte b) {
+            delegate.put(b);
+        }
+
+        @Override
+        public void putShort(short value) {
+            delegate.putShort(value);
+        }
+
+        @Override
+        public void putInt(int value) {
+            delegate.putInt(value);
+        }
+
+        @Override
+        public void putLong(long value) {
+            delegate.putLong(value);
+        }
+
+        @Override
+        public void putFloat(float value) {
+            delegate.putFloat(value);
+        }
+
+        @Override
+        public void putDouble(double value) {
+            delegate.putDouble(value);
+        }
+
+        @Override
+        public void put(byte[] src, int offset, int length) {
+            delegate.put(src, offset, length);
+        }
+
+        @Override
+        public boolean hasRemaining() {
+            return delegate.hasRemaining();
+        }
+
+        @Override
+        public int remaining() {
+            return delegate.remaining();
+        }
+
+        @Override
+        public int position() {
+            return delegate.position();
+        }
+
+        @Override
+        public void position(int position) {
+            delegate.position(position);
+        }
+
+        @Override
+        public void put(ByteBuffer payload) {
+            delegate.put(payload);
+        }
+
+        @Override
+        public int limit() {
+            return delegate.limit();
+        }
+
+        @Override
+        public void put(ReadableBuffer src) {
+            delegate.put(src);
+        }
     }
 }

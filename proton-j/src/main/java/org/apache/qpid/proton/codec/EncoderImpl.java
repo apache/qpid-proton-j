@@ -80,12 +80,6 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     private final ArrayType             _arrayType;
 
-    EncoderImpl(ByteBuffer buffer, DecoderImpl decoder)
-    {
-        this(decoder);
-        setByteBuffer(buffer);
-    }
-
     public EncoderImpl(DecoderImpl decoder)
     {
         _decoder                = decoder;
@@ -129,10 +123,9 @@ public final class EncoderImpl implements ByteBufferEncoder
                                                 _floatType,
                                                 _doubleType,
                                                 _characterType);
-
-
     }
 
+    @Override
     public void setByteBuffer(final ByteBuffer buf)
     {
         _buffer = new WritableBuffer.ByteBufferWrapper(buf);
@@ -228,11 +221,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         _describedTypesClassRegistry.put(clazz, type);
     }
 
+    @Override
     public void writeNull()
     {
         _buffer.put(EncodingCodes.NULL);
     }
 
+    @Override
     public void writeBoolean(final boolean bool)
     {
         if (bool)
@@ -245,6 +240,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeBoolean(final Boolean bool)
     {
         if(bool == null)
@@ -261,6 +257,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeUnsignedByte(final UnsignedByte ubyte)
     {
         if(ubyte == null)
@@ -273,6 +270,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeUnsignedShort(final UnsignedShort ushort)
     {
         if(ushort == null)
@@ -285,6 +283,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeUnsignedInteger(final UnsignedInteger uint)
     {
         if(uint == null)
@@ -297,6 +296,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeUnsignedLong(final UnsignedLong ulong)
     {
         if(ulong == null)
@@ -309,11 +309,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeByte(final byte b)
     {
         _byteType.write(b);
     }
 
+    @Override
     public void writeByte(final Byte b)
     {
         if(b == null)
@@ -326,11 +328,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeShort(final short s)
     {
         _shortType.write(s);
     }
 
+    @Override
     public void writeShort(final Short s)
     {
         if(s == null)
@@ -343,11 +347,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeInteger(final int i)
     {
         _integerType.write(i);
     }
 
+    @Override
     public void writeInteger(final Integer i)
     {
         if(i == null)
@@ -360,11 +366,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeLong(final long l)
     {
         _longType.write(l);
     }
 
+    @Override
     public void writeLong(final Long l)
     {
 
@@ -378,11 +386,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeFloat(final float f)
     {
         _floatType.write(f);
     }
 
+    @Override
     public void writeFloat(final Float f)
     {
         if(f == null)
@@ -395,11 +405,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeDouble(final double d)
     {
         _doubleType.write(d);
     }
 
+    @Override
     public void writeDouble(final Double d)
     {
         if(d == null)
@@ -412,6 +424,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeDecimal32(final Decimal32 d)
     {
         if(d == null)
@@ -424,6 +437,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeDecimal64(final Decimal64 d)
     {
         if(d == null)
@@ -436,6 +450,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeDecimal128(final Decimal128 d)
     {
         if(d == null)
@@ -448,12 +463,14 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeCharacter(final char c)
     {
         // TODO - java character may be half of a pair, should probably throw exception then
         _characterType.write(c);
     }
 
+    @Override
     public void writeCharacter(final Character c)
     {
         if(c == null)
@@ -466,11 +483,13 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeTimestamp(final long timestamp)
     {
         _timestampType.fastWrite(this, timestamp);
     }
 
+    @Override
     public void writeTimestamp(final Date d)
     {
         if(d == null)
@@ -483,6 +502,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeUUID(final UUID uuid)
     {
         if(uuid == null)
@@ -496,6 +516,7 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     }
 
+    @Override
     public void writeBinary(final Binary b)
     {
         if(b == null)
@@ -508,6 +529,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeString(final String s)
     {
         if(s == null)
@@ -520,6 +542,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeSymbol(final Symbol s)
     {
         if(s == null)
@@ -533,6 +556,7 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     }
 
+    @Override
     public void writeList(final List l)
     {
         if(l == null)
@@ -545,6 +569,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeMap(final Map m)
     {
 
@@ -558,6 +583,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeDescribedType(final DescribedType d)
     {
         if(d == null)
@@ -572,6 +598,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final boolean[] a)
     {
         if(a == null)
@@ -584,6 +611,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final byte[] a)
     {
         if(a == null)
@@ -596,6 +624,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final short[] a)
     {
         if(a == null)
@@ -608,6 +637,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final int[] a)
     {
         if(a == null)
@@ -620,6 +650,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final long[] a)
     {
         if(a == null)
@@ -632,6 +663,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final float[] a)
     {
         if(a == null)
@@ -644,6 +676,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final double[] a)
     {
         if(a == null)
@@ -656,6 +689,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final char[] a)
     {
         if(a == null)
@@ -668,6 +702,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeArray(final Object[] a)
     {
         if(a == null)
@@ -680,6 +715,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @Override
     public void writeObject(final Object o)
     {
         if (o == null)
@@ -802,46 +838,9 @@ public final class EncoderImpl implements ByteBufferEncoder
         _buffer.put(src, offset, length);
     }
 
-    void writeRaw(String string)
+    void writeRaw(final String string)
     {
-        final int length = string.length();
-        int c;
-
-        for (int i = 0; i < length; i++)
-        {
-            c = string.charAt(i);
-            if ((c & 0xFF80) == 0)          /* U+0000..U+007F */
-            {
-                _buffer.put((byte) c);
-            }
-            else if ((c & 0xF800) == 0)     /* U+0080..U+07FF */
-            {
-                _buffer.put((byte)(0xC0 | ((c >> 6) & 0x1F)));
-                _buffer.put((byte)(0x80 | (c & 0x3F)));
-            }
-            else if ((c & 0xD800) != 0xD800 || (c > 0xDBFF))     /* U+0800..U+FFFF - excluding surrogate pairs */
-            {
-                _buffer.put((byte)(0xE0 | ((c >> 12) & 0x0F)));
-                _buffer.put((byte)(0x80 | ((c >> 6) & 0x3F)));
-                _buffer.put((byte)(0x80 | (c & 0x3F)));
-            }
-            else
-            {
-                int low;
-
-                if((++i == length) || ((low = string.charAt(i)) & 0xDC00) != 0xDC00)
-                {
-                    throw new IllegalArgumentException("String contains invalid Unicode code points");
-                }
-
-                c = 0x010000 + ((c & 0x03FF) << 10) + (low & 0x03FF);
-
-                _buffer.put((byte)(0xF0 | ((c >> 18) & 0x07)));
-                _buffer.put((byte)(0x80 | ((c >> 12) & 0x3F)));
-                _buffer.put((byte)(0x80 | ((c >> 6) & 0x3F)));
-                _buffer.put((byte)(0x80 | (c & 0x3F)));
-            }
-        }
+        _buffer.put(string);
     }
 
     AMQPType getNullTypeEncoder()

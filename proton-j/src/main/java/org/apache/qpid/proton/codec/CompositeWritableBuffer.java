@@ -1,4 +1,3 @@
-package org.apache.qpid.proton.codec;
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -19,9 +18,10 @@ package org.apache.qpid.proton.codec;
  * under the License.
  *
 */
-
+package org.apache.qpid.proton.codec;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 public class CompositeWritableBuffer implements WritableBuffer
 {
@@ -34,21 +34,25 @@ public class CompositeWritableBuffer implements WritableBuffer
         _second = second;
     }
 
+    @Override
     public void put(byte b)
     {
         (_first.hasRemaining() ? _first : _second).put(b);
     }
 
+    @Override
     public void putFloat(float f)
     {
         putInt(Float.floatToRawIntBits(f));
     }
 
+    @Override
     public void putDouble(double d)
     {
         putLong(Double.doubleToRawLongBits(d));
     }
 
+    @Override
     public void putShort(short s)
     {
         int remaining = _first.remaining();
@@ -69,6 +73,7 @@ public class CompositeWritableBuffer implements WritableBuffer
         }
     }
 
+    @Override
     public void putInt(int i)
     {
         int remaining = _first.remaining();
@@ -89,6 +94,7 @@ public class CompositeWritableBuffer implements WritableBuffer
         }
     }
 
+    @Override
     public void putLong(long l)
     {
         int remaining = _first.remaining();
@@ -109,26 +115,31 @@ public class CompositeWritableBuffer implements WritableBuffer
         }
     }
 
+    @Override
     public boolean hasRemaining()
     {
         return _first.hasRemaining() || _second.hasRemaining();
     }
 
+    @Override
     public int remaining()
     {
         return _first.remaining()+_second.remaining();
     }
 
+    @Override
     public int position()
     {
         return _first.position()+_second.position();
     }
 
+    @Override
     public int limit()
     {
         return _first.limit() + _second.limit();
     }
 
+    @Override
     public void position(int position)
     {
         int first_limit = _first.limit();
@@ -144,6 +155,7 @@ public class CompositeWritableBuffer implements WritableBuffer
         }
     }
 
+    @Override
     public void put(byte[] src, int offset, int length)
     {
         final int firstRemaining = _first.remaining();
@@ -162,6 +174,7 @@ public class CompositeWritableBuffer implements WritableBuffer
         _second.put(src, offset+firstRemaining, length-firstRemaining);
     }
 
+    @Override
     public void put(ByteBuffer payload)
     {
         int firstRemaining = _first.remaining();
@@ -208,5 +221,19 @@ public class CompositeWritableBuffer implements WritableBuffer
             }
         }
         _second.put(payload);
+    }
+
+    @Override
+    public void put(String value)
+    {
+        if (_first.hasRemaining())
+        {
+            byte[] utf8Bytes = value.getBytes(StandardCharsets.UTF_8);
+            put(utf8Bytes, 0, utf8Bytes.length);
+        }
+        else
+        {
+            _second.put(value);
+        }
     }
 }
