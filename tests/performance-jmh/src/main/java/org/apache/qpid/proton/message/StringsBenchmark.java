@@ -18,6 +18,8 @@
 package org.apache.qpid.proton.message;
 
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
+import org.apache.qpid.proton.codec.WritableBuffer;
+import org.apache.qpid.proton.codec.WritableBuffer.ByteBufferWrapper;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.infra.Blackhole;
@@ -39,7 +41,7 @@ public class StringsBenchmark extends MessageBenchmark
     private String string3;
 
     private Message message;
-    private byte[] buffer = new byte[8096];
+    private WritableBuffer buffer;
 
     @Setup
     public void init(Blackhole blackhole)
@@ -48,6 +50,7 @@ public class StringsBenchmark extends MessageBenchmark
         super.init();
         initStrings();
         initStringMessage();
+        initWritableBuffer();
         encode();
     }
 
@@ -65,6 +68,11 @@ public class StringsBenchmark extends MessageBenchmark
         message.setMessageId("my-message-id");
         message.setReplyTo("reply-destination");
         message.setBody(new AmqpValue(PAYLOAD));
+    }
+
+    private void initWritableBuffer()
+    {
+        buffer = ByteBufferWrapper.allocate(8096);
     }
 
     @Benchmark
@@ -90,9 +98,10 @@ public class StringsBenchmark extends MessageBenchmark
     }
 
     @Benchmark
-    public byte[] encodeStringMessage()
+    public WritableBuffer encodeStringMessage()
     {
-        message.encode(buffer, 0, buffer.length);
+        buffer.position(0);
+        message.encode(buffer);
         return buffer;
     }
 
