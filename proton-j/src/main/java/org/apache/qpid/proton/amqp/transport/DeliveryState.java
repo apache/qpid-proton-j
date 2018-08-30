@@ -29,5 +29,14 @@ package org.apache.qpid.proton.amqp.transport;
  */
 public interface DeliveryState
 {
-
+    enum DeliveryStateType
+    {
+        Accepted,
+        Declared,
+        Modified,
+        Received,
+        Rejected,
+        Released,
+        Transactional
+    }
 }

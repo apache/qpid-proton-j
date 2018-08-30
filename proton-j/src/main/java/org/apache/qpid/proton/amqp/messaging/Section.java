@@ -22,4 +22,16 @@ package org.apache.qpid.proton.amqp.messaging;
 
 public interface Section
 {
+    enum SectionType
+    {
+        AmqpSequence,
+        AmqpValue,
+        ApplicationProperties,
+        Data,
+        DeliveryAnnotations,
+        Footer,
+        Header,
+        MessageAnnotations,
+        Properties
+    }
 }
