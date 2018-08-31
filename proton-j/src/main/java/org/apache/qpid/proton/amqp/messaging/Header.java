@@ -26,11 +26,8 @@ package org.apache.qpid.proton.amqp.messaging;
 import org.apache.qpid.proton.amqp.UnsignedByte;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 
-
-public final class Header
-      implements Section
+public final class Header implements Section
 {
-
     private Boolean _durable;
     private UnsignedByte _priority;
     private UnsignedInteger _ttl;
@@ -111,5 +108,10 @@ public final class Header
                ", firstAcquirer=" + _firstAcquirer +
                ", deliveryCount=" + _deliveryCount +
                '}';
+    }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.Header;
     }
 }

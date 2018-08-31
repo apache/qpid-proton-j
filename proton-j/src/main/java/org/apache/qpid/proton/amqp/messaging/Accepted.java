@@ -27,13 +27,11 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.transport.DeliveryState;
 
 
-public final class Accepted
-      implements DeliveryState, Outcome
+public final class Accepted implements DeliveryState, Outcome
 {
     public static final Symbol DESCRIPTOR_SYMBOL = Symbol.valueOf("amqp:accepted:list");
 
     private static final Accepted INSTANCE = new Accepted();
-
 
     /**
      *  TODO should this (and other DeliveryStates) have a private constructor??
@@ -51,5 +49,10 @@ public final class Accepted
     public static Accepted getInstance()
     {
         return INSTANCE;
+    }
+
+    @Override
+    public DeliveryStateType getType() {
+        return DeliveryStateType.Accepted;
     }
 }

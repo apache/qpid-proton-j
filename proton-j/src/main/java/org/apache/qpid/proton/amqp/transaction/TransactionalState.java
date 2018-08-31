@@ -24,13 +24,11 @@
 package org.apache.qpid.proton.amqp.transaction;
 
 import org.apache.qpid.proton.amqp.Binary;
-import org.apache.qpid.proton.amqp.transport.DeliveryState;
 import org.apache.qpid.proton.amqp.messaging.Outcome;
+import org.apache.qpid.proton.amqp.transport.DeliveryState;
 
-public final class TransactionalState
-      implements DeliveryState
+public final class TransactionalState implements DeliveryState
 {
-
     private Binary _txnId;
     private Outcome _outcome;
 
@@ -67,5 +65,9 @@ public final class TransactionalState
                ", outcome=" + _outcome +
                '}';
     }
+
+    @Override
+    public DeliveryStateType getType() {
+        return DeliveryStateType.Transactional;
+    }
 }
-  

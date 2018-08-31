@@ -25,8 +25,7 @@ package org.apache.qpid.proton.amqp.messaging;
 
 import java.util.Map;
 
-public final class ApplicationProperties
-      implements Section
+public final class ApplicationProperties implements Section
 {
     private final Map<String, Object> _value;
 
@@ -45,5 +44,9 @@ public final class ApplicationProperties
     {
         return "ApplicationProperties{" + _value + '}';
     }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.ApplicationProperties;
+    }
 }
-  

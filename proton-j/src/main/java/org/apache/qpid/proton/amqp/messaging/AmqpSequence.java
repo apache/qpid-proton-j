@@ -25,8 +25,7 @@ package org.apache.qpid.proton.amqp.messaging;
 
 import java.util.List;
 
-public final class AmqpSequence
-      implements Section
+public final class AmqpSequence implements Section
 {
     private final List _value;
 
@@ -40,7 +39,6 @@ public final class AmqpSequence
         return _value;
     }
 
-
     @Override
     public String toString()
     {
@@ -48,5 +46,9 @@ public final class AmqpSequence
                _value +
                '}';
     }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.AmqpSequence;
+    }
 }
-  

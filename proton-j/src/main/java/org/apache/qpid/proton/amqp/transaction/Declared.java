@@ -29,8 +29,7 @@ import org.apache.qpid.proton.amqp.messaging.Outcome;
 import org.apache.qpid.proton.amqp.transport.DeliveryState;
 
 
-public final class Declared
-      implements DeliveryState, Outcome
+public final class Declared implements DeliveryState, Outcome
 {
     public static final Symbol DESCRIPTOR_SYMBOL = Symbol.valueOf("amqp:declared:list");
 
@@ -58,5 +57,9 @@ public final class Declared
                "txnId=" + _txnId +
                '}';
     }
+
+    @Override
+    public DeliveryStateType getType() {
+        return DeliveryStateType.Declared;
+    }
 }
-  

@@ -27,9 +27,7 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.transport.DeliveryState;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 
-
-public final class Rejected
-      implements DeliveryState, Outcome
+public final class Rejected implements DeliveryState, Outcome
 {
     public static final Symbol DESCRIPTOR_SYMBOL = Symbol.valueOf("amqp:rejected:list");
 
@@ -47,10 +45,9 @@ public final class Rejected
 
     public int size()
     {
-        return _error != null 
-                  ? 1 
-                  : 0;        
-
+        return _error != null
+                  ? 1
+                  : 0;
     }
 
     @Override
@@ -60,5 +57,9 @@ public final class Rejected
                "error=" + _error +
                '}';
     }
+
+    @Override
+    public DeliveryStateType getType() {
+        return DeliveryStateType.Rejected;
+    }
 }
-  

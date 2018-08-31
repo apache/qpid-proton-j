@@ -20,10 +20,9 @@
  */
 package org.apache.qpid.proton.amqp.messaging;
 
-public interface Section
-{
-    enum SectionType
-    {
+public interface Section {
+
+    enum SectionType {
         AmqpSequence,
         AmqpValue,
         ApplicationProperties,
@@ -34,4 +33,10 @@ public interface Section
         MessageAnnotations,
         Properties
     }
+
+    /**
+     * @return the {@link SectionType} that describes this instance.
+     */
+    SectionType getType();
+
 }

@@ -29,11 +29,8 @@ import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 
-
-public final class Properties
-      implements  Section
+public final class Properties implements Section
 {
-
     private Object _messageId;
     private Binary _userId;
     private String _to;
@@ -217,5 +214,10 @@ public final class Properties
                ", groupSequence=" + _groupSequence +
                ", replyToGroupId='" + _replyToGroupId + '\'' +
                '}';
+    }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.Properties;
     }
 }

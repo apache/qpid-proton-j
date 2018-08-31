@@ -27,12 +27,8 @@ import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.transport.DeliveryState;
 
-
-
-public final class Received
-      implements DeliveryState
+public final class Received implements DeliveryState
 {
-
     private UnsignedInteger _sectionNumber;
     private UnsignedLong _sectionOffset;
 
@@ -56,7 +52,6 @@ public final class Received
         _sectionOffset = sectionOffset;
     }
 
-
     @Override
     public String toString()
     {
@@ -65,5 +60,9 @@ public final class Received
                ", sectionOffset=" + _sectionOffset +
                '}';
     }
+
+    @Override
+    public DeliveryStateType getType() {
+        return DeliveryStateType.Received;
+    }
 }
-  

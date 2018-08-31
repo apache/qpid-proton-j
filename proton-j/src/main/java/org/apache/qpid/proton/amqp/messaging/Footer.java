@@ -25,9 +25,7 @@ package org.apache.qpid.proton.amqp.messaging;
 
 import java.util.Map;
 
-
-public final class Footer
-      implements  Section
+public final class Footer implements  Section
 {
     private final Map _value;
 
@@ -46,5 +44,9 @@ public final class Footer
     {
         return "Footer{" + _value + '}';
     }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.Footer;
+    }
 }
-  

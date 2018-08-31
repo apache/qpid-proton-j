@@ -25,8 +25,7 @@ package org.apache.qpid.proton.amqp.messaging;
 
 import org.apache.qpid.proton.amqp.Binary;
 
-public final class Data
-      implements Section
+public final class Data implements Section
 {
     private final Binary _value;
 
@@ -45,5 +44,9 @@ public final class Data
     {
         return "Data{" + _value + '}';
     }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.Data;
+    }
 }
-  

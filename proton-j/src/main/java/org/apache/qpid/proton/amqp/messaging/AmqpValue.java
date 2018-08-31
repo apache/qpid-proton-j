@@ -23,8 +23,7 @@
 
 package org.apache.qpid.proton.amqp.messaging;
 
-public final class AmqpValue
-      implements  Section
+public final class AmqpValue implements Section
 {
     private final Object _value;
 
@@ -43,5 +42,9 @@ public final class AmqpValue
     {
         return "AmqpValue{" + _value + '}';
     }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.AmqpValue;
+    }
 }
-  

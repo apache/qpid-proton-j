@@ -46,5 +46,9 @@ public final class DeliveryAnnotations implements Section
     {
         return "DeliveryAnnotations{" + _value + '}';
     }
+
+    @Override
+    public SectionType getType() {
+        return SectionType.DeliveryAnnotations;
+    }
 }
-  
