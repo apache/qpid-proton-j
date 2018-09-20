@@ -38,6 +38,7 @@ import java.util.Random;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
@@ -46,9 +47,11 @@ import org.apache.qpid.proton.amqp.messaging.Released;
 import org.apache.qpid.proton.amqp.transport.Attach;
 import org.apache.qpid.proton.amqp.transport.Begin;
 import org.apache.qpid.proton.amqp.transport.Close;
+import org.apache.qpid.proton.amqp.transport.ConnectionError;
 import org.apache.qpid.proton.amqp.transport.Detach;
 import org.apache.qpid.proton.amqp.transport.Disposition;
 import org.apache.qpid.proton.amqp.transport.End;
+import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.amqp.transport.Flow;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.amqp.transport.Open;
@@ -3529,5 +3532,26 @@ public class TransportImplTest
 
         assertEquals("Unexpected delivery count", UnsignedInteger.valueOf(3), sentFlow.getDeliveryCount());
         assertEquals("Unexpected credit", UnsignedInteger.valueOf(123), sentFlow.getLinkCredit());
+    }
+
+    @Test
+    public void testConditionUponTransportClosed() {
+        TransportImpl transport = new TransportImpl();
+        transport.closed(null);
+        assertEquals(transport.getCondition().getCondition(), ConnectionError.FRAMING_ERROR);
+
+        ErrorCondition errorCondition = new ErrorCondition();
+        Symbol protonError = Symbol.getSymbol("proton:io");
+        String protonErrorDescription = "io error";
+        errorCondition.setCondition(protonError);
+        errorCondition.setDescription(protonErrorDescription);
+        transport.setCondition(errorCondition);
+
+        transport.closed(null);
+        assertTrue(transport.getCondition().getCondition().equals(protonError));
+        assertEquals(transport.getCondition().getDescription(), protonErrorDescription);
+
+        transport.closed(new TransportException());
+        assertTrue(transport.getCondition().getCondition().equals(ConnectionError.FRAMING_ERROR));
     }
 }

@@ -255,6 +255,12 @@ public class TransportImpl extends EndpointImpl
     }
 
     @Override
+    public void setCondition(ErrorCondition condition)
+    {
+        _condition = condition;
+    }
+
+    @Override
     public void bind(Connection conn)
     {
         // TODO - check if already bound
@@ -1421,11 +1427,13 @@ public class TransportImpl extends EndpointImpl
     {
         if (!_closeReceived || error != null) {
             if (error == null) {
-                _condition = new ErrorCondition(ConnectionError.FRAMING_ERROR,
-                                               "connection aborted");
+                if (_condition == null) {
+                    _condition = new ErrorCondition(ConnectionError.FRAMING_ERROR,
+                        "connection aborted");
+                }
             } else {
                 _condition = new ErrorCondition(ConnectionError.FRAMING_ERROR,
-                                                error.toString());
+                        error.toString());
             }
             _head_closed = true;
         }
