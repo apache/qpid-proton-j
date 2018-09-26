@@ -30,6 +30,7 @@ public class StringType extends AbstractPrimitiveType<String>
     private static final DecoderImpl.TypeDecoder<String> _stringCreator =
         new DecoderImpl.TypeDecoder<String>()
         {
+            @Override
             public String decode(DecoderImpl decoder, final ReadableBuffer buffer)
             {
                 CharsetDecoder charsetDecoder = decoder.getCharsetDecoder();
@@ -64,11 +65,13 @@ public class StringType extends AbstractPrimitiveType<String>
         decoder.register(this);
     }
 
+    @Override
     public Class<String> getTypeClass()
     {
         return String.class;
     }
 
+    @Override
     public StringEncoding getEncoding(final String val)
     {
         final int length = calculateUTF8Length(val);
@@ -103,11 +106,13 @@ public class StringType extends AbstractPrimitiveType<String>
         return len;
     }
 
+    @Override
     public StringEncoding getCanonicalEncoding()
     {
         return _stringEncoding;
     }
 
+    @Override
     public Collection<StringEncoding> getAllEncodings()
     {
         return Arrays.asList(_shortStringEncoding, _stringEncoding);
@@ -128,6 +133,7 @@ public class StringType extends AbstractPrimitiveType<String>
         @Override
         protected void writeEncodedValue(final String val)
         {
+            getEncoder().getBuffer().ensureRemaining(getEncodedValueSize(val));
             getEncoder().writeRaw(val);
         }
 
@@ -143,16 +149,19 @@ public class StringType extends AbstractPrimitiveType<String>
             return EncodingCodes.STR32;
         }
 
+        @Override
         public StringType getType()
         {
             return StringType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<String> encoding)
         {
             return (getType() == encoding.getType());
         }
 
+        @Override
         public String readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -160,12 +169,14 @@ public class StringType extends AbstractPrimitiveType<String>
             return size == 0 ? "" : decoder.readRaw(_stringCreator, size);
         }
 
+        @Override
         public void setValue(final String val, final int length)
         {
             _value = val;
             _length = length;
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -190,6 +201,7 @@ public class StringType extends AbstractPrimitiveType<String>
         @Override
         protected void writeEncodedValue(final String val)
         {
+            getEncoder().getBuffer().ensureRemaining(getEncodedValueSize(val));
             getEncoder().writeRaw(val);
         }
 
@@ -205,16 +217,19 @@ public class StringType extends AbstractPrimitiveType<String>
             return EncodingCodes.STR8;
         }
 
+        @Override
         public StringType getType()
         {
             return StringType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<String> encoder)
         {
             return encoder == this;
         }
 
+        @Override
         public String readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -222,12 +237,14 @@ public class StringType extends AbstractPrimitiveType<String>
             return size == 0 ? "" : decoder.readRaw(_stringCreator, size);
         }
 
+        @Override
         public void setValue(final String val, final int length)
         {
             _value = val;
             _length = length;
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();

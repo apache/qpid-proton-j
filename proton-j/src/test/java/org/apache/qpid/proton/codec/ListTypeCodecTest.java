@@ -30,6 +30,7 @@ import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Test for the Proton List encoder / decoder
@@ -116,5 +117,31 @@ public class ListTypeCodecTest extends CodecTestSupport {
 
             assertEquals(list.size(), resultList.size());
         }
+    }
+
+    @Test
+    public void testEncodeSmallListReservesSpaceForPayload() throws IOException {
+        doTestEncodeListTypeReservation(SMALL_SIZE);
+    }
+
+    @Test
+    public void testEncodeLargeListReservesSpaceForPayload() throws IOException {
+        doTestEncodeListTypeReservation(LARGE_SIZE);
+    }
+
+    private void doTestEncodeListTypeReservation(int size) throws IOException {
+        List<Integer> list = new ArrayList<>();
+        for (int i = 0; i < size; ++i) {
+            list.add(i);
+        }
+
+        WritableBuffer writable = new WritableBuffer.ByteBufferWrapper(this.buffer);
+        WritableBuffer spy = Mockito.spy(writable);
+
+        encoder.setByteBuffer(spy);
+        encoder.writeList(list);
+
+        // Check that the ListType tries to reserve space, actual encoding size not computed here.
+        Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
     }
 }

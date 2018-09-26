@@ -48,11 +48,13 @@ public class ListType extends AbstractPrimitiveType<List>
         decoder.register(this);
     }
 
+    @Override
     public Class<List> getTypeClass()
     {
         return List.class;
     }
 
+    @Override
     public ListEncoding getEncoding(final List val)
     {
         int calculatedSize = calculateSize(val, _encoder);
@@ -85,11 +87,13 @@ public class ListType extends AbstractPrimitiveType<List>
         return len;
     }
 
+    @Override
     public ListEncoding getCanonicalEncoding()
     {
         return _listEncoding;
     }
 
+    @Override
     public Collection<ListEncoding> getAllEncodings()
     {
         return Arrays.asList(_zeroListEncoding, _shortListEncoding, _listEncoding);
@@ -111,6 +115,7 @@ public class ListType extends AbstractPrimitiveType<List>
         @Override
         protected void writeEncodedValue(final List val)
         {
+            getEncoder().getBuffer().ensureRemaining(getSizeBytes() + getEncodedValueSize(val));
             getEncoder().writeRaw(val.size());
 
             final int count = val.size();
@@ -137,16 +142,19 @@ public class ListType extends AbstractPrimitiveType<List>
             return EncodingCodes.LIST32;
         }
 
+        @Override
         public ListType getType()
         {
             return ListType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<List> encoding)
         {
             return (getType() == encoding.getType());
         }
 
+        @Override
         public List readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -224,6 +232,7 @@ public class ListType extends AbstractPrimitiveType<List>
             return list;
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -232,6 +241,7 @@ public class ListType extends AbstractPrimitiveType<List>
             buffer.position(buffer.position() + size);
         }
 
+        @Override
         public void setValue(final List value, final int length)
         {
             _value = value;
@@ -255,6 +265,7 @@ public class ListType extends AbstractPrimitiveType<List>
         @Override
         protected void writeEncodedValue(final List val)
         {
+            getEncoder().getBuffer().ensureRemaining(getSizeBytes() + getEncodedValueSize(val));
             getEncoder().writeRaw((byte)val.size());
 
             final int count = val.size();
@@ -281,16 +292,19 @@ public class ListType extends AbstractPrimitiveType<List>
             return EncodingCodes.LIST8;
         }
 
+        @Override
         public ListType getType()
         {
             return ListType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<List> encoder)
         {
             return encoder == this;
         }
 
+        @Override
         public List readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -363,6 +377,7 @@ public class ListType extends AbstractPrimitiveType<List>
             return list;
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -371,6 +386,7 @@ public class ListType extends AbstractPrimitiveType<List>
             buffer.position(buffer.position() + size);
         }
 
+        @Override
         public void setValue(final List value, final int length)
         {
             _value = value;
@@ -400,24 +416,29 @@ public class ListType extends AbstractPrimitiveType<List>
             return 0;
         }
 
+        @Override
         public ListType getType()
         {
            return ListType.this;
         }
 
+        @Override
         public void setValue(List value, int length)
         {
         }
 
+        @Override
         public void writeValue(final List val)
         {
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<List> encoder)
         {
             return encoder == this;
         }
 
+        @Override
         public List readValue()
         {
             return Collections.EMPTY_LIST;

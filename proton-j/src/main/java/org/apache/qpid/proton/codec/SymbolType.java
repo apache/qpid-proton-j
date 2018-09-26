@@ -20,13 +20,13 @@
  */
 package org.apache.qpid.proton.codec;
 
-import org.apache.qpid.proton.amqp.Symbol;
-
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.qpid.proton.amqp.Symbol;
 
 public class SymbolType extends AbstractPrimitiveType<Symbol>
 {
@@ -69,6 +69,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         decoder.register(this);
     }
 
+    @Override
     public Class<Symbol> getTypeClass()
     {
         return Symbol.class;
@@ -78,28 +79,35 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
     {
         if (symbol.length() <= 255)
         {
+            // Reserve size of body + type encoding and single byte size
+            encoder.getBuffer().ensureRemaining(2 + symbol.length());
             encoder.writeRaw(EncodingCodes.SYM8);
             encoder.writeRaw((byte) symbol.length());
             symbol.writeTo(encoder.getBuffer());
         }
         else
         {
+            // Reserve size of body + type encoding and four byte size
+            encoder.getBuffer().ensureRemaining(5 + symbol.length());
             encoder.writeRaw(EncodingCodes.SYM32);
             encoder.writeRaw(symbol.length());
             symbol.writeTo(encoder.getBuffer());
         }
     }
 
+    @Override
     public SymbolEncoding getEncoding(final Symbol val)
     {
         return val.length() <= 255 ? _shortSymbolEncoding : _symbolEncoding;
     }
 
+    @Override
     public SymbolEncoding getCanonicalEncoding()
     {
         return _symbolEncoding;
     }
 
+    @Override
     public Collection<SymbolEncoding> getAllEncodings()
     {
         return Arrays.asList(_shortSymbolEncoding, _symbolEncoding);
@@ -118,6 +126,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         @Override
         protected void writeEncodedValue(final Symbol val)
         {
+            getEncoder().getBuffer().ensureRemaining(getEncodedValueSize(val));
             val.writeTo(getEncoder().getBuffer());
         }
 
@@ -127,23 +136,25 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
             return val.length();
         }
 
-
         @Override
         public byte getEncodingCode()
         {
             return EncodingCodes.SYM32;
         }
 
+        @Override
         public SymbolType getType()
         {
             return SymbolType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<Symbol> encoding)
         {
             return (getType() == encoding.getType());
         }
 
+        @Override
         public Symbol readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -151,6 +162,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
             return decoder.readRaw(_symbolCreator, size);
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -173,6 +185,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         @Override
         protected void writeEncodedValue(final Symbol val)
         {
+            getEncoder().getBuffer().ensureRemaining(getEncodedValueSize(val));
             val.writeTo(getEncoder().getBuffer());
         }
 
@@ -182,23 +195,25 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
             return val.length();
         }
 
-
         @Override
         public byte getEncodingCode()
         {
             return EncodingCodes.SYM8;
         }
 
+        @Override
         public SymbolType getType()
         {
             return SymbolType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<Symbol> encoder)
         {
             return encoder == this;
         }
 
+        @Override
         public Symbol readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -206,6 +221,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
             return decoder.readRaw(_symbolCreator, size);
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();

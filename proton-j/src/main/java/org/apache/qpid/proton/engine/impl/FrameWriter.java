@@ -20,6 +20,9 @@
  */
 package org.apache.qpid.proton.engine.impl;
 
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.transport.EmptyFrame;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
@@ -27,9 +30,6 @@ import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.framing.TransportFrame;
-
-import java.nio.BufferOverflowException;
-import java.nio.ByteBuffer;
 
 /**
  * FrameWriter
@@ -128,7 +128,7 @@ class FrameWriter
                     break;
                 }
             }
-            catch (BufferOverflowException e)
+            catch (BufferOverflowException | IndexOutOfBoundsException e)
             {
                 grow();
             }

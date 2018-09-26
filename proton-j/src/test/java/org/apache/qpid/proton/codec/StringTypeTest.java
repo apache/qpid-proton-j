@@ -23,6 +23,7 @@ package org.apache.qpid.proton.codec;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.lang.Character.UnicodeBlock;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -35,6 +36,7 @@ import java.util.Set;
 
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Test the encoding and decoding of {@link StringType} values.
@@ -246,6 +248,36 @@ public class StringTypeTest
                 }
             }
         };
+    }
+
+    @Test
+    public void testEncodeSmallStringReservesSpaceForPayload() throws IOException {
+        doTestEncodeStringTypeReservation(32);
+    }
+
+    @Test
+    public void testEncodeLargeStringReservesSpaceForPayload() throws IOException {
+        doTestEncodeStringTypeReservation(512);
+    }
+
+    private void doTestEncodeStringTypeReservation(int size) throws IOException {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        StringBuilder builder = new StringBuilder(size);
+        for (int i = 0; i < size; ++i) {
+            builder.append(i);
+        }
+
+        WritableBuffer writable = new WritableBuffer.ByteBufferWrapper(ByteBuffer.allocate(2048));
+        WritableBuffer spy = Mockito.spy(writable);
+
+        encoder.setByteBuffer(spy);
+        encoder.writeString(builder.toString());
+
+        // Check that the StringType tries to reserve space, actual encoding size not computed here.
+        Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
     }
 
     @Test

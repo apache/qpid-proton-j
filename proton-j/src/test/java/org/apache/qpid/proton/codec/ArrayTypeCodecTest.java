@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import org.apache.qpid.proton.amqp.Symbol;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Test decoding of AMQP Array types
@@ -273,5 +274,31 @@ public class ArrayTypeCodecTest extends CodecTestSupport {
         for (int i = 0; i < map.length; ++i) {
             assertEquals(source[i], map[i]);
         }
+    }
+
+    @Test
+    public void testEncodeSmallBooleanArrayReservesSpaceForPayload() throws IOException {
+        doTestEncodeBooleanArrayTypeReservation(SMALL_ARRAY_SIZE);
+    }
+
+    @Test
+    public void testEncodeLargeBooleanArrayReservesSpaceForPayload() throws IOException {
+        doTestEncodeBooleanArrayTypeReservation(LARGE_ARRAY_SIZE);
+    }
+
+    private void doTestEncodeBooleanArrayTypeReservation(int size) throws IOException {
+        boolean[] source = new boolean[size];
+        for (int i = 0; i < size; ++i) {
+            source[i] = i % 2 == 0;
+        }
+
+        WritableBuffer writable = new WritableBuffer.ByteBufferWrapper(this.buffer);
+        WritableBuffer spy = Mockito.spy(writable);
+
+        encoder.setByteBuffer(spy);
+        encoder.writeArray(source);
+
+        // Check that the ArrayType tries to reserve space, actual encoding size not computed here.
+        Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
     }
 }

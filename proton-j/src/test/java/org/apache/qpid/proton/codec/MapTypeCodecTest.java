@@ -21,11 +21,13 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.qpid.proton.amqp.Binary;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 public class MapTypeCodecTest extends CodecTestSupport {
 
@@ -94,5 +96,31 @@ public class MapTypeCodecTest extends CodecTestSupport {
 
             assertEquals(map.size(), resultMap.size());
         }
+    }
+
+    @Test
+    public void testEncodeSmallMapReservesSpaceForPayload() throws IOException {
+        doTestEncodeMapTypeReservation(SMALL_SIZE);
+    }
+
+    @Test
+    public void doTestEncodeMapTypeReservation() throws IOException {
+        doTestEncodeMapTypeReservation(LARGE_SIZE);
+    }
+
+    private void doTestEncodeMapTypeReservation(int size) throws IOException {
+        Map<Integer, Integer> map = new HashMap<>();
+        for (int i = 0; i < size; ++i) {
+            map.put(i, i);
+        }
+
+        WritableBuffer writable = new WritableBuffer.ByteBufferWrapper(this.buffer);
+        WritableBuffer spy = Mockito.spy(writable);
+
+        encoder.setByteBuffer(spy);
+        encoder.writeMap(map);
+
+        // Check that the MapType tries to reserve space, actual encoding size not computed here.
+        Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
     }
 }

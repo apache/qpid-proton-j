@@ -84,11 +84,13 @@ public class ArrayType implements PrimitiveType<Object[]>
         decoder.register(this);
     }
 
+    @Override
     public Class<Object[]> getTypeClass()
     {
         return Object[].class;
     }
 
+    @Override
     public ArrayEncoding getEncoding(final Object[] val)
     {
         TypeEncoding<?> encoder = calculateEncoder(val,_encoder);
@@ -102,7 +104,6 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private static TypeEncoding<?> calculateEncoder(final Object[] val, final EncoderImpl encoder)
     {
-
         if(val.length == 0)
         {
             AMQPType underlyingType = encoder.getTypeFromClass(val.getClass().getComponentType());
@@ -269,7 +270,6 @@ public class ArrayType implements PrimitiveType<Object[]>
 
                     size +=  componentEncoding.getConstructorSize()
                                 + componentEncoding.getValueSize(null) * componentCount;
-
                 }
                 else
                 {
@@ -281,16 +281,19 @@ public class ArrayType implements PrimitiveType<Object[]>
         return size;
     }
 
+    @Override
     public ArrayEncoding getCanonicalEncoding()
     {
         return _arrayEncoding;
     }
 
+    @Override
     public Collection<ArrayEncoding> getAllEncodings()
     {
         return Arrays.asList(_shortArrayEncoding, _arrayEncoding);
     }
 
+    @Override
     public void write(final Object[] val)
     {
         ArrayEncoding encoding = getEncoding(val);
@@ -444,25 +447,38 @@ public class ArrayType implements PrimitiveType<Object[]>
             super(encoder, decoder);
         }
 
+        @Override
+        protected void writeSize(final Object[] val)
+        {
+            int encodedValueSize = getEncodedValueSize(val);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
+        }
+
+        @Override
         public void writeValue(final boolean[] a)
         {
             BooleanType.BooleanEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(boolean b : a)
             {
                 underlyingEncoder.writeValue(b);
             }
-
         }
 
+        @Override
         public void writeValue(final byte[] a)
         {
             ByteType.ByteEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(byte b : a)
@@ -471,11 +487,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final short[] a)
         {
             ShortType.ShortEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(short b : a)
@@ -484,12 +503,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final int[] a)
         {
-
             IntegerType.IntegerEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(int b : a)
@@ -498,12 +519,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final long[] a)
         {
-
             LongType.LongEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(long b : a)
@@ -512,12 +535,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final float[] a)
         {
-
             FloatType.FloatEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(float b : a)
@@ -526,12 +551,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final double[] a)
         {
-
             DoubleType.DoubleEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(double b : a)
@@ -540,12 +567,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final char[] a)
         {
-
             CharacterType.CharacterEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw(4 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 4 + underlyingEncoder.getConstructorSize() +
+                                   a.length * underlyingEncoder.getValueSize(null);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw(a.length);
             underlyingEncoder.writeConstructor();
             for(char b : a)
@@ -554,6 +583,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void setValue(final Object[] val, final TypeEncoding encoder, final int size)
         {
             _val = val;
@@ -602,16 +632,19 @@ public class ArrayType implements PrimitiveType<Object[]>
             return EncodingCodes.ARRAY32;
         }
 
+        @Override
         public ArrayType getType()
         {
             return ArrayType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<Object[]> encoding)
         {
             return getType() == encoding.getType();
         }
 
+        @Override
         public Object[] readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -620,6 +653,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             return decodeArray(decoder, count);
         }
 
+        @Override
         public Object readValueArray()
         {
             DecoderImpl decoder = getDecoder();
@@ -628,6 +662,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             return decodeArrayAsObject(decoder, count);
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -637,13 +672,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         }
     }
 
-
-
     private class ShortArrayEncoding
             extends SmallFloatingSizePrimitiveTypeEncoding<Object[]>
             implements ArrayEncoding
     {
-
         private Object[] _val;
         private TypeEncoding _underlyingEncoder;
         private int _size;
@@ -653,26 +685,38 @@ public class ArrayType implements PrimitiveType<Object[]>
             super(encoder, decoder);
         }
 
+        @Override
+        protected void writeSize(final Object[] val)
+        {
+            int encodedValueSize = getEncodedValueSize(val);
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw((byte) encodedValueSize);
+        }
+
+        @Override
         public void writeValue(final boolean[] a)
         {
             BooleanType.BooleanEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(boolean b : a)
             {
                 underlyingEncoder.writeValue(b);
             }
-
         }
 
+        @Override
         public void writeValue(final byte[] a)
         {
             ByteType.ByteEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
-            getEncoder().writeRaw((byte)a.length);
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             underlyingEncoder.writeConstructor();
             for(byte b : a)
             {
@@ -680,11 +724,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final short[] a)
         {
             ShortType.ShortEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(short b : a)
@@ -693,12 +740,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final int[] a)
         {
-
             IntegerType.IntegerEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(int b : a)
@@ -707,12 +756,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final long[] a)
         {
-
             LongType.LongEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(long b : a)
@@ -721,12 +772,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final float[] a)
         {
-
             FloatType.FloatEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(float b : a)
@@ -735,12 +788,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final double[] a)
         {
-
             DoubleType.DoubleEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(double b : a)
@@ -749,12 +804,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void writeValue(final char[] a)
         {
-
             CharacterType.CharacterEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            getEncoder().writeRaw((byte)(1 + underlyingEncoder.getConstructorSize()
-                                  + a.length*underlyingEncoder.getValueSize(null)));
+            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null));
+            getEncoder().getBuffer().ensureRemaining(encodedValueSize);
+            getEncoder().writeRaw(encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(char b : a)
@@ -763,6 +820,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             }
         }
 
+        @Override
         public void setValue(final Object[] val, final TypeEncoding encoder, final int size)
         {
             _val = val;
@@ -840,7 +898,6 @@ public class ArrayType implements PrimitiveType<Object[]>
                     {
                         throw new IllegalArgumentException("Cannot encode arrays of type " + componentType.getName());
                     }
-
                 }
                 else
                 {
@@ -867,16 +924,19 @@ public class ArrayType implements PrimitiveType<Object[]>
             return EncodingCodes.ARRAY8;
         }
 
+        @Override
         public ArrayType getType()
         {
             return ArrayType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<Object[]> encoding)
         {
             return getType() == encoding.getType();
         }
 
+        @Override
         public Object[] readValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -885,6 +945,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             return decodeArray(decoder, count);
         }
 
+        @Override
         public Object readValueArray()
         {
             DecoderImpl decoder = getDecoder();
@@ -893,6 +954,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             return decodeArrayAsObject(decoder, count);
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -922,12 +984,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         }
     }
 
-
     private ByteType.ByteEncoding getUnderlyingEncoding(final byte[] a)
     {
         return _byteType.getCanonicalEncoding();
     }
-
 
     private ShortType.ShortEncoding getUnderlyingEncoding(final short[] a)
     {
@@ -958,18 +1018,15 @@ public class ArrayType implements PrimitiveType<Object[]>
         }
     }
 
-
     private FloatType.FloatEncoding getUnderlyingEncoding(final float[] a)
     {
         return _floatType.getCanonicalEncoding();
     }
 
-
     private DoubleType.DoubleEncoding getUnderlyingEncoding(final double[] a)
     {
         return _doubleType.getCanonicalEncoding();
     }
-
 
     private CharacterType.CharacterEncoding getUnderlyingEncoding(final char[] a)
     {
@@ -1058,13 +1115,11 @@ public class ArrayType implements PrimitiveType<Object[]>
             {
                 throw new ClassCastException("Unexpected class " + constructor.getClass().getName());
             }
-
         }
         else
         {
             return decodeNonPrimitive(decoder, constructor, count);
         }
-
     }
 
     private static boolean[] decodeBooleanArray(BooleanType.BooleanEncoding constructor, final int count)
@@ -1115,7 +1170,6 @@ public class ArrayType implements PrimitiveType<Object[]>
         return array;
     }
 
-
     private static long[] decodeLongArray(LongType.LongEncoding constructor, final int count)
     {
         long[] array = new long[count];
@@ -1151,9 +1205,5 @@ public class ArrayType implements PrimitiveType<Object[]>
 
         return array;
     }
-
-
-
-
 }
 

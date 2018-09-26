@@ -153,6 +153,7 @@ public class MapType extends AbstractPrimitiveType<Map>
         @Override
         protected void writeEncodedValue(final Map map)
         {
+            getEncoder().getBuffer().ensureRemaining(getSizeBytes() + getEncodedValueSize(map));
             getEncoder().writeRaw(2 * map.size());
 
             Iterator<Map.Entry> iter = map.entrySet().iterator();
@@ -260,6 +261,7 @@ public class MapType extends AbstractPrimitiveType<Map>
             return map;
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -292,6 +294,7 @@ public class MapType extends AbstractPrimitiveType<Map>
         @Override
         protected void writeEncodedValue(final Map map)
         {
+            getEncoder().getBuffer().ensureRemaining(getSizeBytes() + getEncodedValueSize(map));
             getEncoder().writeRaw((byte)(2 * map.size()));
 
             Iterator<Map.Entry> iter = map.entrySet().iterator();
@@ -394,6 +397,7 @@ public class MapType extends AbstractPrimitiveType<Map>
             return map;
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();

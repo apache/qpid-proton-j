@@ -41,6 +41,10 @@ public interface WritableBuffer {
 
     boolean hasRemaining();
 
+    default void ensureRemaining(int requiredRemaining) {
+        // No-op to allow for drop in updates
+    }
+
     int remaining();
 
     int position();
@@ -132,6 +136,19 @@ public interface WritableBuffer {
         @Override
         public boolean hasRemaining() {
             return _buf.hasRemaining();
+        }
+
+        @Override
+        public void ensureRemaining(int remaining) {
+            if (remaining < 0) {
+                throw new IllegalArgumentException("Required remaining bytes cannot be negative");
+            }
+
+            if (_buf.remaining() < remaining) {
+                throw new IndexOutOfBoundsException(String.format(
+                    "Requested min remaining bytes(%d) exceeds remaining(%d) in underlying ByteBuffer: %s",
+                    remaining, _buf.remaining(), _buf));
+            }
         }
 
         @Override

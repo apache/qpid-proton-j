@@ -27,6 +27,7 @@ import java.util.Map;
 
 import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 public class ApplicationPropertiesTypeTest extends CodecTestSupport {
 
@@ -85,5 +86,27 @@ public class ApplicationPropertiesTypeTest extends CodecTestSupport {
             assertEquals(currentTime + 100, decoded.getValue().get("long-2"));
             assertEquals(new Date(currentTime + 100), decoded.getValue().get("date-2"));
         }
+    }
+
+    @Test
+    public void testEncodeApplicationPropertiesReservesSpaceForPayload() throws IOException {
+        final int ENTRIES = 8;
+
+        Map<String, Object> propertiesMap = new LinkedHashMap<>();
+        ApplicationProperties properties = new ApplicationProperties(propertiesMap);
+
+        for (int i = 0; i < ENTRIES; ++i) {
+            properties.getValue().put(String.valueOf(i), i);
+        }
+
+        WritableBuffer writable = new WritableBuffer.ByteBufferWrapper(this.buffer);
+        WritableBuffer spy = Mockito.spy(writable);
+
+        encoder.setByteBuffer(spy);
+        encoder.writeObject(properties);
+
+        // Check that the Type tries to reserve space, actual encoding size not computed here.
+        // Each key should also try and reserve space for the String data
+        Mockito.verify(spy, Mockito.times(ENTRIES + 1)).ensureRemaining(Mockito.anyInt());
     }
 }

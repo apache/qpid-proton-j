@@ -20,10 +20,10 @@
  */
 package org.apache.qpid.proton.codec;
 
-import org.apache.qpid.proton.amqp.Binary;
-
 import java.util.Arrays;
 import java.util.Collection;
+
+import org.apache.qpid.proton.amqp.Binary;
 
 public class BinaryType extends AbstractPrimitiveType<Binary>
 {
@@ -43,21 +43,25 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         decoder.register(this);
     }
 
+    @Override
     public Class<Binary> getTypeClass()
     {
         return Binary.class;
     }
 
+    @Override
     public BinaryEncoding getEncoding(final Binary val)
     {
         return val.getLength() <= 255 ? _shortBinaryEncoding : _binaryEncoding;
     }
 
+    @Override
     public BinaryEncoding getCanonicalEncoding()
     {
         return _binaryEncoding;
     }
 
+    @Override
     public Collection<BinaryEncoding> getAllEncodings()
     {
         return Arrays.asList(_shortBinaryEncoding, _binaryEncoding);
@@ -67,12 +71,16 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
     {
         if (binary.getLength() <= 255)
         {
+            // Reserve size of body + type encoding and single byte size
+            encoder.getBuffer().ensureRemaining(2 + binary.getLength());
             encoder.writeRaw(EncodingCodes.VBIN8);
             encoder.writeRaw((byte) binary.getLength());
             encoder.writeRaw(binary.getArray(), binary.getArrayOffset(), binary.getLength());
         }
         else
         {
+            // Reserve size of body + type encoding and four byte size
+            encoder.getBuffer().ensureRemaining(5 + binary.getLength());
             encoder.writeRaw(EncodingCodes.VBIN32);
             encoder.writeRaw(binary.getLength());
             encoder.writeRaw(binary.getArray(), binary.getArrayOffset(), binary.getLength());
@@ -92,6 +100,7 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         @Override
         protected void writeEncodedValue(final Binary val)
         {
+            getEncoder().getBuffer().ensureRemaining(val.getLength());
             getEncoder().writeRaw(val.getArray(), val.getArrayOffset(), val.getLength());
         }
 
@@ -101,23 +110,25 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
             return val.getLength();
         }
 
-
         @Override
         public byte getEncodingCode()
         {
             return EncodingCodes.VBIN32;
         }
 
+        @Override
         public BinaryType getType()
         {
             return BinaryType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<Binary> encoding)
         {
             return (getType() == encoding.getType());
         }
 
+        @Override
         public Binary readValue()
         {
             final DecoderImpl decoder = getDecoder();
@@ -131,6 +142,7 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
             return new Binary(data);
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
@@ -153,6 +165,7 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         @Override
         protected void writeEncodedValue(final Binary val)
         {
+            getEncoder().getBuffer().ensureRemaining(val.getLength());
             getEncoder().writeRaw(val.getArray(), val.getArrayOffset(), val.getLength());
         }
 
@@ -162,23 +175,25 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
             return val.getLength();
         }
 
-
         @Override
         public byte getEncodingCode()
         {
             return EncodingCodes.VBIN8;
         }
 
+        @Override
         public BinaryType getType()
         {
             return BinaryType.this;
         }
 
+        @Override
         public boolean encodesSuperset(final TypeEncoding<Binary> encoder)
         {
             return encoder == this;
         }
 
+        @Override
         public Binary readValue()
         {
             int size = ((int)getDecoder().readRawByte()) & 0xff;
@@ -187,6 +202,7 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
             return new Binary(data);
         }
 
+        @Override
         public void skipValue()
         {
             DecoderImpl decoder = getDecoder();
