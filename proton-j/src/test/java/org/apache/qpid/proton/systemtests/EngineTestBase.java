@@ -82,6 +82,31 @@ public abstract class EngineTestBase
         getServer().transport.outputConsumed();
     }
 
+    protected void pumpAllServerPendingToClient()
+    {
+        while (getServer().transport.pending() != 0)
+        {
+            ByteBuffer serverBuffer = getServer().transport.getOutputBuffer();
+
+            if (shouldLogPumpedBytes())
+            {
+                getTestLoggingHelper().prettyPrint("          <<<" + TestLoggingHelper.SERVER_PREFIX + " ", serverBuffer);
+            }
+            assertTrue("Server expected to produce some output", serverBuffer.hasRemaining());
+
+            ByteBuffer clientBuffer = getClient().transport.getInputBuffer();
+
+            clientBuffer.put(serverBuffer);
+
+            assertEquals("Client expected to consume all server's output", 0, serverBuffer.remaining());
+
+            getClient().transport.processInput().checkIsOk();
+            getServer().transport.outputConsumed();
+        }
+
+        assertEquals("Client expected to consume all server's pending work", 0, getServer().transport.pending());
+    }
+
     protected void pumpClientToServer()
     {
         ByteBuffer clientBuffer = getClient().transport.getOutputBuffer();

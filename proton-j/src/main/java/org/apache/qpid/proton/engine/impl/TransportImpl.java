@@ -167,7 +167,6 @@ public class TransportImpl extends EndpointImpl
         _maxFrameSize = maxFrameSize;
         _frameWriter = new FrameWriter(_encoder, _remoteMaxFrameSize,
                                        FrameWriter.AMQP_FRAME_TYPE,
-                                       _protocolTracer,
                                        this);
     }
 
@@ -1717,6 +1716,11 @@ public class TransportImpl extends EndpointImpl
             }
             System.out.println(msg.toString());
         }
+    }
+
+    boolean isFrameTracingEnabled()
+    {
+        return (_levels & TRACE_FRM) != 0 || _protocolTracer.get() != null;
     }
 
     boolean isTraceFramesEnabled()

@@ -29,6 +29,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.logging.Logger;
 
 import org.apache.qpid.proton.Proton;
@@ -70,13 +71,11 @@ public class DeliveryTest extends EngineTestBase
         getServer().connection = Proton.connection();
         getServer().transport.bind(getServer().connection);
 
-
         LOGGER.fine(bold("======== About to open connections"));
         getClient().connection.open();
         getServer().connection.open();
 
         doOutputInputCycle();
-
 
         LOGGER.fine(bold("======== About to open sessions"));
         getClient().session = getClient().connection.session();
@@ -92,7 +91,6 @@ public class DeliveryTest extends EngineTestBase
 
         pumpServerToClient();
         assertEndpointState(getClient().session, ACTIVE, ACTIVE);
-
 
         LOGGER.fine(bold("======== About to create reciever"));
 
@@ -115,7 +113,6 @@ public class DeliveryTest extends EngineTestBase
         assertEndpointState(getClient().receiver, ACTIVE, UNINITIALIZED);
 
         pumpClientToServer();
-
 
         LOGGER.fine(bold("======== About to set up implicitly created sender"));
 
@@ -141,7 +138,6 @@ public class DeliveryTest extends EngineTestBase
 
         pumpClientToServer();
 
-
         LOGGER.fine(bold("======== About to create messages and send to the client"));
 
         sendMessageToClient("delivery1", "Msg1", null); // Don't set it, so it should be defaulted
@@ -165,6 +161,130 @@ public class DeliveryTest extends EngineTestBase
         assertEquals("Unexpected message format", UnsignedInteger.MAX_VALUE.intValue(), clientDelivery4.getMessageFormat());
     }
 
+    @Test
+    public void testSendReceiveLargeMessage() throws Exception
+    {
+        doTestSendReceiveLargeMessage(-1, -1);
+    }
+
+    @Test
+    public void testSendReceiveLargeMessageWithFrameSizeLimits() throws Exception
+    {
+        doTestSendReceiveLargeMessage(128 * 1024, 128 * 1024);
+    }
+
+    private void doTestSendReceiveLargeMessage(int maxFrameSize, int maxOutboundFrameSize) throws Exception
+    {
+        LOGGER.fine(bold("======== About to create transports"));
+
+        getClient().transport = Proton.transport();
+        if (maxFrameSize > 0) {
+            getClient().transport.setMaxFrameSize(maxFrameSize);
+        }
+        if (maxOutboundFrameSize > 0) {
+            getClient().transport.setOutboundFrameSizeLimit(maxOutboundFrameSize);
+        }
+        ProtocolTracerEnabler.setProtocolTracer(getClient().transport, TestLoggingHelper.CLIENT_PREFIX);
+
+        getServer().transport = Proton.transport();
+        if (maxFrameSize > 0) {
+            getServer().transport.setMaxFrameSize(maxFrameSize);
+        }
+        if (maxOutboundFrameSize > 0) {
+            getServer().transport.setOutboundFrameSizeLimit(maxOutboundFrameSize);
+        }
+        ProtocolTracerEnabler.setProtocolTracer(getServer().transport, "            " + TestLoggingHelper.SERVER_PREFIX);
+
+        doOutputInputCycle();
+
+        getClient().connection = Proton.connection();
+        getClient().transport.bind(getClient().connection);
+
+        getServer().connection = Proton.connection();
+        getServer().transport.bind(getServer().connection);
+
+        LOGGER.fine(bold("======== About to open connections"));
+        getClient().connection.open();
+        getServer().connection.open();
+
+        doOutputInputCycle();
+
+        LOGGER.fine(bold("======== About to open sessions"));
+        getClient().session = getClient().connection.session();
+        getClient().session.open();
+
+        pumpClientToServer();
+
+        getServer().session = getServer().connection.sessionHead(of(UNINITIALIZED), of(ACTIVE));
+        assertEndpointState(getServer().session, UNINITIALIZED, ACTIVE);
+
+        getServer().session.open();
+        assertEndpointState(getServer().session, ACTIVE, ACTIVE);
+
+        pumpServerToClient();
+        assertEndpointState(getClient().session, ACTIVE, ACTIVE);
+
+        LOGGER.fine(bold("======== About to create reciever"));
+
+        getClient().source = new Source();
+        getClient().source.setAddress(_sourceAddress);
+
+        getClient().target = new Target();
+        getClient().target.setAddress(null);
+
+        getClient().receiver = getClient().session.receiver("link1");
+        getClient().receiver.setTarget(getClient().target);
+        getClient().receiver.setSource(getClient().source);
+
+        getClient().receiver.setReceiverSettleMode(ReceiverSettleMode.FIRST);
+        getClient().receiver.setSenderSettleMode(SenderSettleMode.UNSETTLED);
+
+        assertEndpointState(getClient().receiver, UNINITIALIZED, UNINITIALIZED);
+
+        getClient().receiver.open();
+        assertEndpointState(getClient().receiver, ACTIVE, UNINITIALIZED);
+
+        pumpClientToServer();
+
+        LOGGER.fine(bold("======== About to set up implicitly created sender"));
+
+        getServer().sender = (Sender) getServer().connection.linkHead(of(UNINITIALIZED), of(ACTIVE));
+
+        getServer().sender.setReceiverSettleMode(getServer().sender.getRemoteReceiverSettleMode());
+        getServer().sender.setSenderSettleMode(getServer().sender.getRemoteSenderSettleMode());
+
+        org.apache.qpid.proton.amqp.transport.Source serverRemoteSource = getServer().sender.getRemoteSource();
+        getServer().sender.setSource(serverRemoteSource);
+
+        assertEndpointState(getServer().sender, UNINITIALIZED, ACTIVE);
+        getServer().sender.open();
+
+        assertEndpointState(getServer().sender, ACTIVE, ACTIVE);
+
+        pumpServerToClient();
+
+        assertEndpointState(getClient().receiver, ACTIVE, ACTIVE);
+
+        getClient().receiver.flow(1);
+
+        pumpClientToServer();
+
+        String messageContent = createMessageContent(256 * 1024);
+
+        LOGGER.fine(bold("======== About to create messages and send to the client"));
+
+        sendMessageToClient("delivery1", messageContent, 0); // Explicitly set it to the default
+
+        pumpAllServerPendingToClient();
+
+        LOGGER.fine(bold("======== About to process the messages on the client"));
+
+        Delivery clientDelivery = receiveMessageFromServer("delivery1", messageContent);
+
+        // Verify the message format is as expected
+        assertEquals("Unexpected message format", 0, clientDelivery.getMessageFormat());
+    }
+
     private Delivery receiveMessageFromServer(String deliveryTag, String messageContent)
     {
         Delivery delivery = getClient().connection.getWorkHead();
@@ -179,6 +299,7 @@ public class DeliveryTest extends EngineTestBase
         assertFalse(delivery.isPartial());
         assertTrue(delivery.isReadable());
 
+        final int BUFFER_SIZE = messageContent.length() * 4;
         byte[] received = new byte[BUFFER_SIZE];
         int len = getClient().receiver.recv(received, 0, BUFFER_SIZE);
 
@@ -196,6 +317,17 @@ public class DeliveryTest extends EngineTestBase
         return delivery;
     }
 
+    private static String createMessageContent(int length) {
+        Random rand = new Random(System.currentTimeMillis());
+
+        byte[] payload = new byte[length];
+        for (int i = 0; i < length; i++) {
+            payload[i] = (byte) (64 + 1 + rand.nextInt(9));
+        }
+
+        return new String(payload, StandardCharsets.UTF_8);
+    }
+
     private Delivery sendMessageToClient(String deliveryTag, String messageContent, Integer messageFormat)
     {
         byte[] tag = deliveryTag.getBytes(StandardCharsets.UTF_8);
@@ -203,10 +335,11 @@ public class DeliveryTest extends EngineTestBase
         Message m = Proton.message();
         m.setBody(new AmqpValue(messageContent));
 
+        final int BUFFER_SIZE = messageContent.length() * 4;
         byte[] encoded = new byte[BUFFER_SIZE];
         int len = m.encode(encoded, 0, BUFFER_SIZE);
 
-        assertTrue("given array was too small", len < BUFFER_SIZE);
+        assertTrue("given array was too small", len <= BUFFER_SIZE);
 
         Delivery serverDelivery = getServer().sender.delivery(tag);
 

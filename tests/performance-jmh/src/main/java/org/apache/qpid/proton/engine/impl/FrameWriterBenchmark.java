@@ -27,8 +27,6 @@ import org.apache.qpid.proton.codec.AMQPDefinedTypes;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.ReadableBuffer;
-import org.apache.qpid.proton.engine.impl.FrameWriter;
-import org.apache.qpid.proton.engine.impl.TransportImpl;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Measurement;
@@ -90,7 +88,7 @@ public class FrameWriterBenchmark {
         AMQPDefinedTypes.registerAllTypes(decoder, encoder);
 
         transport = (TransportImpl) Proton.transport();
-        frameWriter = new FrameWriter(encoder, 16 * 1024, (byte) 0, null, transport);
+        frameWriter = new FrameWriter(encoder, 16 * 1024, (byte) 0, transport);
 
         transfer = new Transfer();
         transfer.setDeliveryId(UnsignedInteger.ONE);

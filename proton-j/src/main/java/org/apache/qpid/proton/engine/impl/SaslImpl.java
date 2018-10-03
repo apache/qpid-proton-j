@@ -99,7 +99,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
 
         AMQPDefinedTypes.registerAllTypes(_decoder,_encoder);
         _frameParser = new SaslFrameParser(this, _decoder, maxFrameSize);
-        _frameWriter = new FrameWriter(_encoder, maxFrameSize, FrameWriter.SASL_FRAME_TYPE, null, _transport);
+        _frameWriter = new FrameWriter(_encoder, maxFrameSize, FrameWriter.SASL_FRAME_TYPE, _transport);
     }
 
     void fail() {
@@ -498,10 +498,12 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         _allowSkip = allowSkip;
     }
 
+    @Override
     public TransportWrapper wrap(final TransportInput input, final TransportOutput output)
     {
         return new SaslSniffer(new SwitchingSaslTransportWrapper(input, output),
                                new PlainTransportWrapper(output, input)) {
+            @Override
             protected boolean isDeterminationMade() {
                 if (_role == Role.SERVER && _allowSkip) {
                     return super.isDeterminationMade();

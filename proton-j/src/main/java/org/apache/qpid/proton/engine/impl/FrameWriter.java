@@ -20,7 +20,6 @@
  */
 package org.apache.qpid.proton.engine.impl;
 
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.Binary;
@@ -28,225 +27,153 @@ import org.apache.qpid.proton.amqp.transport.EmptyFrame;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.ReadableBuffer;
-import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.framing.TransportFrame;
 
 /**
- * FrameWriter
- *
+ * Writes Frames to an internal buffer for later processing by the transport.
  */
-class FrameWriter
-{
+class FrameWriter {
+
+    static final int DEFAULT_FRAME_BUFFER_FULL_MARK = 64 * 1024;
+    static final int FRAME_HEADER_SIZE = 8;
 
     static final byte AMQP_FRAME_TYPE = 0;
-    static final byte SASL_FRAME_TYPE = (byte) 1;
+    static final byte SASL_FRAME_TYPE = 1;
 
-    private EncoderImpl _encoder;
-    private ByteBuffer _bbuf;
-    private WritableBuffer _buffer;
-    private int _maxFrameSize;
-    private byte _frameType;
-    final private Ref<ProtocolTracer> _protocolTracer;
-    private TransportImpl _transport;
+    private final TransportImpl transport;
+    private final EncoderImpl encoder;
+    private final FrameWriterBuffer frameBuffer = new FrameWriterBuffer();
 
-    private int _frameStart = 0;
-    private int _payloadStart;
-    private int _performativeSize;
-    private long _framesOutput = 0;
+    // Configuration of this Frame Writer
+    private int maxFrameSize;
+    private final byte frameType;
+    private int frameBufferMaxBytes = DEFAULT_FRAME_BUFFER_FULL_MARK;
 
-    FrameWriter(EncoderImpl encoder, int maxFrameSize, byte frameType,
-                Ref<ProtocolTracer> protocolTracer, TransportImpl transport)
-    {
-        _encoder = encoder;
-        _bbuf = ByteBuffer.allocate(1024);
-        _buffer = new WritableBuffer.ByteBufferWrapper(_bbuf);
-        _encoder.setByteBuffer(_buffer);
-        _maxFrameSize = maxFrameSize;
-        _frameType = frameType;
-        _protocolTracer = protocolTracer;
-        _transport = transport;
+    // State of current write operation, reset on start of each new write
+    private int frameStart;
+
+    // Frame Writer metrics
+    private long framesOutput;
+
+    FrameWriter(EncoderImpl encoder, int maxFrameSize, byte frameType, TransportImpl transport) {
+        this.encoder = encoder;
+        this.maxFrameSize = maxFrameSize;
+        this.frameType = frameType;
+        this.transport = transport;
+
+        encoder.setByteBuffer(frameBuffer);
     }
 
-    void setMaxFrameSize(int maxFrameSize)
-    {
-        _maxFrameSize = maxFrameSize;
+    boolean isFull() {
+        return frameBuffer.position() > frameBufferMaxBytes;
     }
 
-    private void grow()
-    {
-        grow(_bbuf.capacity());  // Double current capacity
+    int readBytes(ByteBuffer dst) {
+        return frameBuffer.transferTo(dst);
     }
 
-    private void grow(int amount)
-    {
-        ByteBuffer old = _bbuf;
-        _bbuf = ByteBuffer.allocate(old.capacity() + amount);
-        _buffer = new WritableBuffer.ByteBufferWrapper(_bbuf);
-        old.flip();
-        _bbuf.put(old);
-        _encoder.setByteBuffer(_buffer);
+    long getFramesOutput() {
+        return framesOutput;
     }
 
-    void writeHeader(byte[] header)
-    {
-        _buffer.put(header, 0, header.length);
+    void setMaxFrameSize(int maxFrameSize) {
+        this.maxFrameSize = maxFrameSize;
     }
 
-    private void startFrame()
-    {
-        _frameStart = _buffer.position();
+    void setFrameWriterMaxBytes(int maxBytes) {
+        this.frameBufferMaxBytes = maxBytes;
     }
 
-    private void writePerformative(Object frameBody, ReadableBuffer payload, Runnable onPayloadTooLarge)
-    {
-        while (_buffer.remaining() < 8) {
-            grow();
+    int getFrameWriterMaxBytes() {
+        return frameBufferMaxBytes;
+    }
+
+    void writeHeader(byte[] header) {
+        frameBuffer.put(header, 0, header.length);
+    }
+
+    void writeFrame(Object frameBody) {
+        writeFrame(0, frameBody, null, null);
+    }
+
+    void writeFrame(int channel, Object frameBody, ReadableBuffer payload, Runnable onPayloadTooLarge) {
+        frameStart = frameBuffer.position();
+
+        final int performativeSize = writePerformative(frameBody, payload, onPayloadTooLarge);
+        final int capacity = maxFrameSize > 0 ? maxFrameSize - performativeSize : Integer.MAX_VALUE;
+        final int payloadSize = Math.min(payload == null ? 0 : payload.remaining(), capacity);
+
+        if (transport.isFrameTracingEnabled()) {
+            logFrame(channel, frameBody, payload, payloadSize);
         }
 
-        while (true)
-        {
-            try
-            {
-                _buffer.position(_frameStart + 8);
-                if (frameBody != null) _encoder.writeObject(frameBody);
-
-                _payloadStart = _buffer.position();
-                _performativeSize = _payloadStart - _frameStart;
-
-                if (onPayloadTooLarge == null)
-                {
-                    break;
-                }
-
-                if (_maxFrameSize > 0 && payload != null && (payload.remaining() + _performativeSize) > _maxFrameSize)
-                {
-                    onPayloadTooLarge.run();
-                    onPayloadTooLarge = null;
-                }
-                else
-                {
-                    break;
-                }
-            }
-            catch (BufferOverflowException | IndexOutOfBoundsException e)
-            {
-                grow();
-            }
-        }
-    }
-
-    private void endFrame(int channel)
-    {
-        int frameSize = _buffer.position() - _frameStart;
-        int limit = _buffer.position();
-        _buffer.position(_frameStart);
-        _buffer.putInt(frameSize);
-        _buffer.put((byte) 2);
-        _buffer.put(_frameType);
-        _buffer.putShort((short) channel);
-        _buffer.position(limit);
-    }
-
-    void writeFrame(int channel, Object frameBody, ReadableBuffer payload,
-                    Runnable onPayloadTooLarge)
-    {
-        startFrame();
-
-        writePerformative(frameBody, payload, onPayloadTooLarge);
-
-        int capacity;
-        if (_maxFrameSize > 0) {
-            capacity = _maxFrameSize - _performativeSize;
-        } else {
-            capacity = Integer.MAX_VALUE;
-        }
-        int payloadSize = Math.min(payload == null ? 0 : payload.remaining(), capacity);
-
-        ProtocolTracer tracer = _protocolTracer == null ? null : _protocolTracer.get();
-        if (tracer != null || _transport.isTraceFramesEnabled())
-        {
-            logFrame(tracer, channel, frameBody, payload, payloadSize);
-        }
-
-        if(payloadSize > 0)
-        {
-            while (_buffer.remaining() < payloadSize)
-            {
-                grow(payloadSize - _buffer.remaining());
-            }
-
+        if (payloadSize > 0) {
             int oldLimit = payload.limit();
             payload.limit(payload.position() + payloadSize);
-            _buffer.put(payload);
+            frameBuffer.put(payload);
             payload.limit(oldLimit);
         }
 
         endFrame(channel);
 
-        _framesOutput += 1;
+        framesOutput++;
     }
 
-    private void logFrame(ProtocolTracer tracer, int channel, Object frameBody, ReadableBuffer payload, int payloadSize)
-    {
-        if (_frameType == AMQP_FRAME_TYPE)
-        {
+    private int writePerformative(Object frameBody, ReadableBuffer payload, Runnable onPayloadTooLarge) {
+        frameBuffer.position(frameStart + FRAME_HEADER_SIZE);
+
+        if (frameBody != null) {
+            encoder.writeObject(frameBody);
+        }
+
+        int performativeSize = frameBuffer.position() - frameStart;
+
+        if (onPayloadTooLarge != null && maxFrameSize > 0 && payload != null && (payload.remaining() + performativeSize) > maxFrameSize) {
+            // Next iteration will re-encode the frame body again with updates from the <payload-to-large>
+            // handler and then we can move onto the body portion.
+            onPayloadTooLarge.run();
+            performativeSize = writePerformative(frameBody, payload, null);
+        }
+
+        return performativeSize;
+    }
+
+    private void endFrame(int channel) {
+        int frameSize = frameBuffer.position() - frameStart;
+        int originalPosition = frameBuffer.position();
+
+        frameBuffer.position(frameStart);
+        frameBuffer.putInt(frameSize);
+        frameBuffer.put((byte) 2);
+        frameBuffer.put(frameType);
+        frameBuffer.putShort((short) channel);
+        frameBuffer.position(originalPosition);
+    }
+
+    private void logFrame(int channel, Object frameBody, ReadableBuffer payload, int payloadSize) {
+        if (frameType == AMQP_FRAME_TYPE) {
             ReadableBuffer originalPayload = null;
-            if (payload!=null)
-            {
+            if (payload != null) {
                 originalPayload = payload.slice();
                 originalPayload.limit(payloadSize);
             }
 
             Binary payloadBin = Binary.create(originalPayload);
             FrameBody body = null;
-            if (frameBody == null)
-            {
+            if (frameBody == null) {
                 body = EmptyFrame.INSTANCE;
-            }
-            else
-            {
+            } else {
                 body = (FrameBody) frameBody;
             }
 
             TransportFrame frame = new TransportFrame(channel, body, payloadBin);
 
-            _transport.log(TransportImpl.OUTGOING, frame);
+            transport.log(TransportImpl.OUTGOING, frame);
 
-            if (tracer != null)
-            {
+            ProtocolTracer tracer = transport.getProtocolTracer();
+            if (tracer != null) {
                 tracer.sentFrame(frame);
             }
         }
-    }
-
-    void writeFrame(Object frameBody)
-    {
-        writeFrame(0, frameBody, null, null);
-    }
-
-    boolean isFull() {
-        // XXX: this should probably be tunable
-        return _bbuf.position() > 64*1024;
-    }
-
-    int readBytes(ByteBuffer dst)
-    {
-        ByteBuffer src = _bbuf.duplicate();
-        src.flip();
-
-        int size = Math.min(src.remaining(), dst.remaining());
-        int limit = src.limit();
-        src.limit(size);
-        dst.put(src);
-        src.limit(limit);
-        _bbuf.rewind();
-        _bbuf.put(src);
-
-        return size;
-    }
-
-    long getFramesOutput()
-    {
-        return _framesOutput;
     }
 }
