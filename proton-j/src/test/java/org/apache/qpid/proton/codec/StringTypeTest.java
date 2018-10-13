@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.lang.Character.UnicodeBlock;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -43,8 +43,6 @@ import org.mockito.Mockito;
  */
 public class StringTypeTest
 {
-    private static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
-
     private static final List<String> TEST_DATA = generateTestData();
 
     /**
@@ -58,8 +56,8 @@ public class StringTypeTest
      */
     private static Set<String> getAllStringsFromUnicodeBlocks(final UnicodeBlock... blocks)
     {
-        final Set<UnicodeBlock> blockSet = new HashSet<UnicodeBlock>(Arrays.asList(blocks));
-        final Set<String> strings = new HashSet<String>();
+        final Set<UnicodeBlock> blockSet = new HashSet<>(Arrays.asList(blocks));
+        final Set<String> strings = new HashSet<>();
         for (int codePoint = 0; codePoint <= Character.MAX_CODE_POINT; codePoint++)
         {
             if (blockSet.contains(UnicodeBlock.of(codePoint)))
@@ -73,12 +71,8 @@ public class StringTypeTest
                 }
                 else if (charCount == 2)
                 {
-                    //TODO: use Character.highSurrogate(codePoint) and Character.lowSurrogate(codePoint) when Java 7 is baseline
-                    char highSurrogate = (char) ((codePoint >>> 10) + ('\uD800' - (0x010000 >>> 10)));
-                    char lowSurrogate =  (char) ((codePoint & 0x3ff) + '\uDC00');
-
-                    sb.append(highSurrogate);
-                    sb.append(lowSurrogate);
+                    sb.append(Character.highSurrogate(codePoint));
+                    sb.append(Character.lowSurrogate(codePoint));
                 }
                 else
                 {
@@ -100,7 +94,7 @@ public class StringTypeTest
     {
         for (final String input : TEST_DATA)
         {
-            assertEquals("Incorrect string length calculated for string '"+input+"'",input.getBytes(CHARSET_UTF8).length, StringType.calculateUTF8Length(input));
+            assertEquals("Incorrect string length calculated for string '"+input+"'",input.getBytes(StandardCharsets.UTF_8).length, StringType.calculateUTF8Length(input));
         }
     }
 
@@ -228,12 +222,11 @@ public class StringTypeTest
                                                      UnicodeBlock.GREEK,
                                                      UnicodeBlock.LETTERLIKE_SYMBOLS));
                 // blocks with surrogate pairs
-                // TODO: restore others when Java 7 is baseline
                 addAll(getAllStringsFromUnicodeBlocks(UnicodeBlock.LINEAR_B_SYLLABARY,
-                                                     /*UnicodeBlock.MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS,*/
+                                                     UnicodeBlock.MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS,
                                                      UnicodeBlock.MUSICAL_SYMBOLS,
-                                                     /*UnicodeBlock.EMOTICONS,*/
-                                                     /*UnicodeBlock.PLAYING_CARDS,*/
+                                                     UnicodeBlock.EMOTICONS,
+                                                     UnicodeBlock.PLAYING_CARDS,
                                                      UnicodeBlock.BOX_DRAWING,
                                                      UnicodeBlock.HALFWIDTH_AND_FULLWIDTH_FORMS,
                                                      UnicodeBlock.PRIVATE_USE_AREA,
