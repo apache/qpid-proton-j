@@ -29,16 +29,18 @@ import org.apache.qpid.proton.reactor.Reactor;
 import org.apache.qpid.proton.reactor.Task;
 
 public class TaskImpl implements Task, Comparable<TaskImpl> {
+
+    private static final AtomicInteger COUNT = new AtomicInteger();
+
     private final long deadline;
     private final int counter;
     private boolean cancelled = false;
-    private final AtomicInteger count = new AtomicInteger();
     private Record attachments = new RecordImpl();
     private Reactor reactor;
 
     public TaskImpl(long deadline) {
         this.deadline = deadline;
-        this.counter = count.getAndIncrement();
+        this.counter = COUNT.getAndIncrement();
     }
 
     @Override

@@ -31,16 +31,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class EchoInputStreamWrapper extends Thread {
 
+    private static final AtomicInteger ID_COUNTER = new AtomicInteger();
+
     private final InputStream in;
     private final SinkChannel out;
     private final byte[] bufferBytes = new byte[1024];
     private final ByteBuffer buffer = ByteBuffer.wrap(bufferBytes);
-    private final AtomicInteger idCounter = new AtomicInteger();
 
     private EchoInputStreamWrapper(InputStream in, SinkChannel out) {
         this.in = in;
         this.out = out;
-        setName(getClass().getName() + "-" + idCounter.incrementAndGet());
+        setName(getClass().getName() + "-" + ID_COUNTER.incrementAndGet());
         setDaemon(true);
     }
 
