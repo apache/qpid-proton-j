@@ -50,7 +50,7 @@ public class GoodbyeWorld extends BaseHandler {
     // might take.
     @Override
     public void onReactorFinal(Event e) {
-        System.out.println("Goodbye, World!");;
+        System.out.println("Goodbye, World!");
     }
 
     public static void main(String[] args) throws IOException {

@@ -239,7 +239,7 @@ public class SslEngineFacadeFactory
             _logger.log(Level.FINE, mode + " Enabled cipher suites " + Arrays.asList(sslEngine.getEnabledCipherSuites()));
         }
 
-        boolean useClientMode = mode == SslDomain.Mode.CLIENT ? true : false;
+        boolean useClientMode = mode == SslDomain.Mode.CLIENT;
         sslEngine.setUseClientMode(useClientMode);
 
         removeSSLv3Support(sslEngine);

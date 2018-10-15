@@ -49,11 +49,7 @@ public class MessageImpl implements ProtonJMessage
       }
     }
 
-    private static final ThreadLocal<EncoderDecoderPair> tlsCodec = new ThreadLocal<EncoderDecoderPair>() {
-          @Override protected EncoderDecoderPair initialValue() {
-            return new EncoderDecoderPair();
-          }
-      };
+    private static final ThreadLocal<EncoderDecoderPair> tlsCodec = ThreadLocal.withInitial(EncoderDecoderPair::new);
 
     /**
      * Application code should use {@link org.apache.qpid.proton.message.Message.Factory#create()} instead.

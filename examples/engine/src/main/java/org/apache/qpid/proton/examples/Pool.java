@@ -45,16 +45,8 @@ public class Pool
     final private Collector collector;
     final private Map<String,Connection> connections;
 
-    final private LinkConstructor<Sender> outgoingConstructor = new LinkConstructor<Sender> () {
-        public Sender create(Session ssn, String remote, String local) {
-            return newOutgoing(ssn, remote, local);
-        }
-    };
-    final private LinkConstructor<Receiver> incomingConstructor = new LinkConstructor<Receiver> () {
-        public Receiver create(Session ssn, String remote, String local) {
-            return newIncoming(ssn, remote, local);
-        }
-    };
+    final private LinkConstructor<Sender> outgoingConstructor = this::newOutgoing;
+    final private LinkConstructor<Receiver> incomingConstructor = this::newIncoming;
 
     final private LinkResolver<Sender> outgoingResolver;
     final private LinkResolver<Receiver> incomingResolver;

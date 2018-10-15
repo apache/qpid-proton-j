@@ -36,7 +36,7 @@ class DefaultSslEngineFacade implements ProtonSslEngine
     /**
      * Our testing has shown that application buffers need to be a bit larger
      * than that provided by {@link SSLSession#getApplicationBufferSize()} otherwise
-     * {@link Status#BUFFER_OVERFLOW} will result on {@link SSLEngine#unwrap()}.
+     * {@link Status#BUFFER_OVERFLOW} will result on {@link SSLEngine#unwrap}.
      * Sun's own example uses 50, so we use the same.
      */
     private static final int APPLICATION_BUFFER_EXTRA = 50;
