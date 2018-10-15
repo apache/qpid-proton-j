@@ -71,7 +71,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     private boolean _mechanismsSent;
     private boolean _initSent;
 
-    enum Role { CLIENT, SERVER };
+    enum Role { CLIENT, SERVER }
 
     private SaslOutcome _outcome = SaslOutcome.PN_SASL_NONE;
     private SaslState _state = SaslState.PN_SASL_IDLE;
@@ -89,8 +89,8 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
 
     /**
      * @param maxFrameSize the size of the input and output buffers
-     * returned by {@link SaslTransportWrapper#getInputBuffer()} and
-     * {@link SaslTransportWrapper#getOutputBuffer()}.
+     * {@link SaslTransportWrapper#_inputBuffer} and
+     * {@link SaslTransportWrapper#_outputBuffer}.
      */
     SaslImpl(TransportImpl transport, int maxFrameSize)
     {

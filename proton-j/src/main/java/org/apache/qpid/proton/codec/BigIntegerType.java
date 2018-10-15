@@ -35,8 +35,8 @@ public class BigIntegerType extends AbstractPrimitiveType<BigInteger> {
 
     private static final BigInteger BIG_BYTE_MIN = BigInteger.valueOf(Byte.MIN_VALUE);
     private static final BigInteger BIG_BYTE_MAX = BigInteger.valueOf(Byte.MAX_VALUE);
-    private static final BigInteger BIG_LONG_MIN = BigInteger.valueOf(Long.MIN_VALUE);;
-    private static final BigInteger BIG_LONG_MAX = BigInteger.valueOf(Long.MAX_VALUE);;
+    private static final BigInteger BIG_LONG_MIN = BigInteger.valueOf(Long.MIN_VALUE);
+    private static final BigInteger BIG_LONG_MAX = BigInteger.valueOf(Long.MAX_VALUE);
 
     private BigIntegerEncoding _BigIntegerEncoding;
     private BigIntegerEncoding _smallBigIntegerEncoding;

@@ -28,5 +28,5 @@ public enum EndpointState
 {
     UNINITIALIZED,
     ACTIVE,
-    CLOSED;
+    CLOSED,
 }
