@@ -125,7 +125,7 @@ public class TransportImpl extends EndpointImpl
 
     private FrameHandler _frameHandler = this;
     private boolean _head_closed = false;
-    private ErrorCondition _condition = null;
+    private boolean _conditionSet;
 
     private boolean postedHeadClosed = false;
     private boolean postedTailClosed = false;
@@ -250,7 +250,19 @@ public class TransportImpl extends EndpointImpl
     @Override
     public ErrorCondition getCondition()
     {
-        return _condition;
+        // Get the ErrorCondition, but only return it if its condition field is populated.
+        // This somewhat retains prior TransportImpl behaviour of returning null when no
+        // condition had been set (by TransportImpl itself) rather than the 'empty' ErrorCondition
+        // object historically used in the other areas.
+        ErrorCondition errorCondition = super.getCondition();
+        return errorCondition.getCondition() != null ? errorCondition : null;
+    }
+
+    @Override
+    public void setCondition(ErrorCondition error)
+    {
+        super.setCondition(error);
+        _conditionSet = error != null && error.getCondition() != null;
     }
 
     @Override
@@ -844,7 +856,7 @@ public class TransportImpl extends EndpointImpl
 
     private void processOpen()
     {
-        if (!_isOpenSent && (_condition != null ||
+        if (!_isOpenSent && (_conditionSet ||
              (_connectionEndpoint != null &&
               _connectionEndpoint.getLocalState() != EndpointState.UNINITIALIZED)))
         {
@@ -1042,7 +1054,7 @@ public class TransportImpl extends EndpointImpl
 
     private void processClose()
     {
-        if ((_condition != null ||
+        if ((_conditionSet ||
              (_connectionEndpoint != null &&
               _connectionEndpoint.getLocalState() == EndpointState.CLOSED)) &&
             !_isCloseSent) {
@@ -1053,12 +1065,12 @@ public class TransportImpl extends EndpointImpl
                 ErrorCondition localError;
 
                 if (_connectionEndpoint == null) {
-                    localError = _condition;
+                    localError = getCondition();
                 } else {
                     localError =  _connectionEndpoint.getCondition();
                 }
 
-                if(localError.getCondition() != null)
+                if(localError != null && localError.getCondition() != null)
                 {
                     close.setError(localError);
                 }
@@ -1419,19 +1431,20 @@ public class TransportImpl extends EndpointImpl
     public void closed(TransportException error)
     {
         if (!_closeReceived || error != null) {
-            if (error == null) {
-                _condition = new ErrorCondition(ConnectionError.FRAMING_ERROR,
-                                               "connection aborted");
-            } else {
-                _condition = new ErrorCondition(ConnectionError.FRAMING_ERROR,
-                                                error.toString());
+            // Set an error condition, but only if one was not already set
+            if(!_conditionSet) {
+                String description =  error == null ? "connection aborted" : error.toString();
+                setCondition(new ErrorCondition(ConnectionError.FRAMING_ERROR, description));
             }
+
             _head_closed = true;
         }
-        if (_condition != null && !postedTransportError) {
+
+        if (_conditionSet && !postedTransportError) {
             put(Event.Type.TRANSPORT_ERROR, this);
             postedTransportError = true;
         }
+
         if (!postedTailClosed) {
             put(Event.Type.TRANSPORT_TAIL_CLOSED, this);
             postedTailClosed = true;

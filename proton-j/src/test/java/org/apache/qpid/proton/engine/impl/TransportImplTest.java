@@ -24,6 +24,7 @@ import static org.apache.qpid.proton.engine.impl.TransportTestHelper.stringOfLen
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -38,6 +39,7 @@ import java.util.Random;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
@@ -46,9 +48,11 @@ import org.apache.qpid.proton.amqp.messaging.Released;
 import org.apache.qpid.proton.amqp.transport.Attach;
 import org.apache.qpid.proton.amqp.transport.Begin;
 import org.apache.qpid.proton.amqp.transport.Close;
+import org.apache.qpid.proton.amqp.transport.ConnectionError;
 import org.apache.qpid.proton.amqp.transport.Detach;
 import org.apache.qpid.proton.amqp.transport.Disposition;
 import org.apache.qpid.proton.amqp.transport.End;
+import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.amqp.transport.Flow;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.amqp.transport.Open;
@@ -3529,5 +3533,108 @@ public class TransportImplTest
 
         assertEquals("Unexpected delivery count", UnsignedInteger.valueOf(3), sentFlow.getDeliveryCount());
         assertEquals("Unexpected credit", UnsignedInteger.valueOf(123), sentFlow.getLinkCredit());
+    }
+
+    @Test
+    public void testErrorConditionDefault() {
+        TransportImpl transport = new TransportImpl();
+        assertNull("Expected null ErrorCondition given historic behaviour", transport.getCondition());
+    }
+
+    @Test
+    public void testErrorConditionSetGet() {
+        // Try setting with an empty condition object, expect to get a null back per historic behaviour.
+        TransportImpl transport = new TransportImpl();
+
+        ErrorCondition emptyErrorCondition = new ErrorCondition();
+        assertNull("Expected empty Condition given historic behaviour", emptyErrorCondition.getCondition());
+        transport.setCondition(emptyErrorCondition);
+        assertNull("Expected null ErrorCondition given historic behaviour", transport.getCondition());
+
+        // Try setting with a populated condition object.
+        transport = new TransportImpl();
+
+        Symbol condition = Symbol.getSymbol("some-error");
+        String description = "some-error-description";
+        ErrorCondition populatedErrorCondition = new ErrorCondition();
+        populatedErrorCondition.setCondition(condition);
+        populatedErrorCondition.setDescription(description);
+        assertNotNull("Expected a Condition", populatedErrorCondition.getCondition());
+
+        transport.setCondition(populatedErrorCondition);
+        assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
+        assertEquals("Unexpected ErrorCondition returned", populatedErrorCondition, transport.getCondition());
+
+        // Try setting again with another populated condition object.
+        Symbol otherCondition = Symbol.getSymbol("some-other-error");
+        String otherDescription = "some-other-error-description";
+        ErrorCondition otherErrorCondition = new ErrorCondition();
+        otherErrorCondition.setCondition(otherCondition);
+        otherErrorCondition.setDescription(otherDescription);
+        assertNotNull("Expected a Condition", otherErrorCondition.getCondition());
+
+        assertNotEquals(condition, otherCondition);
+        assertNotEquals(populatedErrorCondition.getCondition(), otherErrorCondition.getCondition());
+        assertNotEquals(description, otherDescription);
+        assertNotEquals(populatedErrorCondition.getDescription(), otherErrorCondition.getDescription());
+        assertNotEquals(populatedErrorCondition, otherErrorCondition);
+
+        transport.setCondition(otherErrorCondition);
+        assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
+        assertEquals("Unexpected ErrorCondition returned", otherErrorCondition, transport.getCondition());
+
+        // Try setting again with an empty condition object, expect to get a null back per historic behaviour.
+        transport.setCondition(emptyErrorCondition);
+        assertNull("Expected null ErrorCondition given historic behaviour", transport.getCondition());
+    }
+
+    @Test
+    public void testErrorConditionAfterTransportClosed() {
+        Symbol condition = Symbol.getSymbol("some-error");
+        String description = "some-error-description";
+        ErrorCondition origErrorCondition = new ErrorCondition();
+        origErrorCondition.setCondition(condition);
+        origErrorCondition.setDescription(description);
+        assertNotNull("Expected a Condition", origErrorCondition.getCondition());
+
+        // Set an error condition, then call 'closed' specifying an error.
+        // Expect the original condition which was set to remain.
+        TransportImpl transport = new TransportImpl();
+
+        transport.setCondition(origErrorCondition);
+        transport.closed(new TransportException("my-ignored-exception"));
+
+        assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
+        assertEquals("Unexpected ErrorCondition returned", origErrorCondition, transport.getCondition());
+
+        // Set an error condition, then call 'closed' without an error.
+        // Expect the original condition which was set to remain.
+        transport = new TransportImpl();
+
+        transport.setCondition(origErrorCondition);
+        transport.closed(null);
+
+        assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
+        assertEquals("Unexpected ErrorCondition returned", origErrorCondition, transport.getCondition());
+
+        // Without having set an error condition, call 'closed' specifying an error.
+        // Expect a condition to be set.
+        String errorDescription = "some-error-description";
+        transport = new TransportImpl();
+        transport.closed(new TransportException(errorDescription));
+
+        assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
+        assertEquals("Unexpected condition returned", ConnectionError.FRAMING_ERROR, transport.getCondition().getCondition());
+        assertEquals("Unexpected description returned", "org.apache.qpid.proton.engine.TransportException: " + errorDescription, transport.getCondition().getDescription());
+
+        // Without having set an error condition, call 'closed' without an error.
+        // Expect a condition to be set.
+        transport = new TransportImpl();
+
+        transport.closed(null);
+
+        assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
+        assertEquals("Unexpected ErrorCondition returned", ConnectionError.FRAMING_ERROR, transport.getCondition().getCondition());
+        assertEquals("Unexpected description returned", "connection aborted", transport.getCondition().getDescription());
     }
 }
