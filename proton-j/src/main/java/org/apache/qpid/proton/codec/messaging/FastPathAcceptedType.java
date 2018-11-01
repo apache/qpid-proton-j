@@ -22,20 +22,29 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.codec.AMQPType;
-import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.DecodeException;
 import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
+import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathAcceptedType implements AMQPType<Accepted>, FastPathDescribedTypeConstructor<Accepted> {
 
+    private static final byte DESCRIPTOR_CODE = 0x24;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000024L), Symbol.valueOf("amqp:accepted:list"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:accepted:list"),
+    };
+
+    private static final byte[] ACCEPTED_ENCODED_BYTES = new byte[] {
+        EncodingCodes.DESCRIBED_TYPE_INDICATOR,
+        EncodingCodes.SMALLULONG,
+        DESCRIPTOR_CODE,
+        EncodingCodes.LIST0
     };
 
     private final AcceptedType acceptedType;
@@ -108,9 +117,7 @@ public class FastPathAcceptedType implements AMQPType<Accepted>, FastPathDescrib
     @Override
     public void write(Accepted accepted) {
         WritableBuffer buffer = getEncoder().getBuffer();
-        buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(acceptedType.getDescriptor());
-        buffer.put(EncodingCodes.LIST0);
+        buffer.put(ACCEPTED_ENCODED_BYTES, 0, ACCEPTED_ENCODED_BYTES.length);
     }
 
     public static void register(Decoder decoder, EncoderImpl encoder) {

@@ -22,19 +22,21 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.Data;
 import org.apache.qpid.proton.codec.AMQPType;
-import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
+import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathDataType implements AMQPType<Data>, FastPathDescribedTypeConstructor<Data> {
 
+    private static final byte DESCRIPTOR_CODE = 0x75;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000075L), Symbol.valueOf("amqp:data:binary"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:data:binary"),
     };
 
     private final DataType dataType;
@@ -90,7 +92,8 @@ public class FastPathDataType implements AMQPType<Data>, FastPathDescribedTypeCo
     public void write(Data data) {
         WritableBuffer buffer = getEncoder().getBuffer();
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(dataType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
         getEncoder().writeBinary(data.getValue());
     }
 

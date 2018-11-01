@@ -33,9 +33,11 @@ import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathDeliveryAnnotationsType implements AMQPType<DeliveryAnnotations>, FastPathDescribedTypeConstructor<DeliveryAnnotations> {
 
+    private static final byte DESCRIPTOR_CODE = 0x71;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000071L), Symbol.valueOf("amqp:delivery-annotations:map"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:delivery-annotations:map"),
     };
 
     private final DeliveryAnnotationsType annotationsType;
@@ -93,7 +95,8 @@ public class FastPathDeliveryAnnotationsType implements AMQPType<DeliveryAnnotat
         WritableBuffer buffer = getEncoder().getBuffer();
 
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(annotationsType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
 
         MapType mapType = (MapType) getEncoder().getType(val.getValue());
 

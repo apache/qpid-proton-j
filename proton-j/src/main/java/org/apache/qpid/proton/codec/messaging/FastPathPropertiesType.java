@@ -22,20 +22,22 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.Properties;
 import org.apache.qpid.proton.codec.AMQPType;
-import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.DecodeException;
 import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
+import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDescribedTypeConstructor<Properties> {
 
+    private static final byte DESCRIPTOR_CODE = 0x73;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000073L), Symbol.valueOf("amqp:properties:list"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:properties:list"),
     };
 
     private final PropertiesType propertiesType;
@@ -164,11 +166,12 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
         byte encodingCode = deduceEncodingCode(value, count);
 
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(propertiesType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
+        buffer.put(encodingCode);
 
         // Optimized step, no other data to be written.
-        if (count == 0 || encodingCode == EncodingCodes.LIST0) {
-            buffer.put(EncodingCodes.LIST0);
+        if (encodingCode == EncodingCodes.LIST0) {
             return;
         }
 
@@ -176,10 +179,8 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
 
         if (encodingCode == EncodingCodes.LIST8) {
             fieldWidth = 1;
-            buffer.put(EncodingCodes.LIST8);
         } else {
             fieldWidth = 4;
-            buffer.put(EncodingCodes.LIST32);
         }
 
         int startIndex = buffer.position();

@@ -22,20 +22,22 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.transport.Flow;
 import org.apache.qpid.proton.codec.AMQPType;
-import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.DecodeException;
 import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
+import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathFlowType implements AMQPType<Flow>, FastPathDescribedTypeConstructor<Flow> {
 
+    private static final byte DESCRIPTOR_CODE = 0x13;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000013L), Symbol.valueOf("amqp:flow:list"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:flow:list"),
     };
 
     private final FlowType flowType;
@@ -159,16 +161,16 @@ public class FastPathFlowType implements AMQPType<Flow>, FastPathDescribedTypeCo
         byte encodingCode = deduceEncodingCode(flow, count);
 
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(flowType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
+        buffer.put(encodingCode);
 
         final int fieldWidth;
 
         if (encodingCode == EncodingCodes.LIST8) {
             fieldWidth = 1;
-            buffer.put(EncodingCodes.LIST8);
         } else {
             fieldWidth = 4;
-            buffer.put(EncodingCodes.LIST32);
         }
 
         int startIndex = buffer.position();

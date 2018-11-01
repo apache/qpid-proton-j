@@ -33,9 +33,11 @@ import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathFooterType implements AMQPType<Footer>, FastPathDescribedTypeConstructor<Footer> {
 
+    private static final byte DESCRIPTOR_CODE = 0x78;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000078L), Symbol.valueOf("amqp:footer:map"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:footer:map"),
     };
 
     private final FooterType footerType;
@@ -92,7 +94,8 @@ public class FastPathFooterType implements AMQPType<Footer>, FastPathDescribedTy
         WritableBuffer buffer = getEncoder().getBuffer();
 
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(footerType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
 
         MapType mapType = (MapType) getEncoder().getType(val.getValue());
 

@@ -26,20 +26,30 @@ import org.apache.qpid.proton.amqp.transport.DeliveryState;
 import org.apache.qpid.proton.amqp.transport.Disposition;
 import org.apache.qpid.proton.amqp.transport.Role;
 import org.apache.qpid.proton.codec.AMQPType;
-import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.DecodeException;
 import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
+import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathDispositionType implements AMQPType<Disposition>, FastPathDescribedTypeConstructor<Disposition> {
 
+    private static final byte DESCRIPTOR_CODE = 0x15;
+    private static final byte ACCEPTED_DESCRIPTOR_CODE = 0x24;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000015L), Symbol.valueOf("amqp:disposition:list"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:disposition:list"),
+    };
+
+    private static final byte[] ACCEPTED_ENCODED_BYTES = new byte[] {
+        EncodingCodes.DESCRIBED_TYPE_INDICATOR,
+        EncodingCodes.SMALLULONG,
+        ACCEPTED_DESCRIPTOR_CODE,
+        EncodingCodes.LIST0
     };
 
     private final DispositionType dispositionType;
@@ -148,16 +158,16 @@ public class FastPathDispositionType implements AMQPType<Disposition>, FastPathD
         byte encodingCode = deduceEncodingCode(disposition, count);
 
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(dispositionType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
+        buffer.put(encodingCode);
 
         final int fieldWidth;
 
         if (encodingCode == EncodingCodes.LIST8) {
             fieldWidth = 1;
-            buffer.put(EncodingCodes.LIST8);
         } else {
             fieldWidth = 4;
-            buffer.put(EncodingCodes.LIST32);
         }
 
         int startIndex = buffer.position();
@@ -204,7 +214,11 @@ public class FastPathDispositionType implements AMQPType<Disposition>, FastPathD
                 getEncoder().writeBoolean(disposition.getSettled());
                 break;
             case 4:
-                getEncoder().writeObject(disposition.getState());
+                if (Accepted.getInstance().equals(disposition.getState())) {
+                    getEncoder().getBuffer().put(ACCEPTED_ENCODED_BYTES, 0, ACCEPTED_ENCODED_BYTES.length);
+                } else {
+                    getEncoder().writeObject(disposition.getState());
+                }
                 break;
             case 5:
                 getEncoder().writeBoolean(disposition.getBatchable());

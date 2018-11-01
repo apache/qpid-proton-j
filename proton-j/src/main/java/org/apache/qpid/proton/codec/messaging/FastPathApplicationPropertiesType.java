@@ -22,20 +22,22 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.apache.qpid.proton.codec.AMQPType;
-import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
+import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
 import org.apache.qpid.proton.codec.MapType;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public class FastPathApplicationPropertiesType implements AMQPType<ApplicationProperties>, FastPathDescribedTypeConstructor<ApplicationProperties> {
 
+    private static final byte DESCRIPTOR_CODE = 0x74;
+
     private static final Object[] DESCRIPTORS =
     {
-        UnsignedLong.valueOf(0x0000000000000074L), Symbol.valueOf("amqp:application-properties:map"),
+        UnsignedLong.valueOf(DESCRIPTOR_CODE), Symbol.valueOf("amqp:application-properties:map"),
     };
 
     private final ApplicationPropertiesType propertiesType;
@@ -92,7 +94,8 @@ public class FastPathApplicationPropertiesType implements AMQPType<ApplicationPr
         WritableBuffer buffer = getEncoder().getBuffer();
 
         buffer.put(EncodingCodes.DESCRIBED_TYPE_INDICATOR);
-        getEncoder().writeUnsignedLong(propertiesType.getDescriptor());
+        buffer.put(EncodingCodes.SMALLULONG);
+        buffer.put(DESCRIPTOR_CODE);
 
         MapType mapType = (MapType) getEncoder().getType(val.getValue());
 
