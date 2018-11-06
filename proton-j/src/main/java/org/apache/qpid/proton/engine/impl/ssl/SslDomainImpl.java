@@ -19,7 +19,6 @@
 package org.apache.qpid.proton.engine.impl.ssl;
 
 import javax.net.ssl.SSLContext;
-import org.apache.qpid.proton.ProtonUnsupportedOperationException;
 import org.apache.qpid.proton.engine.ProtonJSslDomain;
 import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.SslPeerDetails;
@@ -27,7 +26,7 @@ import org.apache.qpid.proton.engine.SslPeerDetails;
 public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, ProtonJSslDomain
 {
     private Mode _mode;
-    private VerifyMode _verifyMode = VerifyMode.ANONYMOUS_PEER;
+    private VerifyMode _verifyMode;
     private String _certificateFile;
     private String _privateKeyFile;
     private String _privateKeyPassword;
@@ -94,10 +93,6 @@ public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, Proton
     @Override
     public void setPeerAuthentication(VerifyMode verifyMode)
     {
-        if(verifyMode == VerifyMode.VERIFY_PEER_NAME)
-        {
-            throw new ProtonUnsupportedOperationException();
-        }
         _verifyMode = verifyMode;
         _sslEngineFacadeFactory.resetCache();
     }
@@ -105,6 +100,11 @@ public class SslDomainImpl implements SslDomain, ProtonSslEngineProvider, Proton
     @Override
     public VerifyMode getPeerAuthentication()
     {
+        if(_verifyMode == null)
+        {
+           return _mode == Mode.SERVER ? VerifyMode.ANONYMOUS_PEER : VerifyMode.VERIFY_PEER_NAME;
+        }
+
         return _verifyMode;
     }
 

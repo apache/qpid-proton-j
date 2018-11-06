@@ -194,15 +194,21 @@ public interface Transport extends Endpoint
      * {@link Ssl} object, regardless of the parameters supplied.
      *
      * @param sslDomain the SSL settings to use
-     * @param sslPeerDetails may be null, in which case SSL session resume will not be attempted
+     * @param sslPeerDetails peer details, used for SNI, hostname verification, etc when connecting. May be null.
      * @return an {@link Ssl} object representing the SSL session.
+     * @throws IllegalArgumentException if the sslDomain requests hostname verification but sslPeerDetails are null.
+     * @throws IllegalStateException if the sslDomain has not been initialised.
      */
-    Ssl ssl(SslDomain sslDomain, SslPeerDetails sslPeerDetails);
+    Ssl ssl(SslDomain sslDomain, SslPeerDetails sslPeerDetails) throws IllegalArgumentException;
 
     /**
-     * As per {@link #ssl(SslDomain, SslPeerDetails)} but no attempt is made to resume a previous SSL session.
+     * Equivalent to {@link #ssl(SslDomain, SslPeerDetails)} but passing null for SslPeerDetails, meaning no SNI detail
+     * is sent, hostname verification isn't supported etc when connecting.
+     *
+     * @throws IllegalArgumentException if the sslDomain requests hostname verification.
+     * @throws IllegalStateException if the sslDomain has not been initialised.
      */
-    Ssl ssl(SslDomain sslDomain);
+    Ssl ssl(SslDomain sslDomain) throws IllegalArgumentException;
 
 
     /**

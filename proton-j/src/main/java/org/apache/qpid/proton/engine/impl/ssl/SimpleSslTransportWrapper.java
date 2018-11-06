@@ -360,9 +360,15 @@ public class SimpleSslTransportWrapper implements SslTransportWrapper
         try {
             unwrapInput();
         } catch (SSLException e) {
-            _logger.log(Level.WARNING, e.getMessage());
+            if(_logger.isLoggable(Level.FINEST)){
+                _logger.log(Level.FINEST, e.getMessage(), e);
+            } else {
+                _logger.log(Level.WARNING, e.getMessage());
+            }
             _inputBuffer.position(_inputBuffer.limit());
             _tail_closed = true;
+
+            throw new TransportException(e);
         } finally {
             _inputBuffer.compact();
         }

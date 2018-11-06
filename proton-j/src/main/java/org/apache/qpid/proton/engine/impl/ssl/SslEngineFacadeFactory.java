@@ -53,6 +53,7 @@ import java.util.logging.Logger;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
@@ -231,6 +232,13 @@ public class SslEngineFacadeFactory
             if (mode == SslDomain.Mode.SERVER)
             {
                 sslEngine.setNeedClientAuth(true);
+            }
+
+            if(domain.getPeerAuthentication() == SslDomain.VerifyMode.VERIFY_PEER_NAME)
+            {
+                SSLParameters sslParameters = sslEngine.getSSLParameters();
+                sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+                sslEngine.setSSLParameters(sslParameters);
             }
         }
 

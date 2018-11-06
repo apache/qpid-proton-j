@@ -22,6 +22,8 @@ import static org.apache.qpid.proton.engine.EndpointState.ACTIVE;
 import static org.apache.qpid.proton.engine.EndpointState.UNINITIALIZED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,6 +33,8 @@ import java.security.SecureRandom;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManagerFactory;
 
 import org.apache.qpid.proton.Proton;
@@ -41,7 +45,9 @@ import org.apache.qpid.proton.engine.EndpointState;
 import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.SslDomain.Mode;
 import org.apache.qpid.proton.engine.SslDomain.VerifyMode;
+import org.apache.qpid.proton.engine.SslPeerDetails;
 import org.apache.qpid.proton.engine.Transport;
+import org.apache.qpid.proton.engine.TransportException;
 import org.junit.Test;
 
 public class SslTest
@@ -65,6 +71,27 @@ public class SslTest
 
     private final Connection _clientConnection = Proton.connection();
     private final Connection _serverConnection = Proton.connection();
+
+    @Test
+    public void testFailureToInitSslDomainThrowsISE() throws Exception {
+        SslDomain sslDomain = SslDomain.Factory.create();
+
+        try {
+            _clientTransport.ssl(sslDomain, null);
+            fail("Expected an exception to be thrown");
+        } catch (IllegalStateException ise) {
+            // Expected
+            assertTrue(ise.getMessage().contains("Client/server mode must be configured"));
+        }
+
+        try {
+            _serverTransport.ssl(sslDomain);
+            fail("Expected an exception to be thrown");
+        } catch (IllegalStateException ise) {
+            // Expected
+            assertTrue(ise.getMessage().contains("Client/server mode must be configured"));
+        }
+    }
 
     @Test
     public void testOpenConnectionsWithProvidedSslContext() throws Exception
@@ -123,6 +150,143 @@ public class SslTest
 
         assertConditions(_clientTransport);
         assertConditions(_serverTransport);
+    }
+
+    @Test
+    public void testHostnameVerificationSuccess() throws Exception {
+        doHostnameVerificationTestImpl(true, true);
+    }
+
+    @Test
+    public void testHostnameVerificationFailure() throws Exception {
+        doHostnameVerificationTestImpl(false, true);
+    }
+
+    @Test
+    public void testHostnameVerificationSkipped() throws Exception {
+        doHostnameVerificationTestImpl(false, false);
+    }
+
+    private void doHostnameVerificationTestImpl(boolean useMatchingServerName, boolean useHostnameVerification) throws Exception {
+        final String serverPeerName = useMatchingServerName ? "localhost" : "anotherserverhost";
+        final VerifyMode clientVerifyMode = useHostnameVerification ? VerifyMode.VERIFY_PEER_NAME : VerifyMode.VERIFY_PEER;
+
+        SslDomain clientSslDomain = SslDomain.Factory.create();
+        clientSslDomain.init(Mode.CLIENT);
+        clientSslDomain.setPeerAuthentication(clientVerifyMode);
+
+        SSLContext clientSslContext = createSslContext(CLIENT_JKS_KEYSTORE, PASSWORD, CLIENT_JKS_TRUSTSTORE, PASSWORD);
+        clientSslDomain.setSslContext(clientSslContext);
+        SslPeerDetails sslPeerDetails = SslPeerDetails.Factory.create(serverPeerName, 1234);
+        _clientTransport.ssl(clientSslDomain, sslPeerDetails);
+
+        SslDomain serverSslDomain = SslDomain.Factory.create();
+        serverSslDomain.init(Mode.SERVER);
+        serverSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER_NAME);
+        SSLContext serverSslContext = createSslContext(SERVER_JKS_KEYSTORE, PASSWORD, SERVER_JKS_TRUSTSTORE, PASSWORD);
+        serverSslDomain.setSslContext(serverSslContext);
+        _serverTransport.ssl(serverSslDomain, SslPeerDetails.Factory.create("client", 4567));
+
+        _clientConnection.setContainer(CLIENT_CONTAINER);
+        _serverConnection.setContainer(SERVER_CONTAINER);
+
+        _clientTransport.bind(_clientConnection);
+        _serverTransport.bind(_serverConnection);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+
+        _clientConnection.open();
+
+        assertEndpointState(_clientConnection, ACTIVE, UNINITIALIZED);
+        assertEndpointState(_serverConnection, UNINITIALIZED, UNINITIALIZED);
+
+        assertConditions(_clientTransport);
+        assertConditions(_serverTransport);
+
+        if(useHostnameVerification && !useMatchingServerName) {
+            // Verify the expected failures and resulting transport closures
+            pumpWithFailingNegotiation();
+
+            assertEquals(Transport.END_OF_STREAM, _clientTransport.pending());
+            assertEquals(Transport.END_OF_STREAM, _clientTransport.capacity());
+
+            assertEquals(Transport.END_OF_STREAM, _serverTransport.pending());
+            assertEquals(Transport.END_OF_STREAM, _serverTransport.capacity());
+            return;
+        } else {
+            // Verify the connections succeed
+            _pumper.pumpAll();
+
+            assertEndpointState(_clientConnection, ACTIVE, UNINITIALIZED);
+            assertEndpointState(_serverConnection, UNINITIALIZED, ACTIVE);
+
+            assertConditions(_clientTransport);
+            assertConditions(_serverTransport);
+
+            _serverConnection.open();
+
+            assertEndpointState(_clientConnection, ACTIVE, UNINITIALIZED);
+            assertEndpointState(_serverConnection, ACTIVE, ACTIVE);
+
+            assertConditions(_clientTransport);
+            assertConditions(_serverTransport);
+
+            _pumper.pumpAll();
+
+            assertEndpointState(_clientConnection, ACTIVE, ACTIVE);
+            assertEndpointState(_serverConnection, ACTIVE, ACTIVE);
+
+            assertConditions(_clientTransport);
+            assertConditions(_serverTransport);
+        }
+    }
+
+    @Test
+    public void testOmittingPeerDetailsThrowsIAEWhenRequired() throws Exception {
+        doOmitPeerDetailsThrowsIAEWhenRequiredTestImpl(true);
+        doOmitPeerDetailsThrowsIAEWhenRequiredTestImpl(false);
+    }
+
+    private void doOmitPeerDetailsThrowsIAEWhenRequiredTestImpl(boolean explicitlySetVerifyMode) {
+        SslDomain clientSslDomain = SslDomain.Factory.create();
+        clientSslDomain.init(Mode.CLIENT);
+
+        if (explicitlySetVerifyMode) {
+            clientSslDomain.setPeerAuthentication(VerifyMode.VERIFY_PEER_NAME);
+        }
+
+        try {
+            _clientTransport.ssl(clientSslDomain, null);
+            fail("Expected an exception to be thrown");
+        } catch (IllegalArgumentException ise) {
+            // Expected
+        }
+
+        try {
+            _clientTransport.ssl(clientSslDomain);
+            fail("Expected an exception to be thrown");
+        } catch (IllegalArgumentException ise) {
+            // Expected
+        }
+    }
+
+    private void pumpWithFailingNegotiation() throws Exception {
+        try {
+            _pumper.pumpAll();
+            fail("Expected an exception");
+        } catch (TransportException te) {
+            assertTrue(te.getCause().getCause() instanceof SSLHandshakeException);
+        }
+
+        try {
+            _pumper.pumpAll();
+            fail("Expected an exception");
+        } catch (TransportException te) {
+            assertTrue(te.getCause().getCause() instanceof SSLException);
+        }
+
+        _pumper.pumpAll();
     }
 
     private void assertConditions(Transport transport)

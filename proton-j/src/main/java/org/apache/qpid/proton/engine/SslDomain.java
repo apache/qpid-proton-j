@@ -49,15 +49,24 @@ public interface SslDomain
     /**
      * Determines the level of peer validation.
      *
-     * {@link #ANONYMOUS_PEER} is configured by default.
+     * {@link #VERIFY_PEER_NAME} is used by default in {@link Mode#CLIENT client}
+     * mode if not configured otherwise, with {@link #ANONYMOUS_PEER} used for
+     * {@link Mode#SERVER server} mode if not configured otherwise.
      */
     public enum VerifyMode
     {
         /**
-         * will only connect to those peers that provide a valid identifying certificate signed
-         * by a trusted CA and are using an authenticated cipher
+         * Requires peers provide a valid identifying certificate signed by
+         * a trusted certificate. Does not verify hostname details of the
+         * peer certificate, use {@link #VERIFY_PEER_NAME} for this instead.
          */
         VERIFY_PEER,
+        /**
+         * Requires peers provide a valid identifying certificate signed
+         * by a trusted certificate, including verifying hostname details
+         * of the certificate using peer details provided when configuring
+         * TLS via {@link Transport#ssl(SslDomain, SslPeerDetails)}.
+         */
         VERIFY_PEER_NAME,
         /**
          * does not require a valid certificate, and permits use of ciphers that

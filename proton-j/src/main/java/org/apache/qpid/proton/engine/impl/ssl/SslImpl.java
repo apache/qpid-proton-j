@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import org.apache.qpid.proton.ProtonUnsupportedOperationException;
 import org.apache.qpid.proton.engine.Ssl;
 import org.apache.qpid.proton.engine.SslDomain;
+import org.apache.qpid.proton.engine.SslDomain.VerifyMode;
 import org.apache.qpid.proton.engine.SslPeerDetails;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
@@ -54,6 +55,14 @@ public class SslImpl implements Ssl, TransportLayer
         _domain = domain;
         _protonSslEngineProvider = (ProtonSslEngineProvider)domain;
         _peerDetails = peerDetails;
+
+        if(_domain.getMode() == null) {
+            throw new IllegalStateException("Client/server mode must be configured, SslDomain must have init called.");
+        }
+
+        if(_peerDetails == null && _domain.getPeerAuthentication() == VerifyMode.VERIFY_PEER_NAME) {
+            throw new IllegalArgumentException("Peer hostname verification is enabled, but no peer details were provided");
+        }
     }
 
     public TransportWrapper wrap(TransportInput inputProcessor, TransportOutput outputProcessor)

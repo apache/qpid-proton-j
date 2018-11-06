@@ -25,6 +25,7 @@ import string
 import subprocess
 import sys
 from proton import *
+from org.apache.qpid.proton.engine import TransportException
 from .common import Skipped, pump
 
 
@@ -81,6 +82,25 @@ class SslTest(common.Test):
 
     def _pump(self, ssl_client, ssl_server, buffer_size=1024):
         pump(ssl_client.transport, ssl_server.transport, buffer_size)
+
+    def _pump_with_failing_negotiation(self, client, server, onesided = False):
+        # Exception once for client/server transport
+        try:
+            self._pump( client, server )
+            assert False, "Expected exception did not occur!"
+        except TransportException:
+            pass
+
+        if(onesided != True):
+            # Exception once for server/client transport
+            try:
+                self._pump( client, server )
+                assert False, "Expected exception did not occur!"
+            except TransportException:
+                pass
+
+        # Ensure both are processed to completion
+        self._pump( client, server )
 
     def _do_handshake(self, client, server):
         """ Attempt to connect client to server. Will throw a TransportException if the SSL
@@ -154,6 +174,8 @@ class SslTest(common.Test):
                                            self._testpath("server-private-key.pem"),
                                            "server-password")
         server = SslTest.SslTestConnection( self.server_domain, mode=Transport.SERVER )
+
+        self.client_domain.set_peer_authentication( SSLDomain.ANONYMOUS_PEER )
         client = SslTest.SslTestConnection( self.client_domain )
 
         client.connection.open()
@@ -235,7 +257,7 @@ class SslTest(common.Test):
 
         client.connection.open()
         server.connection.open()
-        self._pump( client, server )
+        self._pump_with_failing_negotiation(client, server)
         assert client.transport.closed
         assert server.transport.closed
         assert client.connection.state & Endpoint.REMOTE_UNINIT
@@ -260,7 +282,7 @@ class SslTest(common.Test):
 
         client.connection.open()
         server.connection.open()
-        self._pump( client, server )
+        self._pump_with_failing_negotiation(client, server)
         assert client.transport.closed
         assert server.transport.closed
         assert client.connection.state & Endpoint.REMOTE_UNINIT
@@ -335,7 +357,7 @@ class SslTest(common.Test):
 
         client.connection.open()
         server.connection.open()
-        self._pump( client, server )
+        self._pump_with_failing_negotiation(client, server)
         assert client.transport.closed
         assert server.transport.closed
         assert client.connection.state & Endpoint.REMOTE_UNINIT
@@ -430,7 +452,7 @@ class SslTest(common.Test):
 
         client.connection.open()
         server.connection.open()
-        self._pump( client, server )
+        self._pump_with_failing_negotiation(client, server, onesided = True)
         assert client.transport.closed
         assert server.transport.closed
         assert client.connection.state & Endpoint.REMOTE_UNINIT
@@ -479,6 +501,7 @@ class SslTest(common.Test):
     def test_singleton(self):
         """Verify that only a single instance of SSL can exist per Transport"""
         transport = Transport()
+        self.client_domain.set_peer_authentication( SSLDomain.VERIFY_PEER )
         ssl1 = SSL(transport, self.client_domain)
         ssl2 = transport.ssl(self.client_domain)
         ssl3 = transport.ssl(self.client_domain)

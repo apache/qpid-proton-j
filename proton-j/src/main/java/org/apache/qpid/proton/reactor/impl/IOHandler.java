@@ -37,6 +37,7 @@ import org.apache.qpid.proton.engine.EndpointState;
 import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.Transport;
+import org.apache.qpid.proton.engine.TransportException;
 import org.apache.qpid.proton.engine.impl.TransportImpl;
 import org.apache.qpid.proton.engine.Record;
 import org.apache.qpid.proton.reactor.Reactor;
@@ -232,7 +233,7 @@ public class IOHandler extends BaseHandler {
                     } else {
                         transport.process();
                     }
-                } catch (IOException e) {
+                } catch (IOException | TransportException e) {
                     ErrorCondition condition = new ErrorCondition();
                     condition.setCondition(Symbol.getSymbol("proton:io"));
                     condition.setDescription(e.getMessage());

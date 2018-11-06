@@ -347,12 +347,19 @@ public class SimpleSslTransportWrapperTest
     @Test
     public void testSslUnwrapThrowsException_returnsErrorResultAndRefusesFurtherInput() throws Exception
     {
-        SSLException sslException = new SSLException("unwrap exception");
+        String unwrapExceptionMessage = "unwrap exception message";
+        SSLException sslException = new SSLException(unwrapExceptionMessage);
         _dummySslEngine.rejectNextEncodedPacket(sslException);
 
         _sslWrapper.tail().put("<-A->".getBytes(StandardCharsets.UTF_8));
-        _sslWrapper.process();
-        assertEquals(_sslWrapper.capacity(), Transport.END_OF_STREAM);
+        try {
+            _sslWrapper.process();
+            fail("no exception");
+        } catch(TransportException e) {
+            assertEquals("javax.net.ssl.SSLException: " + unwrapExceptionMessage, e.getMessage());
+        }
+
+        assertEquals(Transport.END_OF_STREAM, _sslWrapper.capacity());
     }
 
     @Test
