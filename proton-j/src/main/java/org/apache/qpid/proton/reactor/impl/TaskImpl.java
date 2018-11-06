@@ -21,8 +21,6 @@
 
 package org.apache.qpid.proton.reactor.impl;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.qpid.proton.engine.Record;
 import org.apache.qpid.proton.engine.impl.RecordImpl;
 import org.apache.qpid.proton.reactor.Reactor;
@@ -32,13 +30,12 @@ public class TaskImpl implements Task, Comparable<TaskImpl> {
     private final long deadline;
     private final int counter;
     private boolean cancelled = false;
-    private final AtomicInteger count = new AtomicInteger();
     private Record attachments = new RecordImpl();
     private Reactor reactor;
 
-    public TaskImpl(long deadline) {
+    public TaskImpl(long deadline, int counter) {
         this.deadline = deadline;
-        this.counter = count.getAndIncrement();
+        this.counter = counter;
     }
 
     @Override

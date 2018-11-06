@@ -22,6 +22,7 @@
 package org.apache.qpid.proton.reactor.impl;
 
 import java.util.PriorityQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Event.Type;
@@ -32,13 +33,14 @@ public class Timer {
 
     private CollectorImpl collector;
     private PriorityQueue<TaskImpl> tasks = new PriorityQueue<TaskImpl>();
+    private AtomicInteger counter = new AtomicInteger();
 
     public Timer(Collector collector) {
         this.collector = (CollectorImpl)collector;
     }
 
     Task schedule(long deadline) {
-        TaskImpl task = new TaskImpl(deadline);
+        TaskImpl task = new TaskImpl(deadline, counter.incrementAndGet());
         tasks.add(task);
         return task;
     }

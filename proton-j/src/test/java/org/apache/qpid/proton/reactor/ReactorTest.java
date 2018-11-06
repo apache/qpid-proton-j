@@ -33,6 +33,7 @@ import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import junit.framework.AssertionFailedError;
 
@@ -485,6 +486,36 @@ public class ReactorTest {
         reactorHandler.assertEvents(Type.REACTOR_INIT, Type.SELECTABLE_INIT, Type.SELECTABLE_UPDATED, Type.REACTOR_QUIESCED, Type.SELECTABLE_UPDATED,
                 Type.SELECTABLE_FINAL, Type.REACTOR_FINAL);
         taskHandler.assertEvents(Type.TIMER_TASK);
+    }
+
+    @Test
+    public void scheduleWithEqualDeadline() throws IOException {
+        final int count = 10;
+        final ArrayList<Integer> taskRunOrder = new ArrayList<Integer>();
+
+        class TaskHandler extends BaseHandler {
+            private int _counter;
+
+            private TaskHandler(int counter) {
+                _counter = counter;
+            }
+
+            @Override
+            public void onTimerTask(Event event) {
+                taskRunOrder.add(_counter);
+            }
+        }
+
+        final List<Integer> expectedOrder = new ArrayList<>();
+        for(int i = 0 ; i < count; i++) {
+            reactor.schedule(0, new TaskHandler(i));
+            expectedOrder.add(i);
+        }
+
+        reactor.run();
+        reactor.free();
+
+        assertEquals(expectedOrder, taskRunOrder);
     }
 
     private class BarfException extends RuntimeException {
