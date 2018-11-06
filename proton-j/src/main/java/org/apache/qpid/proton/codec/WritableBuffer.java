@@ -145,9 +145,11 @@ public interface WritableBuffer {
             }
 
             if (_buf.remaining() < remaining) {
-                throw new IndexOutOfBoundsException(String.format(
+                IndexOutOfBoundsException cause = new IndexOutOfBoundsException(String.format(
                     "Requested min remaining bytes(%d) exceeds remaining(%d) in underlying ByteBuffer: %s",
                     remaining, _buf.remaining(), _buf));
+
+                throw (BufferOverflowException) new BufferOverflowException().initCause(cause);
             }
         }
 

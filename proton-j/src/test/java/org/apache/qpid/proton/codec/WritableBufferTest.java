@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
 import org.junit.Test;
@@ -80,7 +81,7 @@ public class WritableBufferTest {
     }
 
     @Test
-    public void testEnsureReminingThrowsWhenExpected() {
+    public void testEnsureRemainingThrowsWhenExpected() {
         ByteBuffer data = ByteBuffer.allocate(100);
         WritableBuffer buffer = WritableBuffer.ByteBufferWrapper.wrap(data);
 
@@ -88,7 +89,7 @@ public class WritableBufferTest {
         try {
             buffer.ensureRemaining(1024);
             fail("Should have thrown an error on request for more than is available.");
-        } catch (IndexOutOfBoundsException iobe) {}
+        } catch (BufferOverflowException boe) {}
 
         try {
             buffer.ensureRemaining(-1);
@@ -97,7 +98,7 @@ public class WritableBufferTest {
     }
 
     @Test
-    public void testEnsureReminingDefaultImplementation() {
+    public void testEnsureRemainingDefaultImplementation() {
         WritableBuffer buffer = new DefaultWritableBuffer();
 
         try {
