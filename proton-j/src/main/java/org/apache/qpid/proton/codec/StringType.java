@@ -84,26 +84,42 @@ public class StringType extends AbstractPrimitiveType<String>
 
     static int calculateUTF8Length(final String s)
     {
-        int len = s.length();
-        final int length = len;
-        for (int i = 0; i < length; i++)
+        final int stringLength = s.length();
+
+        // ASCII Optimized length case
+        int utf8len = stringLength;
+        int processed = 0;
+        for (; processed < stringLength && s.charAt(processed) < 0x80; processed++) {}
+
+        if (processed < stringLength)
         {
-            int c = s.charAt(i);
+            // Non-ASCII length remainder
+            utf8len = extendedCalculateUTF8Length(s, processed, stringLength, utf8len);
+        }
+
+        return utf8len;
+    }
+
+    static int extendedCalculateUTF8Length(final String s, int index, int length, int utf8len) {
+        for (; index < length; index++)
+        {
+            int c = s.charAt(index);
             if ((c & 0xFF80) != 0)         /* U+0080..    */
             {
-                len++;
+                utf8len++;
                 if(((c & 0xF800) != 0))    /* U+0800..    */
                 {
-                    len++;
+                    utf8len++;
                     // surrogate pairs should always combine to create a code point with a 4 octet representation
                     if ((c & 0xD800) == 0xD800 && c < 0xDC00)
                     {
-                        i++;
+                        index++;
                     }
                 }
             }
         }
-        return len;
+
+        return utf8len;
     }
 
     @Override
