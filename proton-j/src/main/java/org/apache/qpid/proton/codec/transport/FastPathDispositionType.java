@@ -124,10 +124,10 @@ public class FastPathDispositionType implements AMQPType<Disposition>, FastPathD
                     disposition.setRole(Boolean.TRUE.equals(decoder.readBoolean()) ? Role.RECEIVER : Role.SENDER);
                     break;
                 case 1:
-                    disposition.setFirst(decoder.readUnsignedInteger());
+                    disposition.setFirst(decoder.readUnsignedInteger(null));
                     break;
                 case 2:
-                    disposition.setLast(decoder.readUnsignedInteger());
+                    disposition.setLast(decoder.readUnsignedInteger(null));
                     break;
                 case 3:
                     disposition.setSettled(decoder.readBoolean(false));

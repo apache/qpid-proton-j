@@ -20,6 +20,18 @@
  */
 package org.apache.qpid.proton.codec;
 
+import java.lang.reflect.Array;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.apache.qpid.proton.ProtonException;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Decimal128;
@@ -31,12 +43,6 @@ import org.apache.qpid.proton.amqp.UnsignedByte;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.UnsignedShort;
-
-import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
 
 public class DecoderImpl implements ByteBufferDecoder
 {
@@ -90,11 +96,11 @@ public class DecoderImpl implements ByteBufferDecoder
 
             if (EncodingCodes.SMALLULONG == encoding || EncodingCodes.ULONG == encoding)
             {
-                descriptor = readUnsignedLong();
+                descriptor = readUnsignedLong(null);
             }
             else if (EncodingCodes.SYM8 == encoding || EncodingCodes.SYM32 == encoding)
             {
-                descriptor = readSymbol();
+                descriptor = readSymbol(null);
             }
             else
             {
@@ -110,17 +116,19 @@ public class DecoderImpl implements ByteBufferDecoder
                 }
             }
 
-            TypeConstructor<?> nestedEncoding = readConstructor();
+            TypeConstructor<?> nestedEncoding = readConstructor(false);
             DescribedTypeConstructor<?> dtc = _dynamicTypeConstructors.get(descriptor);
             if(dtc == null)
             {
                 dtc = new DescribedTypeConstructor()
                 {
+                    @Override
                     public DescribedType newInstance(final Object described)
                     {
                         return new UnknownDescribedType(descriptor, described);
                     }
 
+                    @Override
                     public Class<?> getTypeClass()
                     {
                         return UnknownDescribedType.class;
@@ -136,11 +144,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public void register(final Object descriptor, final FastPathDescribedTypeConstructor<?> btc)
     {
         _fastPathTypeConstructors.put(descriptor, btc);
     }
 
+    @Override
     public void register(final Object descriptor, final DescribedTypeConstructor dtc)
     {
         // Allow external type constructors to replace the built-in instances.
@@ -157,11 +167,13 @@ public class DecoderImpl implements ByteBufferDecoder
     }
 
 
+    @Override
     public Boolean readBoolean()
     {
         return readBoolean(null);
     }
 
+    @Override
     public Boolean readBoolean(final Boolean defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -173,7 +185,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.BOOLEAN_FALSE:
                 return Boolean.FALSE;
             case EncodingCodes.BOOLEAN:
-                return (Boolean) _constructors[EncodingCodes.BOOLEAN & 0xff].readValue();
+                return readRawByte() == 0 ? Boolean.FALSE : Boolean.TRUE;
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -181,6 +193,7 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public boolean readBoolean(final boolean defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -192,7 +205,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.BOOLEAN_FALSE:
                 return false;
             case EncodingCodes.BOOLEAN:
-                return (Boolean) _constructors[EncodingCodes.BOOLEAN & 0xff].readValue();
+                return readRawByte() != 0;
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -200,18 +213,20 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Byte readByte()
     {
         return readByte(null);
     }
 
+    @Override
     public Byte readByte(final Byte defaultVal)
     {
         byte encodingCode = _buffer.get();
 
         switch (encodingCode) {
             case EncodingCodes.BYTE:
-                return (Byte) _constructors[EncodingCodes.BYTE & 0xff].readValue();
+                return (Byte) readRawByte();
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -219,9 +234,10 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public byte readByte(final byte defaultVal)
     {
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor instanceof ByteType.ByteEncoding)
         {
             return ((ByteType.ByteEncoding)constructor).readPrimitiveValue();
@@ -240,11 +256,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Short readShort()
     {
         return readShort(null);
     }
 
+    @Override
     public Short readShort(final Short defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -252,7 +270,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.SHORT:
-                return (Short) _constructors[EncodingCodes.SHORT & 0xff].readValue();
+                return Short.valueOf(readRawShort());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -260,10 +278,10 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public short readShort(final short defaultVal)
     {
-
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor instanceof ShortType.ShortEncoding)
         {
             return ((ShortType.ShortEncoding)constructor).readPrimitiveValue();
@@ -282,11 +300,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Integer readInteger()
     {
         return readInteger(null);
     }
 
+    @Override
     public Integer readInteger(final Integer defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -294,9 +314,9 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.SMALLINT:
-                return (Integer) _constructors[EncodingCodes.SMALLINT & 0xff].readValue();
+                return Integer.valueOf(readRawByte());
             case EncodingCodes.INT:
-                return (Integer) _constructors[EncodingCodes.INT & 0xff].readValue();
+                return Integer.valueOf(readRawInt());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -304,10 +324,10 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public int readInteger(final int defaultVal)
     {
-
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor instanceof IntegerType.IntegerEncoding)
         {
             return ((IntegerType.IntegerEncoding)constructor).readPrimitiveValue();
@@ -326,11 +346,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Long readLong()
     {
         return readLong(null);
     }
 
+    @Override
     public Long readLong(final Long defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -338,9 +360,9 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.SMALLLONG:
-                return (Long) _constructors[EncodingCodes.SMALLLONG & 0xff].readValue();
+                return Long.valueOf(readRawByte());
             case EncodingCodes.LONG:
-                return (Long) _constructors[EncodingCodes.LONG & 0xff].readValue();
+                return Long.valueOf(readRawLong());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -348,10 +370,10 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public long readLong(final long defaultVal)
     {
-
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor instanceof LongType.LongEncoding)
         {
             return ((LongType.LongEncoding)constructor).readPrimitiveValue();
@@ -370,11 +392,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public UnsignedByte readUnsignedByte()
     {
         return readUnsignedByte(null);
     }
 
+    @Override
     public UnsignedByte readUnsignedByte(final UnsignedByte defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -382,7 +406,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.UBYTE:
-                return (UnsignedByte) _constructors[EncodingCodes.UBYTE & 0xff].readValue();
+                return UnsignedByte.valueOf(readRawByte());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -390,11 +414,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public UnsignedShort readUnsignedShort()
     {
         return readUnsignedShort(null);
     }
 
+    @Override
     public UnsignedShort readUnsignedShort(final UnsignedShort defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -402,7 +428,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.USHORT:
-                return (UnsignedShort) _constructors[EncodingCodes.USHORT & 0xff].readValue();
+                return UnsignedShort.valueOf(readRawShort());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -410,11 +436,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public UnsignedInteger readUnsignedInteger()
     {
         return readUnsignedInteger(null);
     }
 
+    @Override
     public UnsignedInteger readUnsignedInteger(final UnsignedInteger defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -424,9 +452,9 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.UINT0:
                 return UnsignedInteger.ZERO;
             case EncodingCodes.SMALLUINT:
-                return (UnsignedInteger) _constructors[EncodingCodes.SMALLUINT & 0xff].readValue();
+                return UnsignedInteger.valueOf(((int) readRawByte()) & 0xff);
             case EncodingCodes.UINT:
-                return (UnsignedInteger) _constructors[EncodingCodes.UINT & 0xff].readValue();
+                return UnsignedInteger.valueOf(readRawInt());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -434,11 +462,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public UnsignedLong readUnsignedLong()
     {
         return readUnsignedLong(null);
     }
 
+    @Override
     public UnsignedLong readUnsignedLong(final UnsignedLong defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -448,9 +478,9 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.ULONG0:
                 return UnsignedLong.ZERO;
             case EncodingCodes.SMALLULONG:
-                return (UnsignedLong) _constructors[EncodingCodes.SMALLULONG & 0xff].readValue();
+                return UnsignedLong.valueOf(((long) readRawByte())&0xffl);
             case EncodingCodes.ULONG:
-                return (UnsignedLong) _constructors[EncodingCodes.ULONG & 0xff].readValue();
+                return UnsignedLong.valueOf(readRawLong());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -458,11 +488,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Character readCharacter()
     {
         return readCharacter(null);
     }
 
+    @Override
     public Character readCharacter(final Character defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -470,7 +502,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.CHAR:
-                return (Character) _constructors[EncodingCodes.CHAR & 0xff].readValue();
+                return Character.valueOf((char) (readRawInt() & 0xffff));
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -478,6 +510,7 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public char readCharacter(final char defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -485,7 +518,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.CHAR:
-                return (Character) _constructors[EncodingCodes.CHAR & 0xff].readValue();
+                return (char) (readRawInt() & 0xffff);
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -493,11 +526,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Float readFloat()
     {
         return readFloat(null);
     }
 
+    @Override
     public Float readFloat(final Float defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -505,7 +540,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.FLOAT:
-                return (Float) _constructors[EncodingCodes.FLOAT & 0xff].readValue();
+                return Float.valueOf(readRawFloat());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -513,10 +548,10 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public float readFloat(final float defaultVal)
     {
-
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor instanceof FloatType.FloatEncoding)
         {
             return ((FloatType.FloatEncoding)constructor).readPrimitiveValue();
@@ -535,11 +570,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Double readDouble()
     {
         return readDouble(null);
     }
 
+    @Override
     public Double readDouble(final Double defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -547,7 +584,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.DOUBLE:
-                return (Double) _constructors[EncodingCodes.DOUBLE & 0xff].readValue();
+                return Double.valueOf(readRawDouble());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -555,10 +592,10 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public double readDouble(final double defaultVal)
     {
-
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor instanceof DoubleType.DoubleEncoding)
         {
             return ((DoubleType.DoubleEncoding)constructor).readPrimitiveValue();
@@ -577,11 +614,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public UUID readUUID()
     {
         return readUUID(null);
     }
 
+    @Override
     public UUID readUUID(final UUID defaultVal)
     {
         byte encodingCode = _buffer.get();
@@ -589,7 +628,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.UUID:
-                return (UUID) _constructors[EncodingCodes.UUID & 0xff].readValue();
+                return new UUID(readRawLong(), readRawLong());
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
@@ -597,11 +636,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Decimal32 readDecimal32()
     {
         return readDecimal32(null);
     }
 
+    @Override
     public Decimal32 readDecimal32(final Decimal32 defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -617,11 +658,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Decimal64 readDecimal64()
     {
         return readDecimal64(null);
     }
 
+    @Override
     public Decimal64 readDecimal64(final Decimal64 defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -637,11 +680,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Decimal128 readDecimal128()
     {
         return readDecimal128(null);
     }
 
+    @Override
     public Decimal128 readDecimal128(final Decimal128 defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -657,11 +702,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Date readTimestamp()
     {
         return readTimestamp(null);
     }
 
+    @Override
     public Date readTimestamp(final Date defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -669,7 +716,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.TIMESTAMP:
-                return (Date) _constructors[EncodingCodes.TIMESTAMP & 0xff].readValue();
+                return new Date(readRawLong());
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
@@ -677,11 +724,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Binary readBinary()
     {
         return readBinary(null);
     }
 
+    @Override
     public Binary readBinary(final Binary defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -699,11 +748,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Symbol readSymbol()
     {
         return readSymbol(null);
     }
 
+    @Override
     public Symbol readSymbol(final Symbol defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -721,11 +772,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public String readString()
     {
         return readString(null);
     }
 
+    @Override
     public String readString(final String defaultValue)
     {
         byte encodingCode = _buffer.get();
@@ -743,6 +796,7 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     public List readList()
     {
@@ -763,11 +817,13 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public <T> void readList(final ListProcessor<T> processor)
     {
         //TODO.
     }
 
+    @Override
     @SuppressWarnings("rawtypes")
     public Map readMap()
     {
@@ -786,57 +842,68 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public <T> T[] readArray(final Class<T> clazz)
     {
         return null;  //TODO.
     }
 
+    @Override
     public Object[] readArray()
     {
         return (Object[]) readConstructor().readValue();
 
     }
 
+    @Override
     public boolean[] readBooleanArray()
     {
         return (boolean[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public byte[] readByteArray()
     {
         return (byte[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public short[] readShortArray()
     {
         return (short[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public int[] readIntegerArray()
     {
         return (int[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public long[] readLongArray()
     {
         return (long[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public float[] readFloatArray()
     {
         return (float[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public double[] readDoubleArray()
     {
         return (double[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public char[] readCharacterArray()
     {
         return (char[]) ((ArrayType.ArrayEncoding)readConstructor()).readValueArray();
     }
 
+    @Override
     public <T> T[] readMultiple(final Class<T> clazz)
     {
         Object val = readObject();
@@ -867,6 +934,7 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Object[] readMultiple()
     {
         Object val = readObject();
@@ -886,41 +954,49 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public byte[] readByteMultiple()
     {
         return new byte[0];  //TODO.
     }
 
+    @Override
     public short[] readShortMultiple()
     {
         return new short[0];  //TODO.
     }
 
+    @Override
     public int[] readIntegerMultiple()
     {
         return new int[0];  //TODO.
     }
 
+    @Override
     public long[] readLongMultiple()
     {
         return new long[0];  //TODO.
     }
 
+    @Override
     public float[] readFloatMultiple()
     {
         return new float[0];  //TODO.
     }
 
+    @Override
     public double[] readDoubleMultiple()
     {
         return new double[0];  //TODO.
     }
 
+    @Override
     public char[] readCharacterMultiple()
     {
         return new char[0];  //TODO.
     }
 
+    @Override
     public Object readObject()
     {
         boolean arrayType = false;
@@ -932,7 +1008,7 @@ public class DecoderImpl implements ByteBufferDecoder
                 arrayType = true;
         }
 
-        TypeConstructor constructor = readConstructor();
+        TypeConstructor<?> constructor = readConstructor();
         if(constructor== null)
         {
             throw new DecodeException("Unknown constructor");
@@ -945,6 +1021,7 @@ public class DecoderImpl implements ByteBufferDecoder
         }
     }
 
+    @Override
     public Object readObject(final Object defaultValue)
     {
         Object val = readObject();
@@ -1004,6 +1081,7 @@ public class DecoderImpl implements ByteBufferDecoder
         return decode;
     }
 
+    @Override
     public void setByteBuffer(final ByteBuffer buffer)
     {
         _buffer = new ReadableBuffer.ByteBufferReader(buffer);
@@ -1045,11 +1123,13 @@ public class DecoderImpl implements ByteBufferDecoder
             _described = described;
         }
 
+        @Override
         public Object getDescriptor()
         {
             return _descriptor;
         }
 
+        @Override
         public Object getDescribed()
         {
             return _described;
@@ -1070,6 +1150,7 @@ public class DecoderImpl implements ByteBufferDecoder
 
     }
 
+    @Override
     public int getByteBufferRemaining() {
         return _buffer.remaining();
     }

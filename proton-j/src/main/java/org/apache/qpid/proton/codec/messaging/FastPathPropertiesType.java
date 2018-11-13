@@ -1,5 +1,5 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
+  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
@@ -28,6 +28,7 @@ import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
 import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
@@ -57,6 +58,7 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
     @Override
     public Properties readValue() {
         DecoderImpl decoder = getDecoder();
+        ReadableBuffer buffer = decoder.getBuffer();
         byte typeCode = decoder.getBuffer().get();
 
         @SuppressWarnings("unused")
@@ -67,12 +69,12 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
             case EncodingCodes.LIST0:
                 break;
             case EncodingCodes.LIST8:
-                size = ((int)decoder.getBuffer().get()) & 0xff;
-                count = ((int)decoder.getBuffer().get()) & 0xff;
+                size = buffer.get() & 0xff;
+                count = buffer.get() & 0xff;
                 break;
             case EncodingCodes.LIST32:
-                size = decoder.getBuffer().getInt();
-                count = decoder.getBuffer().getInt();
+                size = buffer.getInt();
+                count = buffer.getInt();
                 break;
             default:
                 throw new DecodeException("Incorrect type found in Properties encoding: " + typeCode);
@@ -86,40 +88,40 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
                     properties.setMessageId(decoder.readObject());
                     break;
                 case 1:
-                    properties.setUserId(decoder.readBinary());
+                    properties.setUserId(decoder.readBinary(null));
                     break;
                 case 2:
-                    properties.setTo(decoder.readString());
+                    properties.setTo(decoder.readString(null));
                     break;
                 case 3:
-                    properties.setSubject(decoder.readString());
+                    properties.setSubject(decoder.readString(null));
                     break;
                 case 4:
-                    properties.setReplyTo(decoder.readString());
+                    properties.setReplyTo(decoder.readString(null));
                     break;
                 case 5:
                     properties.setCorrelationId(decoder.readObject());
                     break;
                 case 6:
-                    properties.setContentType(decoder.readSymbol());
+                    properties.setContentType(decoder.readSymbol(null));
                     break;
                 case 7:
-                    properties.setContentEncoding(decoder.readSymbol());
+                    properties.setContentEncoding(decoder.readSymbol(null));
                     break;
                 case 8:
-                    properties.setAbsoluteExpiryTime(decoder.readTimestamp());
+                    properties.setAbsoluteExpiryTime(decoder.readTimestamp(null));
                     break;
                 case 9:
-                    properties.setCreationTime(decoder.readTimestamp());
+                    properties.setCreationTime(decoder.readTimestamp(null));
                     break;
                 case 10:
-                    properties.setGroupId(decoder.readString());
+                    properties.setGroupId(decoder.readString(null));
                     break;
                 case 11:
-                    properties.setGroupSequence(decoder.readUnsignedInteger());
+                    properties.setGroupSequence(decoder.readUnsignedInteger(null));
                     break;
                 case 12:
-                    properties.setReplyToGroupId(decoder.readString());
+                    properties.setReplyToGroupId(decoder.readString(null));
                     break;
                 default:
                     throw new IllegalStateException("To many entries in Properties encoding");
@@ -300,8 +302,7 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
 
     public static void register(Decoder decoder, EncoderImpl encoder) {
         FastPathPropertiesType type = new FastPathPropertiesType(encoder);
-        for(Object descriptor : DESCRIPTORS)
-        {
+        for(Object descriptor : DESCRIPTORS) {
             decoder.register(descriptor, (FastPathDescribedTypeConstructor<?>) type);
         }
         encoder.register(type);

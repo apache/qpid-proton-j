@@ -109,28 +109,28 @@ public class FastPathFlowType implements AMQPType<Flow>, FastPathDescribedTypeCo
         for (int index = 0; index < count; ++index) {
             switch (index) {
                 case 0:
-                    flow.setNextIncomingId(decoder.readUnsignedInteger());
+                    flow.setNextIncomingId(decoder.readUnsignedInteger(null));
                     break;
                 case 1:
-                    flow.setIncomingWindow(decoder.readUnsignedInteger());
+                    flow.setIncomingWindow(decoder.readUnsignedInteger(null));
                     break;
                 case 2:
-                    flow.setNextOutgoingId(decoder.readUnsignedInteger());
+                    flow.setNextOutgoingId(decoder.readUnsignedInteger(null));
                     break;
                 case 3:
-                    flow.setOutgoingWindow(decoder.readUnsignedInteger());
+                    flow.setOutgoingWindow(decoder.readUnsignedInteger(null));
                     break;
                 case 4:
-                    flow.setHandle(decoder.readUnsignedInteger());
+                    flow.setHandle(decoder.readUnsignedInteger(null));
                     break;
                 case 5:
-                    flow.setDeliveryCount(decoder.readUnsignedInteger());
+                    flow.setDeliveryCount(decoder.readUnsignedInteger(null));
                     break;
                 case 6:
-                    flow.setLinkCredit(decoder.readUnsignedInteger());
+                    flow.setLinkCredit(decoder.readUnsignedInteger(null));
                     break;
                 case 7:
-                    flow.setAvailable(decoder.readUnsignedInteger());
+                    flow.setAvailable(decoder.readUnsignedInteger(null));
                     break;
                 case 8:
                     flow.setDrain(decoder.readBoolean(false));

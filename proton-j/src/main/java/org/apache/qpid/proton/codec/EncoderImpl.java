@@ -157,44 +157,52 @@ public final class EncoderImpl implements ByteBufferEncoder
         return getTypeFromClass(clazz, null);
     }
 
-    private AMQPType getTypeFromClass(final Class clazz, Object instance)
+    private AMQPType<?> getTypeFromClass(final Class<?> clazz, final Object instance)
     {
-        AMQPType amqpType = _typeRegistry.get(clazz);
+        AMQPType<?> amqpType = _typeRegistry.get(clazz);
         if(amqpType == null)
         {
-            if(clazz.isArray())
-            {
-                amqpType = _arrayType;
-            }
-            else
-            {
-                if(List.class.isAssignableFrom(clazz))
-                {
-                    amqpType = _listType;
-                }
-                else if(Map.class.isAssignableFrom(clazz))
-                {
-                    amqpType = _mapType;
-                }
-                else if(DescribedType.class.isAssignableFrom(clazz))
-                {
-                    amqpType = _describedTypesClassRegistry.get(clazz);
-                    if(amqpType == null && instance != null)
-                    {
-                        Object descriptor = ((DescribedType) instance).getDescriptor();
-                        amqpType = _describedDescriptorRegistry.get(descriptor);
-                        if(amqpType == null)
-                        {
-                            amqpType = new DynamicDescribedType(this, descriptor);
-                            _describedDescriptorRegistry.put(descriptor, amqpType);
-                        }
-                    }
-
-                    return amqpType;
-                }
-            }
-            _typeRegistry.put(clazz, amqpType);
+            amqpType = deduceTypeFromClass(clazz, instance);
         }
+
+        return amqpType;
+    }
+
+    private AMQPType<?> deduceTypeFromClass(final Class<?> clazz, final Object instance) {
+        AMQPType<?> amqpType = null;
+
+        if(clazz.isArray())
+        {
+            amqpType = _arrayType;
+        }
+        else
+        {
+            if(List.class.isAssignableFrom(clazz))
+            {
+                amqpType = _listType;
+            }
+            else if(Map.class.isAssignableFrom(clazz))
+            {
+                amqpType = _mapType;
+            }
+            else if(DescribedType.class.isAssignableFrom(clazz))
+            {
+                amqpType = _describedTypesClassRegistry.get(clazz);
+                if(amqpType == null && instance != null)
+                {
+                    Object descriptor = ((DescribedType) instance).getDescriptor();
+                    amqpType = _describedDescriptorRegistry.get(descriptor);
+                    if(amqpType == null)
+                    {
+                        amqpType = new DynamicDescribedType(this, descriptor);
+                        _describedDescriptorRegistry.put(descriptor, amqpType);
+                    }
+                }
+
+                return amqpType;
+            }
+        }
+        _typeRegistry.put(clazz, amqpType);
 
         return amqpType;
     }
@@ -212,7 +220,7 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     public void registerDescribedType(Class clazz, Object descriptor)
     {
-        AMQPType type = _describedDescriptorRegistry.get(descriptor);
+        AMQPType<?> type = _describedDescriptorRegistry.get(descriptor);
         if(type == null)
         {
             type = new DynamicDescribedType(this, descriptor);
@@ -513,7 +521,6 @@ public final class EncoderImpl implements ByteBufferEncoder
         {
             _uuidType.fastWrite(this, uuid);
         }
-
     }
 
     @Override
@@ -553,7 +560,6 @@ public final class EncoderImpl implements ByteBufferEncoder
         {
             _symbolType.fastWrite(this, s);
         }
-
     }
 
     @Override
@@ -715,44 +721,51 @@ public final class EncoderImpl implements ByteBufferEncoder
         }
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
     public void writeObject(final Object o)
     {
-        if (o == null)
+        if (o != null)
         {
-            getBuffer().put(EncodingCodes.NULL);
-            return;
-        }
+            AMQPType type = _typeRegistry.get(o.getClass());
 
-        AMQPType type = _typeRegistry.get(o.getClass());
-
-        if(type == null)
-        {
-            if(o.getClass().isArray())
+            if(type != null)
             {
-                writeArrayType(o);
-            }
-            else if(o instanceof List)
-            {
-                writeList((List)o);
-            }
-            else if(o instanceof Map)
-            {
-                writeMap((Map)o);
-            }
-            else if(o instanceof DescribedType)
-            {
-                writeDescribedType((DescribedType)o);
+                type.write(o);
             }
             else
             {
-                throw new IllegalArgumentException(
-                    "Do not know how to write Objects of class " + o.getClass().getName());
+                writeUnregisteredType(o);
             }
         }
         else
         {
-            type.write(o);
+            _buffer.put(EncodingCodes.NULL);
+        }
+    }
+
+    private void writeUnregisteredType(final Object o)
+    {
+        if(o.getClass().isArray())
+        {
+            writeArrayType(o);
+        }
+        else if(o instanceof List)
+        {
+            writeList((List<?>)o);
+        }
+        else if(o instanceof Map)
+        {
+            writeMap((Map<?, ?>)o);
+        }
+        else if(o instanceof DescribedType)
+        {
+            writeDescribedType((DescribedType)o);
+        }
+        else
+        {
+            throw new IllegalArgumentException(
+                "Do not know how to write Objects of class " + o.getClass().getName());
         }
     }
 
@@ -843,7 +856,7 @@ public final class EncoderImpl implements ByteBufferEncoder
         _buffer.put(string);
     }
 
-    AMQPType getNullTypeEncoder()
+    AMQPType<?> getNullTypeEncoder()
     {
         return _nullType;
     }

@@ -28,6 +28,7 @@ import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
 import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
@@ -57,6 +58,7 @@ public class FastPathHeaderType implements AMQPType<Header>, FastPathDescribedTy
     @Override
     public Header readValue() {
         DecoderImpl decoder = getDecoder();
+        ReadableBuffer buffer = decoder.getBuffer();
         byte typeCode = decoder.getBuffer().get();
 
         @SuppressWarnings("unused")
@@ -67,12 +69,12 @@ public class FastPathHeaderType implements AMQPType<Header>, FastPathDescribedTy
             case EncodingCodes.LIST0:
                 break;
             case EncodingCodes.LIST8:
-                size = ((int)decoder.getBuffer().get()) & 0xff;
-                count = ((int)decoder.getBuffer().get()) & 0xff;
+                size = buffer.get() & 0xff;
+                count = buffer.get() & 0xff;
                 break;
             case EncodingCodes.LIST32:
-                size = decoder.getBuffer().getInt();
-                count = decoder.getBuffer().getInt();
+                size = buffer.getInt();
+                count = buffer.getInt();
                 break;
             default:
                 throw new DecodeException("Incorrect type found in Header encoding: " + typeCode);
@@ -83,19 +85,19 @@ public class FastPathHeaderType implements AMQPType<Header>, FastPathDescribedTy
         for (int index = 0; index < count; ++index) {
             switch (index) {
                 case 0:
-                    header.setDurable(decoder.readBoolean());
+                    header.setDurable(decoder.readBoolean(null));
                     break;
                 case 1:
-                    header.setPriority(decoder.readUnsignedByte());
+                    header.setPriority(decoder.readUnsignedByte(null));
                     break;
                 case 2:
-                    header.setTtl(decoder.readUnsignedInteger());
+                    header.setTtl(decoder.readUnsignedInteger(null));
                     break;
                 case 3:
-                    header.setFirstAcquirer(decoder.readBoolean());
+                    header.setFirstAcquirer(decoder.readBoolean(null));
                     break;
                 case 4:
-                    header.setDeliveryCount(decoder.readUnsignedInteger());
+                    header.setDeliveryCount(decoder.readUnsignedInteger(null));
                     break;
                 default:
                     throw new IllegalStateException("To many entries in Header encoding");
