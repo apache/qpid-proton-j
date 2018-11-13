@@ -18,6 +18,8 @@ package org.apache.qpid.proton.codec.messaging;
 
 import java.util.Collection;
 
+import org.apache.qpid.proton.ProtonException;
+import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.Data;
@@ -27,6 +29,7 @@ import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
 import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
@@ -80,7 +83,33 @@ public class FastPathDataType implements AMQPType<Data>, FastPathDescribedTypeCo
 
     @Override
     public Data readValue() {
-        return new Data(getDecoder().readBinary());
+        ReadableBuffer buffer = getDecoder().getBuffer();
+        byte encodingCode = buffer.get();
+
+        int size = 0;
+
+        switch (encodingCode) {
+            case EncodingCodes.VBIN8:
+                size = buffer.get() & 0xFF;
+                break;
+            case EncodingCodes.VBIN32:
+                size = buffer.getInt();
+                break;
+            case EncodingCodes.NULL:
+                return new Data(null);
+            default:
+                throw new ProtonException("Expected Binary type but found encoding: " + encodingCode);
+        }
+
+        if (size > buffer.remaining()) {
+            throw new IllegalArgumentException("Binary data size " + size + " is specified to be greater than the " +
+                                               "amount of data available ("+ buffer.remaining()+")");
+        }
+
+        byte[] data = new byte[size];
+        buffer.get(data, 0, size);
+
+        return new Data(new Binary(data));
     }
 
     @Override
