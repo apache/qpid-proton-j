@@ -834,22 +834,39 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             return false;
         }
 
-        ReadableBuffer buffer = (ReadableBuffer)other;
-        if (this.remaining() != buffer.remaining()) {
+        ReadableBuffer buffer = (ReadableBuffer) other;
+        final int remaining = remaining();
+        if (remaining != buffer.remaining()) {
             return false;
         }
+        if (hasArray()) {
+            return equals(currentArray, position, remaining, buffer);
+        } else {
+            return equals(this, buffer);
+        }
+    }
 
-        final int origPos = position();
+    private static boolean equals(byte[] buffer, int start, int length, ReadableBuffer other) {
+        final int position = other.position();
+        for (int i = 0; i < length; i++) {
+            if (buffer[start + i] != other.get(position + i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean equals(ReadableBuffer buffer, ReadableBuffer other) {
+        final int origPos = buffer.position();
         try {
-            for (int i = buffer.position(); hasRemaining(); i++) {
-                if (!equals(this.get(), buffer.get(i))) {
+            for (int i = other.position(); buffer.hasRemaining(); i++) {
+                if (!equals(buffer.get(), other.get(i))) {
                     return false;
                 }
             }
-
             return true;
         } finally {
-            position(origPos);
+            buffer.position(origPos);
         }
     }
 
