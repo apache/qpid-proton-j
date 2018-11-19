@@ -16,7 +16,15 @@
  */
 package org.apache.qpid.proton.codec;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -3608,6 +3616,84 @@ public class CompositeReadableBufferTest {
 
         assertEquals(2, buffer1.position());
         assertEquals(3, buffer2.position());
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentlyPositionedSlicesSame() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentlyPositionedSlicesSameTestImpl(false);
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentlyPositionedSlicesSameMultipleArrays() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentlyPositionedSlicesSameTestImpl(true);
+    }
+
+    private void doEqualsWhenContentRemainingWithDifferentlyPositionedSlicesSameTestImpl(boolean multipleArrays) {
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        CompositeReadableBuffer buffer2 = new CompositeReadableBuffer();
+
+        byte[] data1 = new byte[] {-1, -1, 0, 1, 2, 3, 4, 5};
+        byte[] data2 = new byte[] {-1, -1, -1, 0, 1, 2, 3, 4, 5};
+
+        buffer1.append(data1);
+        buffer1.position(2);
+
+        buffer2.append(data2);
+        buffer2.position(3);
+
+        if (multipleArrays) {
+            byte[] data3 = new byte[] { 5, 4, 3, 2, 1 };
+            buffer1.append(data3);
+            buffer2.append(data3);
+        }
+
+        buffer1 = buffer1.slice();
+        buffer2 = buffer2.slice();
+
+        assertEquals(buffer1, buffer2);
+        assertEquals(buffer2, buffer1);
+
+        assertEquals(0, buffer1.position());
+        assertEquals(0, buffer2.position());
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentlyPositionedSlicesNotSame() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentlyPositionedSlicesNotSameTestImpl(false);
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentlyPositionedSlicesNotSameMultipleArrays() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentlyPositionedSlicesNotSameTestImpl(true);
+    }
+
+    private void doEqualsWhenContentRemainingWithDifferentlyPositionedSlicesNotSameTestImpl(boolean multipleArrays) {
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        CompositeReadableBuffer buffer2 = new CompositeReadableBuffer();
+
+        byte[] data1 = new byte[] {-1, -1, 0, 1, 2, 3, 4, 5};
+        byte[] data2 = new byte[] {-1, -1, -1, 0, 1, 2, 3, 4, -1};
+
+        buffer1.append(data1);
+        buffer1.position(2);
+
+        buffer2.append(data2);
+        buffer2.position(3);
+
+        if (multipleArrays) {
+            byte[] data3 = new byte[] { 5, 4, 3, 2, 1 };
+            buffer1.append(data3);
+            buffer2.append(data3);
+        }
+
+        buffer1 = buffer1.slice();
+        buffer2 = buffer2.slice();
+
+        assertNotEquals(buffer1, buffer2);
+        assertNotEquals(buffer2, buffer1);
+
+        assertEquals(0, buffer1.position());
+        assertEquals(0, buffer2.position());
     }
 
     //----- Utility Methods --------------------------------------------------//
