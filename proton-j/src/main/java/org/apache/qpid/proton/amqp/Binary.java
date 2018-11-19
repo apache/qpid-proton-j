@@ -27,7 +27,6 @@ import org.apache.qpid.proton.codec.ReadableBuffer;
 
 public final class Binary
 {
-
     private final byte[] _data;
     private final int _offset;
     private final int _length;
@@ -102,7 +101,6 @@ public final class Binary
         return true;
     }
 
-
     public int getArrayOffset()
     {
         return _offset;
@@ -118,10 +116,10 @@ public final class Binary
         return _length;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder str = new StringBuilder();
-
 
         for (int i = 0; i < _length; i++)
         {
@@ -138,12 +136,10 @@ public final class Binary
         }
 
         return str.toString();
-
     }
 
     public static Binary combine(final Collection<Binary> binaries)
     {
-
         if(binaries.size() == 1)
         {
             return binaries.iterator().next();
@@ -190,9 +186,11 @@ public final class Binary
 
     public static Binary create(ByteBuffer buffer)
     {
-        if( buffer == null )
+        if (buffer == null)
+        {
             return null;
-        if( buffer.isDirect() || buffer.isReadOnly() )
+        }
+        if (buffer.isDirect() || buffer.isReadOnly())
         {
             byte data[] = new byte [buffer.remaining()];
             ByteBuffer dup = buffer.duplicate();
@@ -205,4 +203,17 @@ public final class Binary
         }
     }
 
+    public static Binary copy(Binary source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+        else
+        {
+            byte[] data = new byte[source.getLength()];
+            System.arraycopy(source.getArray(), source.getArrayOffset(), data, 0, source.getLength());
+            return new Binary(data);
+        }
+    }
 }

@@ -29,6 +29,17 @@ public final class Close implements FrameBody
 {
     private ErrorCondition _error;
 
+    public Close() {}
+
+    public Close(Close other)
+    {
+        if (other._error != null)
+        {
+            this._error = new ErrorCondition();
+            this._error.copyFrom(other._error);
+        }
+    }
+
     public ErrorCondition getError()
     {
         return _error;
@@ -39,6 +50,7 @@ public final class Close implements FrameBody
         _error = error;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleClose(this, payload, context);
@@ -51,5 +63,10 @@ public final class Close implements FrameBody
                "error=" + _error +
                '}';
     }
+
+    @Override
+    public Close copy()
+    {
+        return new Close(this);
+    }
 }
-  

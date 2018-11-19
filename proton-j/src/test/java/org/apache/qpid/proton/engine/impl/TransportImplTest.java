@@ -379,7 +379,7 @@ public class TransportImplTest
         protected void writeFrame(int channel, FrameBody frameBody,
                                   ReadableBuffer payload, Runnable onPayloadTooLarge) {
             super.writeFrame(channel, frameBody, payload, onPayloadTooLarge);
-            writes.addLast(frameBody);
+            writes.addLast(frameBody != null ? frameBody.copy() : null);
         }
     }
 

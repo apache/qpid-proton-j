@@ -23,18 +23,18 @@
 
 package org.apache.qpid.proton.amqp.transport;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
 
-import java.util.Arrays;
-import java.util.Map;
-
-
+@SuppressWarnings("rawtypes")
 public final class Begin implements FrameBody
 {
-
     private UnsignedShort _remoteChannel;
     private UnsignedInteger _nextOutgoingId;
     private UnsignedInteger _incomingWindow;
@@ -43,6 +43,27 @@ public final class Begin implements FrameBody
     private Symbol[] _offeredCapabilities;
     private Symbol[] _desiredCapabilities;
     private Map _properties;
+
+    public Begin() {}
+
+    @SuppressWarnings("unchecked")
+    public Begin(Begin other)
+    {
+        this._remoteChannel = other._remoteChannel;
+        this._nextOutgoingId = other._nextOutgoingId;
+        this._incomingWindow = other._incomingWindow;
+        this._outgoingWindow = other._outgoingWindow;
+        this._handleMax = other._handleMax;
+        if (other._offeredCapabilities != null) {
+            this._offeredCapabilities = Arrays.copyOf(other._offeredCapabilities, other._offeredCapabilities.length);
+        }
+        if (other._desiredCapabilities != null) {
+            this._desiredCapabilities = Arrays.copyOf(other._desiredCapabilities, other._desiredCapabilities.length);
+        }
+        if (other._properties != null) {
+            this._properties = new LinkedHashMap<>(other._properties);
+        }
+    }
 
     public UnsignedShort getRemoteChannel()
     {
@@ -139,11 +160,11 @@ public final class Begin implements FrameBody
         _properties = properties;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleBegin(this, payload, context);
     }
-
 
     @Override
     public String toString()
@@ -159,5 +180,10 @@ public final class Begin implements FrameBody
                ", properties=" + _properties +
                '}';
     }
+
+    @Override
+    public Begin copy()
+    {
+        return new Begin(this);
+    }
 }
-  

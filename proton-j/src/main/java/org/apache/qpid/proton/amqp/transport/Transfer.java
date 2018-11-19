@@ -40,6 +40,23 @@ public final class Transfer implements FrameBody
     private boolean _aborted;
     private boolean _batchable;
 
+    public Transfer() {}
+
+    public Transfer(Transfer other)
+    {
+        this._handle = other._handle;
+        this._deliveryId = other._deliveryId;
+        this._deliveryTag = Binary.copy(other._deliveryTag);
+        this._messageFormat = other._messageFormat;
+        this._settled = other._settled;
+        this._more = other._more;
+        this._rcvSettleMode = other._rcvSettleMode;
+        this._state = other._state;
+        this._resume = other._resume;
+        this._aborted = other._aborted;
+        this._batchable = other._batchable;
+    }
+
     public UnsignedInteger getHandle()
     {
         return _handle;
@@ -155,6 +172,7 @@ public final class Transfer implements FrameBody
         _batchable = batchable;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleTransfer(this, payload, context);
@@ -177,5 +195,10 @@ public final class Transfer implements FrameBody
                ", batchable=" + _batchable +
                '}';
     }
+
+    @Override
+    public Transfer copy()
+    {
+        return new Transfer(this);
+    }
 }
-  

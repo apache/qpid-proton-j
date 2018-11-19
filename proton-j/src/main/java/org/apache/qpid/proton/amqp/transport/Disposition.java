@@ -35,6 +35,18 @@ public final class Disposition implements FrameBody
     private DeliveryState _state;
     private boolean _batchable;
 
+    public Disposition() {}
+
+    public Disposition(Disposition other)
+    {
+        this._role = other._role;
+        this._first = other._first;
+        this._last = other._last;
+        this._settled = other._settled;
+        this._state = other._state;
+        this._batchable = other._batchable;
+    }
+
     public Role getRole()
     {
         return _role;
@@ -104,6 +116,7 @@ public final class Disposition implements FrameBody
         _batchable = batchable;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleDisposition(this, payload, context);
@@ -120,5 +133,11 @@ public final class Disposition implements FrameBody
                ", state=" + _state +
                ", batchable=" + _batchable +
                '}';
+    }
+
+    @Override
+    public Disposition copy()
+    {
+        return new Disposition(this);
     }
 }

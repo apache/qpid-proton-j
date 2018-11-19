@@ -23,11 +23,13 @@
 
 package org.apache.qpid.proton.amqp.transport;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 
+@SuppressWarnings("rawtypes")
 public final class Flow implements FrameBody
 {
     private UnsignedInteger _nextIncomingId;
@@ -41,6 +43,27 @@ public final class Flow implements FrameBody
     private boolean _drain;
     private boolean _echo;
     private Map _properties;
+
+    public Flow() {}
+
+    @SuppressWarnings("unchecked")
+    public Flow(Flow other)
+    {
+        this._nextIncomingId = other._nextIncomingId;
+        this._incomingWindow = other._incomingWindow;
+        this._nextOutgoingId = other._nextOutgoingId;
+        this._outgoingWindow = other._outgoingWindow;
+        this._handle = other._handle;
+        this._deliveryCount = other._deliveryCount;
+        this._linkCredit = other._linkCredit;
+        this._available = other._available;
+        this._drain = other._drain;
+        this._echo = other._echo;
+        if (other._properties != null)
+        {
+            this._properties = new LinkedHashMap<>(other._properties);
+        }
+    }
 
     public UnsignedInteger getNextIncomingId()
     {
@@ -167,6 +190,7 @@ public final class Flow implements FrameBody
         _properties = properties;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleFlow(this, payload, context);
@@ -189,5 +213,10 @@ public final class Flow implements FrameBody
                ", properties=" + _properties +
                '}';
     }
+
+    @Override
+    public Flow copy()
+    {
+        return new Flow(this);
+    }
 }
-  

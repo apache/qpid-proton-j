@@ -23,15 +23,16 @@
 
 package org.apache.qpid.proton.amqp.transport;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
 
-import java.util.Arrays;
-import java.util.Map;
-
-
+@SuppressWarnings("rawtypes")
 public final class Open implements FrameBody
 {
     private String _containerId;
@@ -44,6 +45,33 @@ public final class Open implements FrameBody
     private Symbol[] _offeredCapabilities;
     private Symbol[] _desiredCapabilities;
     private Map _properties;
+
+    public Open() {}
+
+    @SuppressWarnings("unchecked")
+    public Open(Open other)
+    {
+        this._containerId = other._containerId;
+        this._hostname = other._hostname;
+        this._maxFrameSize = other._maxFrameSize;
+        this._channelMax = other._channelMax;
+        this._idleTimeOut = other._idleTimeOut;
+        if (other._outgoingLocales != null) {
+            this._outgoingLocales = Arrays.copyOf(other._outgoingLocales, other._outgoingLocales.length);
+        }
+        if (other._incomingLocales != null) {
+            this._incomingLocales = Arrays.copyOf(other._incomingLocales, other._incomingLocales.length);
+        }
+        if (other._offeredCapabilities != null) {
+            this._offeredCapabilities = Arrays.copyOf(other._offeredCapabilities, other._offeredCapabilities.length);
+        }
+        if (other._desiredCapabilities != null) {
+            this._desiredCapabilities = Arrays.copyOf(other._desiredCapabilities, other._desiredCapabilities.length);
+        }
+        if (other._properties != null) {
+            this._properties = new LinkedHashMap<>(other._properties);
+        }
+    }
 
     public String getContainerId()
     {
@@ -150,6 +178,7 @@ public final class Open implements FrameBody
         _properties = properties;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleOpen(this, payload, context);
@@ -171,5 +200,10 @@ public final class Open implements FrameBody
                ", properties=" + _properties +
                '}';
     }
+
+    @Override
+    public Open copy()
+    {
+        return new Open(this);
+    }
 }
-  

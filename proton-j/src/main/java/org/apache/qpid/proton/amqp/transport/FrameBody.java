@@ -40,4 +40,10 @@ public interface FrameBody
     }
 
     <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context);
+
+    /**
+     * @return a deep copy of this FrameBody.
+     */
+    FrameBody copy();
+
 }

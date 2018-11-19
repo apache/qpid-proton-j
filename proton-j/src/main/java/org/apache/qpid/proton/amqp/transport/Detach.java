@@ -28,10 +28,22 @@ import org.apache.qpid.proton.amqp.UnsignedInteger;
 
 public final class Detach implements FrameBody
 {
-
     private UnsignedInteger _handle;
     private boolean _closed;
     private ErrorCondition _error;
+
+    public Detach() {}
+
+    public Detach(Detach other)
+    {
+        this._handle = other._handle;
+        this._closed = other._closed;
+        if (other._error != null)
+        {
+            this._error = new ErrorCondition();
+            this._error.copyFrom(other._error);
+        }
+    }
 
     public UnsignedInteger getHandle()
     {
@@ -67,7 +79,8 @@ public final class Detach implements FrameBody
     {
         _error = error;
     }
-    
+
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleDetach(this, payload, context);
@@ -82,5 +95,10 @@ public final class Detach implements FrameBody
                ", error=" + _error +
                '}';
     }
+
+    @Override
+    public Detach copy()
+    {
+        return new Detach(this);
+    }
 }
-  

@@ -37,4 +37,10 @@ public final class EmptyFrame implements FrameBody
     {
         return "Empty Frame";
     }
+
+    @Override
+    public EmptyFrame copy()
+    {
+        return new EmptyFrame();
+    }
 }

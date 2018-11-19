@@ -23,17 +23,18 @@
 
 package org.apache.qpid.proton.amqp.transport;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedLong;
 
-import java.util.Arrays;
-import java.util.Map;
-
+@SuppressWarnings("rawtypes")
 public final class Attach implements FrameBody
 {
-
     private String _name;
     private UnsignedInteger _handle;
     private Role _role = Role.SENDER;
@@ -48,6 +49,39 @@ public final class Attach implements FrameBody
     private Symbol[] _offeredCapabilities;
     private Symbol[] _desiredCapabilities;
     private Map _properties;
+
+    public Attach() {}
+
+    @SuppressWarnings("unchecked")
+    public Attach(Attach other)
+    {
+        this._name = other._name;
+        this._handle = other._handle;
+        this._role = other._role;
+        this._sndSettleMode = other._sndSettleMode;
+        this._rcvSettleMode = other._rcvSettleMode;
+        if (other._source != null) {
+            this._source = other._source.copy();
+        }
+        if (other._target != null) {
+            this._target = other._target.copy();
+        }
+        if (other._unsettled != null) {
+            this._unsettled = new LinkedHashMap<>(other._unsettled);
+        }
+        this._incompleteUnsettled = other._incompleteUnsettled;
+        this._initialDeliveryCount = other._initialDeliveryCount;
+        this._maxMessageSize = other._maxMessageSize;
+        if (other._offeredCapabilities != null) {
+            this._offeredCapabilities = Arrays.copyOf(other._offeredCapabilities, other._offeredCapabilities.length);
+        }
+        if (other._desiredCapabilities != null) {
+            this._desiredCapabilities = Arrays.copyOf(other._desiredCapabilities, other._desiredCapabilities.length);
+        }
+        if (other._properties != null) {
+            this._properties = new LinkedHashMap<>(other._properties);
+        }
+    }
 
     public String getName()
     {
@@ -203,11 +237,11 @@ public final class Attach implements FrameBody
         _properties = properties;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleAttach(this, payload, context);
     }
-
 
     @Override
     public String toString()
@@ -228,5 +262,11 @@ public final class Attach implements FrameBody
                ", desiredCapabilities=" + (_desiredCapabilities == null ? null : Arrays.asList(_desiredCapabilities)) +
                ", properties=" + _properties +
                '}';
+    }
+
+    @Override
+    public Attach copy()
+    {
+        return new Attach(this);
     }
 }

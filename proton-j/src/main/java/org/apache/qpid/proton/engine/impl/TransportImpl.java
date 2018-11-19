@@ -145,7 +145,11 @@ public class TransportImpl extends EndpointImpl
 
     private List<TransportLayer> _additionalTransportLayers;
 
-    private final PartialTransferHandler partialTransferHandler = new PartialTransferHandler();
+    // Cached instances used to carry the Performatives to the frame writer without the need to create
+    // a new instance on each operation that triggers a write
+    private final Disposition cachedDisposition = new Disposition();
+    private final Flow cachedFlow = new Flow();
+    private final Transfer cachedTransfer = new Transfer();
 
     /**
      * Application code should use {@link org.apache.qpid.proton.engine.Transport.Factory#create()} instead
@@ -154,7 +158,6 @@ public class TransportImpl extends EndpointImpl
     {
         this(DEFAULT_MAX_FRAME_SIZE);
     }
-
 
     /**
      * Creates a transport with the given maximum frame size.
@@ -447,7 +450,6 @@ public class TransportImpl extends EndpointImpl
                         transportLink.clearLocalHandle();
                         transportSession.freeLocalHandle(localHandle);
 
-
                         Detach detach = new Detach();
                         detach.setHandle(localHandle);
                         detach.setClosed(!link.detached());
@@ -457,7 +459,6 @@ public class TransportImpl extends EndpointImpl
                         {
                             detach.setError(localError);
                         }
-
 
                         writeFrame(transportSession.getLocalChannel(), detach, null, null);
                     }
@@ -472,19 +473,24 @@ public class TransportImpl extends EndpointImpl
 
     private void writeFlow(TransportSession ssn, TransportLink link)
     {
-        Flow flow = new Flow();
-        flow.setNextIncomingId(ssn.getNextIncomingId());
-        flow.setNextOutgoingId(ssn.getNextOutgoingId());
+        cachedFlow.setNextIncomingId(ssn.getNextIncomingId());
+        cachedFlow.setNextOutgoingId(ssn.getNextOutgoingId());
         ssn.updateIncomingWindow();
-        flow.setIncomingWindow(ssn.getIncomingWindowSize());
-        flow.setOutgoingWindow(ssn.getOutgoingWindowSize());
+        cachedFlow.setIncomingWindow(ssn.getIncomingWindowSize());
+        cachedFlow.setOutgoingWindow(ssn.getOutgoingWindowSize());
+        cachedFlow.setProperties(null);
         if (link != null) {
-            flow.setHandle(link.getLocalHandle());
-            flow.setDeliveryCount(link.getDeliveryCount());
-            flow.setLinkCredit(link.getLinkCredit());
-            flow.setDrain(link.getLink().getDrain());
+            cachedFlow.setHandle(link.getLocalHandle());
+            cachedFlow.setDeliveryCount(link.getDeliveryCount());
+            cachedFlow.setLinkCredit(link.getLinkCredit());
+            cachedFlow.setDrain(link.getLink().getDrain());
+        } else {
+            cachedFlow.setHandle(null);
+            cachedFlow.setDeliveryCount(null);
+            cachedFlow.setLinkCredit(null);
+            cachedFlow.setDrain(false);
         }
-        writeFrame(ssn.getLocalChannel(), flow, null, null);
+        writeFrame(ssn.getLocalChannel(), cachedFlow, null, null);
     }
 
     private void processSenderFlow()
@@ -494,7 +500,6 @@ public class TransportImpl extends EndpointImpl
             EndpointImpl endpoint = _connectionEndpoint.getTransportHead();
             while(endpoint != null)
             {
-
                 if(endpoint instanceof SenderImpl)
                 {
                     SenderImpl sender = (SenderImpl) endpoint;
@@ -509,7 +514,6 @@ public class TransportImpl extends EndpointImpl
 
                         writeFlow(transportSession, transportLink);
                     }
-
                 }
 
                 endpoint = endpoint.transportNext();
@@ -578,35 +582,48 @@ public class TransportImpl extends EndpointImpl
             tpDelivery = new TransportDelivery(deliveryId, delivery, tpLink);
             delivery.setTransportDelivery(tpDelivery);
 
-            final Transfer transfer = new Transfer();
-            transfer.setDeliveryId(deliveryId);
-            transfer.setDeliveryTag(new Binary(delivery.getTag()));
-            transfer.setHandle(tpLink.getLocalHandle());
+            cachedTransfer.setDeliveryId(deliveryId);
+            cachedTransfer.setDeliveryTag(new Binary(delivery.getTag()));
+            cachedTransfer.setHandle(tpLink.getLocalHandle());
+            cachedTransfer.setRcvSettleMode(null);
+            cachedTransfer.setResume(false); // Ensure default is written
+            cachedTransfer.setAborted(false); // Ensure default is written
+            cachedTransfer.setBatchable(false); // Ensure default is written
 
             if(delivery.getLocalState() != null)
             {
-                transfer.setState(delivery.getLocalState());
+                cachedTransfer.setState(delivery.getLocalState());
+            }
+            else
+            {
+                cachedTransfer.setState(null);
             }
 
             if(delivery.isSettled())
             {
-                transfer.setSettled(Boolean.TRUE);
+                cachedTransfer.setSettled(Boolean.TRUE);
             }
             else
             {
+                cachedTransfer.setSettled(Boolean.FALSE);
                 tpSession.addUnsettledOutgoing(deliveryId, delivery);
             }
 
             if(snd.current() == delivery)
             {
-                transfer.setMore(true);
+                cachedTransfer.setMore(true);
+            }
+            else
+            {
+                // Partial transfers will reset this as needed to true in the FrameWriter
+                cachedTransfer.setMore(false);
             }
 
             int messageFormat = delivery.getMessageFormat();
             if(messageFormat == DeliveryImpl.DEFAULT_MESSAGE_FORMAT) {
-                transfer.setMessageFormat(UnsignedInteger.ZERO);
+                cachedTransfer.setMessageFormat(UnsignedInteger.ZERO);
             } else {
-                transfer.setMessageFormat(UnsignedInteger.valueOf(messageFormat));
+                cachedTransfer.setMessageFormat(UnsignedInteger.valueOf(messageFormat));
             }
 
             ReadableBuffer payload = delivery.getData();
@@ -614,9 +631,8 @@ public class TransportImpl extends EndpointImpl
             int pending = payload.remaining();
 
             try {
-                writeFrame(tpSession.getLocalChannel(), transfer, payload, partialTransferHandler.setTransfer(transfer));
+                writeFrame(tpSession.getLocalChannel(), cachedTransfer, payload, () -> cachedTransfer.setMore(true));
             } finally {
-                partialTransferHandler.setTransfer(null);
                 delivery.afterSend();  // Allow for freeing resources after write of buffered data
             }
 
@@ -627,7 +643,7 @@ public class TransportImpl extends EndpointImpl
             {
                 session.incrementOutgoingBytes(-pending);
 
-                if (!transfer.getMore()) {
+                if (!cachedTransfer.getMore()) {
                     // Clear the in-progress delivery marker
                     tpLink.setInProgressDelivery(null);
 
@@ -655,26 +671,25 @@ public class TransportImpl extends EndpointImpl
         if(wasDone && delivery.getLocalState() != null)
         {
             TransportDelivery tpDelivery = delivery.getTransportDelivery();
-            Disposition disposition = new Disposition();
-            disposition.setFirst(tpDelivery.getDeliveryId());
-            disposition.setLast(tpDelivery.getDeliveryId());
-            disposition.setRole(Role.SENDER);
-            disposition.setSettled(delivery.isSettled());
+            // Use cached object as holder of data for immediate write to the FrameWriter
+            cachedDisposition.setFirst(tpDelivery.getDeliveryId());
+            cachedDisposition.setLast(tpDelivery.getDeliveryId());
+            cachedDisposition.setRole(Role.SENDER);
+            cachedDisposition.setSettled(delivery.isSettled());
+            cachedDisposition.setBatchable(false);  // Enforce default is written
             if(delivery.isSettled())
             {
                 tpDelivery.settled();
             }
-            disposition.setState(delivery.getLocalState());
+            cachedDisposition.setState(delivery.getLocalState());
 
-            writeFrame(tpSession.getLocalChannel(), disposition, null,
-                       null);
+            writeFrame(tpSession.getLocalChannel(), cachedDisposition, null, null);
         }
 
         return !delivery.isBuffered();
     }
 
-    private boolean processTransportWorkReceiver(DeliveryImpl delivery,
-                                                 ReceiverImpl rcv)
+    private boolean processTransportWorkReceiver(DeliveryImpl delivery, ReceiverImpl rcv)
     {
         TransportDelivery tpDelivery = delivery.getTransportDelivery();
         SessionImpl session = rcv.getSession();
@@ -684,19 +699,19 @@ public class TransportImpl extends EndpointImpl
         {
             boolean settled = delivery.isSettled();
             DeliveryState localState = delivery.getLocalState();
-
-            Disposition disposition = new Disposition();
-            disposition.setFirst(tpDelivery.getDeliveryId());
-            disposition.setLast(tpDelivery.getDeliveryId());
-            disposition.setRole(Role.RECEIVER);
-            disposition.setSettled(settled);
-            disposition.setState(localState);
+            // Use cached object as holder of data for immediate write to the FrameWriter
+            cachedDisposition.setFirst(tpDelivery.getDeliveryId());
+            cachedDisposition.setLast(tpDelivery.getDeliveryId());
+            cachedDisposition.setRole(Role.RECEIVER);
+            cachedDisposition.setSettled(settled);
+            cachedDisposition.setState(localState);
+            cachedDisposition.setBatchable(false);  // Enforce default is written
 
             if(localState == null && settled) {
-                disposition.setState(delivery.getDefaultDeliveryState());
+                cachedDisposition.setState(delivery.getDefaultDeliveryState());
             }
 
-            writeFrame(tpSession.getLocalChannel(), disposition, null, null);
+            writeFrame(tpSession.getLocalChannel(), cachedDisposition, null, null);
             if (settled)
             {
                 tpDelivery.settled();
@@ -1683,23 +1698,6 @@ public class TransportImpl extends EndpointImpl
     public String toString()
     {
         return "TransportImpl [_connectionEndpoint=" + _connectionEndpoint + ", " + super.toString() + "]";
-    }
-
-    private static class PartialTransferHandler implements Runnable
-    {
-        private Transfer _transfer;
-
-        PartialTransferHandler setTransfer(Transfer transfer)
-        {
-            this._transfer = transfer;
-            return this;
-        }
-
-        @Override
-        public void run()
-        {
-            _transfer.setMore(true);
-        }
     }
 
     /**

@@ -29,6 +29,17 @@ public final class End implements FrameBody
 {
     private ErrorCondition _error;
 
+    public End() {}
+
+    public End(End other)
+    {
+        if (other._error != null)
+        {
+            this._error = new ErrorCondition();
+            this._error.copyFrom(other._error);
+        }
+    }
+
     public ErrorCondition getError()
     {
         return _error;
@@ -39,6 +50,7 @@ public final class End implements FrameBody
         _error = error;
     }
 
+    @Override
     public <E> void invoke(FrameBodyHandler<E> handler, Binary payload, E context)
     {
         handler.handleEnd(this, payload, context);
@@ -51,5 +63,10 @@ public final class End implements FrameBody
                "error=" + _error +
                '}';
     }
+
+    @Override
+    public End copy()
+    {
+        return new End(this);
+    }
 }
-  
