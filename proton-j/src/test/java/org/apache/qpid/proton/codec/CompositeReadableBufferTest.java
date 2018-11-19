@@ -3464,6 +3464,8 @@ public class CompositeReadableBufferTest {
         buffer.append(data);
 
         assertEquals(buffer, buffer);
+
+        assertEquals(0, buffer.position());
     }
 
     @Test
@@ -3481,6 +3483,10 @@ public class CompositeReadableBufferTest {
         assertEquals(buffer1, buffer2);
         assertEquals(buffer2, buffer3);
         assertEquals(buffer3, buffer1);
+
+        assertEquals(0, buffer1.position());
+        assertEquals(0, buffer2.position());
+        assertEquals(0, buffer3.position());
     }
 
     @Test
@@ -3495,6 +3501,9 @@ public class CompositeReadableBufferTest {
         buffer2.append(data2);
 
         assertNotEquals(buffer1, buffer2);
+
+        assertEquals(0, buffer1.position());
+        assertEquals(0, buffer2.position());
     }
 
     @Test
@@ -3509,6 +3518,9 @@ public class CompositeReadableBufferTest {
         buffer2.append(data2).append(data1);
 
         assertNotEquals(buffer1, buffer2);
+
+        assertEquals(0, buffer1.position());
+        assertEquals(0, buffer2.position());
     }
 
     @Test
@@ -3523,6 +3535,79 @@ public class CompositeReadableBufferTest {
         buffer2.append(data1).append(data2);
 
         assertEquals(buffer1, buffer2);
+
+        assertEquals(0, buffer1.position());
+        assertEquals(0, buffer2.position());
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentStartPositionsSame() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentStartPositionsSameTestImpl(false);
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentStartPositionsSameMultipleArrays() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentStartPositionsSameTestImpl(true);
+    }
+
+    private void doEqualsWhenContentRemainingWithDifferentStartPositionsSameTestImpl(boolean multipleArrays) {
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        CompositeReadableBuffer buffer2 = new CompositeReadableBuffer();
+
+        byte[] data1 = new byte[] {-1, -1, 0, 1, 2, 3, 4, 5};
+        byte[] data2 = new byte[] {-1, -1, -1, 0, 1, 2, 3, 4, 5};
+
+        buffer1.append(data1);
+        buffer1.position(2);
+
+        buffer2.append(data2);
+        buffer2.position(3);
+
+        if (multipleArrays) {
+            byte[] data3 = new byte[] { 5, 4, 3, 2, 1 };
+            buffer1.append(data3);
+            buffer2.append(data3);
+        }
+
+        assertEquals(buffer1, buffer2);
+
+        assertEquals(2, buffer1.position());
+        assertEquals(3, buffer2.position());
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentStartPositionsNotSame() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentStartPositionsNotSameTestImpl(false);
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingWithDifferentStartPositionsNotSameMultipleArrays() throws CharacterCodingException {
+        doEqualsWhenContentRemainingWithDifferentStartPositionsNotSameTestImpl(true);
+    }
+
+    private void doEqualsWhenContentRemainingWithDifferentStartPositionsNotSameTestImpl(boolean multipleArrays) {
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        CompositeReadableBuffer buffer2 = new CompositeReadableBuffer();
+
+        byte[] data1 = new byte[] {-1, -1, 0, 1, 2, 3, 4, 5};
+        byte[] data2 = new byte[] {-1, -1, -1, 0, 1, 2, 3, 4, -1};
+
+        buffer1.append(data1);
+        buffer1.position(2);
+
+        buffer2.append(data2);
+        buffer2.position(3);
+
+        if (multipleArrays) {
+            byte[] data3 = new byte[] { 5, 4, 3, 2, 1 };
+            buffer1.append(data3);
+            buffer2.append(data3);
+        }
+
+        assertNotEquals(buffer1, buffer2);
+
+        assertEquals(2, buffer1.position());
+        assertEquals(3, buffer2.position());
     }
 
     //----- Utility Methods --------------------------------------------------//

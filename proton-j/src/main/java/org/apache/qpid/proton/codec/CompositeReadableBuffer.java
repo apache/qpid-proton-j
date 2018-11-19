@@ -839,17 +839,18 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             return false;
         }
 
-        final int currentPos = position();
-
-        for (int i = buffer.position(); hasRemaining(); i++) {
-            if (!equals(this.get(), buffer.get(i))) {
-                return false;
+        final int origPos = position();
+        try {
+            for (int i = buffer.position(); hasRemaining(); i++) {
+                if (!equals(this.get(), buffer.get(i))) {
+                    return false;
+                }
             }
+
+            return true;
+        } finally {
+            position(origPos);
         }
-
-        position(currentPos);
-
-        return true;
     }
 
     @Override
