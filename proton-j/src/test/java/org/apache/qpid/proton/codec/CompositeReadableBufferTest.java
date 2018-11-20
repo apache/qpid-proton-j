@@ -3696,6 +3696,68 @@ public class CompositeReadableBufferTest {
         assertEquals(0, buffer2.position());
     }
 
+    @Test
+    public void testEqualsWhenContentRemainingIsSubsetOfSingleChunkInMultiArrayBufferSame() {
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        CompositeReadableBuffer buffer2 = new CompositeReadableBuffer();
+
+        byte[] data1 = new byte[] {-1, -1, 0, 1, 2, 3, 4, 5};
+        byte[] data2 = new byte[] {-1, -1, -1, 0, 1, 2, 3, 4, 5};
+
+        buffer1.append(data1);
+        buffer1.position(2);
+
+        buffer2.append(data2);
+        buffer2.position(3);
+
+        byte[] data3 = new byte[] { 5, 4, 3, 2, 1 };
+        buffer1.append(data3);
+        buffer2.append(data3);
+
+        buffer1.limit(data1.length);
+        buffer2.limit(data2.length);
+
+        assertEquals(6, buffer1.remaining());
+        assertEquals(6, buffer2.remaining());
+
+        assertEquals(buffer1, buffer2);
+        assertEquals(buffer2, buffer1);
+
+        assertEquals(2, buffer1.position());
+        assertEquals(3, buffer2.position());
+    }
+
+    @Test
+    public void testEqualsWhenContentRemainingIsSubsetOfSingleChunkInMultiArrayBufferNotSame() {
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        CompositeReadableBuffer buffer2 = new CompositeReadableBuffer();
+
+        byte[] data1 = new byte[] {-1, -1, 0, 1, 2, 3, 4, 5};
+        byte[] data2 = new byte[] {-1, -1, -1, 0, 1, 2, 3, 4, -1};
+
+        buffer1.append(data1);
+        buffer1.position(2);
+
+        buffer2.append(data2);
+        buffer2.position(3);
+
+        byte[] data3 = new byte[] { 5, 4, 3, 2, 1 };
+        buffer1.append(data3);
+        buffer2.append(data3);
+
+        buffer1.limit(data1.length);
+        buffer2.limit(data2.length);
+
+        assertEquals(6, buffer1.remaining());
+        assertEquals(6, buffer2.remaining());
+
+        assertNotEquals(buffer1, buffer2);
+        assertNotEquals(buffer2, buffer1);
+
+        assertEquals(2, buffer1.position());
+        assertEquals(3, buffer2.position());
+    }
+
     //----- Utility Methods --------------------------------------------------//
 
     private void assertContentEquals(CompositeReadableBuffer buffer, byte array[], int offset, int length) {

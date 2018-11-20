@@ -46,6 +46,8 @@ public class CompositeReadableBufferBenchmark {
     private boolean direct;
     @Param({"1", "2"})
     private int chunks;
+    private CompositeReadableBuffer compositePartial;
+    private ReadableBuffer bufferReaderPartial;
 
     @Setup
     public void init() {
@@ -62,12 +64,21 @@ public class CompositeReadableBufferBenchmark {
             byte[] lastChunk = new byte[remaining];
             composite.append(lastChunk);
         }
+
+        compositePartial = composite.duplicate().limit(sizePerChunk);
+        bufferReaderPartial = bufferReader.duplicate().limit(sizePerChunk);
     }
 
     @Benchmark
     public boolean equalsToByteBufferReader() {
         composite.position(0);
         return composite.equals(bufferReader);
+    }
+
+    @Benchmark
+    public boolean equalsToWithSingleArraySubsetOfBuffer() {
+        compositePartial.position(0);
+        return compositePartial.equals(bufferReaderPartial);
     }
 
     public static void main(String[] args) throws RunnerException {

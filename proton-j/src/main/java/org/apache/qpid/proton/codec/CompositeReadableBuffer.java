@@ -103,6 +103,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         return currentArray != null && (contents == null || contents.size() == 1);
     }
 
+    @Override
     public int capacity() {
         return capacity;
     }
@@ -840,7 +841,14 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             return false;
         }
 
-        if (hasArray()) {
+        if (remaining == 0) {
+            // No content to compare, and we already checked 'remaining' is equal. Protects from NPE below.
+            return true;
+        }
+
+        if (hasArray() || remaining <= currentArray.length - currentOffset) {
+            // Either there is only one array, or the span to compare is within a single chunk of this buffer,
+            // allowing the compare to directly access the underlying array instead of using slower get methods.
             return equals(currentArray, currentOffset, remaining, buffer);
         } else {
             return equals(this, buffer);
