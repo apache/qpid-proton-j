@@ -1,4 +1,8 @@
 language: java
 sudo: false
-jdk:
-  - openjdk8
+matrix:
+  include:
+    - os: linux
+      jdk: openjdk8
+    - os: linux
+      jdk: openjdk11
