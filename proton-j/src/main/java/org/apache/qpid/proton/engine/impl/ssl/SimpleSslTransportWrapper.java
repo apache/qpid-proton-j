@@ -106,6 +106,7 @@ public class SimpleSslTransportWrapper implements SslTransportWrapper
      */
     private void unwrapInput() throws SSLException
     {
+        int prevInRemaining = -1;
         while (true) {
             SSLEngineResult result = _sslEngine.unwrap(_inputBuffer, _decodedInputBuffer);
             logEngineClientModeAndResult(result, "input");
@@ -171,6 +172,14 @@ public class SimpleSslTransportWrapper implements SslTransportWrapper
             switch (hstatus)
             {
             case NEED_WRAP:
+                int inputRemaining = _inputBuffer.remaining();
+                if (inputRemaining > 0 && status == Status.OK && (inputRemaining < prevInRemaining || prevInRemaining < 0)) {
+                    // Track remaining input so we break if no progress is made.
+                    prevInRemaining = inputRemaining;
+                    // Process a wrap, try to progress on the remaining input.
+                    pending();
+                    continue;
+                }
                 // wait for write to kick in
                 break;
             case NEED_TASK:
