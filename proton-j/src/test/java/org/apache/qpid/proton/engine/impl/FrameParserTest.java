@@ -22,8 +22,8 @@ import static org.apache.qpid.proton.engine.Transport.DEFAULT_MAX_FRAME_SIZE;
 import static org.apache.qpid.proton.engine.impl.AmqpHeader.HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -41,7 +41,6 @@ import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
 import org.apache.qpid.proton.framing.TransportFrame;
-import org.hamcrest.Description;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
@@ -293,7 +292,7 @@ public class FrameParserTest
         return argThat(new TransportFrameMatcher(channel, frameBody));
     }
 
-    private class TransportFrameMatcher extends ArgumentMatcher<TransportFrame>
+    private class TransportFrameMatcher implements ArgumentMatcher<TransportFrame>
     {
         private final TransportFrame _expectedTransportFrame;
 
@@ -303,14 +302,13 @@ public class FrameParserTest
         }
 
         @Override
-        public boolean matches(Object transportFrameObj)
+        public boolean matches(TransportFrame transportFrame)
         {
-            if(transportFrameObj == null)
+            if(transportFrame == null)
             {
                 return false;
             }
 
-            TransportFrame transportFrame = (TransportFrame)transportFrameObj;
             FrameBody actualFrame = transportFrame.getBody();
 
             int _expectedChannel = _expectedTransportFrame.getChannel();
@@ -321,10 +319,9 @@ public class FrameParserTest
         }
 
         @Override
-        public void describeTo(Description description)
+        public String toString()
         {
-            super.describeTo(description);
-            description.appendText("Expected: " + _expectedTransportFrame);
+            return "TransportFrameMatcher, Expected: " + _expectedTransportFrame;
         }
     }
 }

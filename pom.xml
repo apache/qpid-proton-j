@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>18</version>
+    <version>19</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -37,12 +37,13 @@
 
     <!-- Test dependency versions -->
     <junit-version>4.12</junit-version>
-    <mockito-version>1.10.19</mockito-version>
-    <jython-version>2.7.0</jython-version>
+    <mockito-version>2.23.4</mockito-version>
+    <jython-version>2.7.1</jython-version>
 
     <!-- Plugin versions -->
-    <maven-bundle-plugin-version>3.2.0</maven-bundle-plugin-version>
-    <jacoco-plugin-version>0.7.9</jacoco-plugin-version>
+    <maven-bundle-plugin-version>4.1.0</maven-bundle-plugin-version>
+    <jacoco-plugin-version>0.8.2</jacoco-plugin-version>
+    <surefire.version>2.21.0</surefire.version>
 
     <!-- surefire forked jvm arguments -->
     <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
