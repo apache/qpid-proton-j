@@ -80,14 +80,16 @@ public class CompositeReadableBufferStringDecodeBenchmark {
 
     @Benchmark
     public void decodeSingleArray() throws CharacterCodingException {
-        this.charsetDecoder.reset();
+        charsetDecoder.reset();
         blackhole.consume(singleArrayString.readString(charsetDecoder));
+        singleArrayString.rewind();
     }
 
     @Benchmark
     public void decodeMultiArray() throws CharacterCodingException {
-        this.charsetDecoder.reset();
+        charsetDecoder.reset();
         blackhole.consume(splitArrayString.readString(charsetDecoder));
+        singleArrayString.rewind();
     }
 
     public static void main(String[] args) throws RunnerException {
