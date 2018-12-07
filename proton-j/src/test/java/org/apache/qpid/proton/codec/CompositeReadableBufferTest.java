@@ -3398,6 +3398,20 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
+    public void testHashCodeMatchesByteBufferWhenLimitSetGivesNoRemaining() throws CharacterCodingException {
+        byte[] data = new byte[] {9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
+
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        buffer1.append(data);
+        buffer1.limit(10);
+
+        ByteBuffer buffer2 = ByteBuffer.wrap(data);
+        buffer2.limit(10);
+
+        assertEquals(buffer1.hashCode(), buffer2.hashCode());
+    }
+
+    @Test
     public void testHashCodeMatchesByteBufferSingleArrayContents() throws CharacterCodingException {
         byte[] data = new byte[] {9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
 
@@ -3457,6 +3471,29 @@ public class CompositeReadableBufferTest {
         ByteBuffer slice2 = ((ByteBuffer) buffer2.position(1).limit(4)).slice();
 
         assertEquals(slice1.hashCode(), slice2.hashCode());
+    }
+
+    @Test
+    public void testHashCodeMatchesByteBufferMultipleArrayContentsWithRangeOfLimits() throws CharacterCodingException {
+        byte[] data = new byte[] {10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
+
+        byte[] data1 = new byte[] {10, 9};
+        byte[] data2 = new byte[] {8, 7};
+        byte[] data3 = new byte[] {6, 5, 4};
+        byte[] data4 = new byte[] {3};
+        byte[] data5 = new byte[] {2, 1, 0};
+
+        CompositeReadableBuffer buffer1 = new CompositeReadableBuffer();
+        buffer1.append(data1).append(data2).append(data3).append(data4).append(data5);
+
+        ByteBuffer buffer2 = ByteBuffer.wrap(data);
+
+        for (int i = 0; i < data.length; ++i) {
+            buffer1.limit(i);
+            buffer2.limit(i);
+
+            assertEquals(buffer1.hashCode(), buffer2.hashCode());
+        }
     }
 
     //----- Tests for equals -------------------------------------------------//

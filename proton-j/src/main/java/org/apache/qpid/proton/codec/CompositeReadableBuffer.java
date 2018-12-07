@@ -702,11 +702,11 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     }
 
     private void validateBuffer(ReadableBuffer buffer) {
-        if(buffer == null) {
+        if (buffer == null) {
             throw new IllegalArgumentException("A non-null buffer must be provided");
         }
 
-        if(!buffer.hasRemaining()) {
+        if (!buffer.hasRemaining()) {
             throw new IllegalArgumentException("Buffer has no remaining content to append");
         }
     }
@@ -739,8 +739,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         do {
             int bufferRemaining = buffer.remaining();
             int arrayRemaining = buffer.currentArray.length - buffer.currentOffset;
-            if (buffer.currentOffset > 0 || bufferRemaining < arrayRemaining)
-            {
+            if (buffer.currentOffset > 0 || bufferRemaining < arrayRemaining) {
                 int length = Math.min(arrayRemaining, bufferRemaining);
                 chunk = new byte[length];
                 System.arraycopy(buffer.currentArray, buffer.currentOffset, chunk, 0, length);
@@ -783,7 +782,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             validateAppendable();
             validateBuffer(buffer);
 
-            if(buffer.hasArray()) {
+            if (buffer.hasArray()) {
                 byte[] chunk = buffer.array();
 
                 int bufferRemaining = buffer.remaining();
@@ -809,16 +808,44 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     @Override
     public int hashCode() {
         int hash = 1;
+        int remaining = remaining();
 
-        if (currentArrayIndex < 0) {
-            int span = limit() - position();
-            while (span > 0) {
-                hash = 31 * hash + currentArray[currentOffset + --span];
+        if (currentArrayIndex < 0 || remaining <= currentArray.length - currentOffset) {
+            while (remaining > 0) {
+                hash = 31 * hash + currentArray[currentOffset + --remaining];
             }
         } else {
-            final int currentPos = position();
-            for (int i = limit() - 1; i >= currentPos; i--) {
-                hash = 31 * hash + (int)get(i);
+            hash = hashCodeFromComponents();
+        }
+
+        return hash;
+    }
+
+    private int hashCodeFromComponents() {
+        int hash = 1;
+        byte[] array = currentArray;
+        int arrayOffset = currentOffset;
+        int arraysIndex = currentArrayIndex;
+
+        // Run to the the array and offset where we want to start the hash from
+        final int remaining = remaining();
+        for (int moveBy = remaining; moveBy > 0; ) {
+            if (moveBy <= array.length - arrayOffset) {
+                arrayOffset += moveBy;
+                break;
+            } else {
+                moveBy -= array.length - arrayOffset;
+                array = contents.get(++arraysIndex);
+                arrayOffset = 0;
+            }
+        }
+
+        // Now run backwards through the arrays to match what ByteBuffer would produce
+        for (int moveBy = remaining; moveBy > 0; moveBy--) {
+            hash = 31 * hash + array[--arrayOffset];
+            if (arrayOffset == 0 && arraysIndex > 0) {
+                array = contents.get(--arraysIndex);
+                arrayOffset = array.length;
             }
         }
 
