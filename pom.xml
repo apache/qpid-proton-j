@@ -192,9 +192,9 @@
 
   <url>http://qpid.apache.org/proton</url>
   <scm>
-    <connection>scm:git:http://git-wip-us.apache.org/repos/asf/qpid-proton-j.git</connection>
-    <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/qpid-proton-j.git</developerConnection>
-    <url>https://git-wip-us.apache.org/repos/asf?p=qpid-proton-j.git</url>
+    <connection>scm:git:http://gitbox.apache.org/repos/asf/qpid-proton-j.git</connection>
+    <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/qpid-proton-j.git</developerConnection>
+    <url>https://gitbox.apache.org/repos/asf?p=qpid-proton-j.git</url>
     <tag>HEAD</tag>
   </scm>
   <issueManagement>
