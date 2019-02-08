@@ -22,13 +22,22 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
+import org.apache.qpid.proton.amqp.security.SaslInit;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.Transfer;
 import org.apache.qpid.proton.codec.AMQPDefinedTypes;
@@ -36,10 +45,10 @@ import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.framing.TransportFrame;
+
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
+import org.mockito.ArgumentMatcher;
 
 /**
  * Tests for the FrameWriter implementation
@@ -251,16 +260,23 @@ public class FrameWriterTest {
 
     @Test
     public void testFrameWriterLogsFramesToTracer() {
-        FrameWriterProtocolTracer tracer = new FrameWriterProtocolTracer();
-        transport.setProtocolTracer(tracer);
+        List<TransportFrame> frames = new ArrayList<>();
+        transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void sentFrame(final TransportFrame transportFrame)
+            {
+                frames.add(transportFrame);
+            }
+        });
 
         Transfer transfer = createTransfer();
         FrameWriter framer = new FrameWriter(encoder, Integer.MAX_VALUE, (byte) 0, transport);
 
         framer.writeFrame(16, transfer, bigPayload, new PartialTransferHandler(transfer));
 
-        assertNotNull(tracer.getSentFrame());
-        TransportFrame sentFrame = tracer.getSentFrame();
+        assertEquals(1, frames.size());
+        TransportFrame sentFrame = frames.get(0);
 
         assertEquals(16, sentFrame.getChannel());
         assertTrue(sentFrame.getBody() instanceof Transfer);
@@ -273,22 +289,54 @@ public class FrameWriterTest {
     @Test
     public void testFrameWriterLogsFramesToSystem() {
         transport.trace(2);
-        TransportImpl spy = Mockito.spy(transport);
+        TransportImpl spy = spy(transport);
 
         Transfer transfer = createTransfer();
         FrameWriter framer = new FrameWriter(encoder, Integer.MAX_VALUE, (byte) 0, spy);
 
-        framer.writeFrame(16, transfer, bigPayload, new PartialTransferHandler(transfer));
+        int channel = 16;
+        framer.writeFrame(channel, transfer, bigPayload, new PartialTransferHandler(transfer));
 
-        ArgumentCaptor<TransportFrame> frameCatcher = ArgumentCaptor.forClass(TransportFrame.class);
-        Mockito.verify(spy).log(Mockito.anyString(), frameCatcher.capture());
+        verify(spy).log(eq(TransportImpl.OUTGOING),
+                        eq(channel),
+                        isA(Transfer.class),
+                        isBinaryOfLength());
+    }
 
-        assertEquals(16, frameCatcher.getValue().getChannel());
-        assertTrue(frameCatcher.getValue().getBody() instanceof Transfer);
+    @Test
+    public void testFrameWriterLogsSaslFramesToTracer() {
+        List<SaslFrameBody> bodies = new ArrayList<>();
+        transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void sentSaslBody(final SaslFrameBody saslFrameBody)
+            {
+                bodies.add(saslFrameBody);
 
-        Binary payload = frameCatcher.getValue().getPayload();
+            }
+        });
 
-        assertEquals(bigPayload.capacity(), payload.getLength());
+        SaslInit init = new SaslInit();
+        FrameWriter framer = new FrameWriter(encoder, Integer.MAX_VALUE,  FrameWriter.SASL_FRAME_TYPE, transport);
+
+        framer.writeFrame(0, init, null, null);
+
+        assertEquals(1, bodies.size());
+        assertTrue( bodies.get(0) instanceof SaslInit);
+    }
+
+    @Test
+    public void testFrameWriterLogsSaslFramesToSystem() {
+        transport.trace(2);
+        TransportImpl spy = spy(transport);
+
+        SaslInit init = new SaslInit();
+        FrameWriter framer = new FrameWriter(encoder, Integer.MAX_VALUE,  FrameWriter.SASL_FRAME_TYPE, spy);
+
+        framer.writeFrame(0, init, null, null);
+
+        verify(spy).log(eq(TransportImpl.OUTGOING),
+                        isA(SaslInit.class));
     }
 
     @Test
@@ -324,24 +372,6 @@ public class FrameWriterTest {
         return transfer;
     }
 
-    private static final class FrameWriterProtocolTracer implements ProtocolTracer {
-
-        private TransportFrame sentFrame;
-
-        public TransportFrame getSentFrame() {
-            return sentFrame;
-        }
-
-        @Override
-        public void receivedFrame(TransportFrame transportFrame) {
-        }
-
-        @Override
-        public void sentFrame(TransportFrame transportFrame) {
-            sentFrame = transportFrame;
-        }
-    }
-
     private static final class PartialTransferHandler implements Runnable {
         private Transfer transfer;
 
@@ -352,6 +382,37 @@ public class FrameWriterTest {
         @Override
         public void run() {
             transfer.setMore(true);
+        }
+    }
+
+    private Binary isBinaryOfLength()
+    {
+        return argThat(new BinaryLengthMatcher(bigPayload.capacity()));
+    }
+
+    private static class BinaryLengthMatcher implements ArgumentMatcher<Binary>
+    {
+        private final int _expectedLength;
+        BinaryLengthMatcher(int expectedLength)
+        {
+            _expectedLength = expectedLength;
+        }
+
+        @Override
+        public boolean matches(Binary buf)
+        {
+            if(buf == null)
+            {
+                return false;
+            }
+
+            return buf.getLength() == _expectedLength;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "BinaryLengthMatcher, Expected: length " + _expectedLength;
         }
     }
 }

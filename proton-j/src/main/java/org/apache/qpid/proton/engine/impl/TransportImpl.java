@@ -30,6 +30,7 @@ import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 import org.apache.qpid.proton.amqp.transport.Attach;
 import org.apache.qpid.proton.amqp.transport.Begin;
 import org.apache.qpid.proton.amqp.transport.Close;
@@ -1417,7 +1418,9 @@ public class TransportImpl extends EndpointImpl
             throw new IllegalStateException("Transport cannot accept frame: " + frame);
         }
 
-        log(INCOMING, frame);
+        int channel = frame.getChannel();
+        Binary payload = frame.getPayload();
+        log(INCOMING, channel, frame.getBody(), payload);
 
         ProtocolTracer tracer = _protocolTracer.get();
         if( tracer != null )
@@ -1712,19 +1715,30 @@ public class TransportImpl extends EndpointImpl
     static String INCOMING = "<-";
     static String OUTGOING = "->";
 
-    void log(String event, TransportFrame frame)
+    void log(final String event, final int channel, final FrameBody frameBody, final Binary payload)
     {
         if (isTraceFramesEnabled()) {
             StringBuilder msg = new StringBuilder();
             msg.append("[").append(System.identityHashCode(this)).append(":")
-                .append(frame.getChannel()).append("]");
-            msg.append(" ").append(event).append(" ").append(frame.getBody());
+               .append(channel).append("]");
+            msg.append(" ").append(event).append(" ").append(frameBody);
 
-            Binary bin = frame.getPayload();
-            if (bin != null) {
-                msg.append(" (").append(bin.getLength()).append(") ");
-                msg.append(StringUtils.toQuotedString(bin, TRACE_FRAME_PAYLOAD_LENGTH, true));
+            if (payload != null) {
+                msg.append(" (").append(payload.getLength()).append(") ");
+                msg.append(StringUtils.toQuotedString(payload, TRACE_FRAME_PAYLOAD_LENGTH, true));
             }
+            System.out.println(msg.toString());
+        }
+    }
+
+    void log(final String event, final SaslFrameBody frameBody)
+    {
+        if (isTraceFramesEnabled()) {
+            int channel = 0;
+            StringBuilder msg = new StringBuilder();
+            msg.append("[").append(System.identityHashCode(this)).append(":")
+               .append(channel).append("]");
+            msg.append(" ").append(event).append(" ").append(frameBody);
             System.out.println(msg.toString());
         }
     }

@@ -309,7 +309,7 @@ public class FrameParserTest
                 return false;
             }
 
-            FrameBody actualFrame = transportFrame.getBody();
+            FrameBody actualFrame = (FrameBody) transportFrame.getBody();
 
             int _expectedChannel = _expectedTransportFrame.getChannel();
             FrameBody expectedFrame = _expectedTransportFrame.getBody();

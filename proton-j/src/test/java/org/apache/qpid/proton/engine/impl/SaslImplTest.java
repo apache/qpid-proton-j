@@ -20,11 +20,19 @@
 */
 package org.apache.qpid.proton.engine.impl;
 
+import static junit.framework.TestCase.assertTrue;
 import static org.junit.Assert.assertEquals;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
+import org.apache.qpid.proton.amqp.security.SaslMechanisms;
+import org.apache.qpid.proton.framing.TransportFrame;
+
 import org.junit.Test;
 
 public class SaslImplTest {
@@ -49,6 +57,30 @@ public class SaslImplTest {
         sasl.plain(username, password);
 
         assertEquals("Unexpected response data", new Binary(expectedResponseBytes), sasl.getChallengeResponse());
+    }
+
+    @Test
+    public void testProtocolTracing() {
+        TransportImpl transport = new TransportImpl();
+        List<SaslFrameBody> bodies = new ArrayList<>();
+        transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void receivedSaslBody(final SaslFrameBody saslFrameBody)
+            {
+                bodies.add(saslFrameBody);
+            }
+        });
+
+        SaslImpl sasl = new SaslImpl(transport, 512);
+
+        SaslMechanisms mechs = new SaslMechanisms();
+        mechs.setSaslServerMechanisms(Symbol.valueOf("TESTMECH"));
+
+        assertEquals(0, bodies.size());
+        sasl.handle(mechs, null);
+        assertEquals(1, bodies.size());
+        assertTrue(bodies.get(0) instanceof SaslMechanisms);
     }
 
 }

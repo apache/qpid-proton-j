@@ -23,6 +23,7 @@ package org.apache.qpid.proton.engine.impl;
 import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 import org.apache.qpid.proton.amqp.transport.EmptyFrame;
 import org.apache.qpid.proton.amqp.transport.FrameBody;
 import org.apache.qpid.proton.codec.EncoderImpl;
@@ -151,6 +152,7 @@ class FrameWriter {
     }
 
     private void logFrame(int channel, Object frameBody, ReadableBuffer payload, int payloadSize) {
+        ProtocolTracer tracer = transport.getProtocolTracer();
         if (frameType == AMQP_FRAME_TYPE) {
             ReadableBuffer originalPayload = null;
             if (payload != null) {
@@ -168,11 +170,17 @@ class FrameWriter {
 
             TransportFrame frame = new TransportFrame(channel, body, payloadBin);
 
-            transport.log(TransportImpl.OUTGOING, frame);
+            Binary payload1 = frame.getPayload();
+            transport.log(TransportImpl.OUTGOING, channel, frame.getBody(), payload1);
 
-            ProtocolTracer tracer = transport.getProtocolTracer();
             if (tracer != null) {
-                tracer.sentFrame(frame);
+                tracer.sentFrame(new TransportFrame(channel, body, payloadBin));
+            }
+        } else {
+            SaslFrameBody body = (SaslFrameBody) frameBody;
+            transport.log(TransportImpl.OUTGOING, body);
+            if (tracer != null) {
+                tracer.sentSaslBody(body);
             }
         }
     }
