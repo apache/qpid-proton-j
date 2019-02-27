@@ -30,6 +30,7 @@ import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 import org.apache.qpid.proton.amqp.transport.Attach;
 import org.apache.qpid.proton.amqp.transport.Begin;
 import org.apache.qpid.proton.amqp.transport.Close;
@@ -1715,18 +1716,27 @@ public class TransportImpl extends EndpointImpl
     void log(String event, TransportFrame frame)
     {
         if (isTraceFramesEnabled()) {
-            StringBuilder msg = new StringBuilder();
-            msg.append("[").append(System.identityHashCode(this)).append(":")
-                .append(frame.getChannel()).append("]");
-            msg.append(" ").append(event).append(" ").append(frame.getBody());
-
-            Binary bin = frame.getPayload();
-            if (bin != null) {
-                msg.append(" (").append(bin.getLength()).append(") ");
-                msg.append(StringUtils.toQuotedString(bin, TRACE_FRAME_PAYLOAD_LENGTH, true));
-            }
-            System.out.println(msg.toString());
+            outputMessage(event, frame.getChannel(), frame.getBody(), frame.getPayload());
         }
+    }
+
+    void log(final String event, final SaslFrameBody frameBody) {
+        if (isTraceFramesEnabled()) {
+            outputMessage(event, 0, frameBody, null);
+        }
+    }
+
+    private void outputMessage(String event, int channel, Object frameBody, Binary payload) {
+        StringBuilder msg = new StringBuilder();
+
+        msg.append("[").append(System.identityHashCode(this)).append(":").append(channel).append("] ");
+        msg.append(event).append(" ").append(frameBody);
+        if (payload != null) {
+            msg.append(" (").append(payload.getLength()).append(") ");
+            msg.append(StringUtils.toQuotedString(payload, TRACE_FRAME_PAYLOAD_LENGTH, true));
+        }
+
+        System.out.println(msg.toString());
     }
 
     boolean isFrameTracingEnabled()

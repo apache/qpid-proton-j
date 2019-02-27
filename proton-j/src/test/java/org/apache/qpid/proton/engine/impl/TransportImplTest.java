@@ -29,12 +29,15 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.spy;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
 
 import org.apache.qpid.proton.Proton;
@@ -75,6 +78,7 @@ import org.apache.qpid.proton.message.Message;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TransportImplTest
@@ -3636,5 +3640,55 @@ public class TransportImplTest
         assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
         assertEquals("Unexpected ErrorCondition returned", ConnectionError.FRAMING_ERROR, transport.getCondition().getCondition());
         assertEquals("Unexpected description returned", "connection aborted", transport.getCondition().getDescription());
+    }
+
+    @Test
+    public void testProtocolTracingLogsToTracer()
+    {
+        Connection connection = new ConnectionImpl();
+        List<TransportFrame> frames = new ArrayList<>();
+        _transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void receivedFrame(final TransportFrame transportFrame)
+            {
+                frames.add(transportFrame);
+            }
+
+            @Override
+            public void sentFrame(TransportFrame transportFrame) { }
+        });
+
+        assertTrue(_transport.isHandlingFrames());
+        _transport.bind(connection);
+
+        assertTrue(_transport.isHandlingFrames());
+        _transport.handleFrame(TRANSPORT_FRAME_OPEN);
+        assertTrue(_transport.isHandlingFrames());
+
+        assertEquals(1, frames.size());
+        TransportFrame transportFrame = frames.get(0);
+        assertTrue(transportFrame.getBody() instanceof Open);
+        assertEquals(CHANNEL_ID, transportFrame.getChannel());
+    }
+
+    @Test
+    public void testProtocolTracingLogsToSystem() {
+        Connection connection = new ConnectionImpl();
+        TransportImpl spy = spy(_transport);
+
+        assertTrue(spy.isHandlingFrames());
+        spy.bind(connection);
+
+        assertTrue(spy.isHandlingFrames());
+        spy.handleFrame(TRANSPORT_FRAME_OPEN);
+        assertTrue(spy.isHandlingFrames());
+
+        ArgumentCaptor<TransportFrame> frameCatcher = ArgumentCaptor.forClass(TransportFrame.class);
+        Mockito.verify(spy).log(eq(TransportImpl.INCOMING), frameCatcher.capture());
+
+        assertEquals(TRANSPORT_FRAME_OPEN.getChannel(), frameCatcher.getValue().getChannel());
+        assertTrue(frameCatcher.getValue().getBody() instanceof Open);
+        assertNull(frameCatcher.getValue().getPayload());
     }
 }

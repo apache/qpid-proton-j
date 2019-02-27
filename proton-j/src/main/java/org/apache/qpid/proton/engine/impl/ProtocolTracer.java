@@ -20,6 +20,7 @@
  */
 package org.apache.qpid.proton.engine.impl;
 
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 import org.apache.qpid.proton.framing.TransportFrame;
 
 /**
@@ -29,4 +30,6 @@ public interface ProtocolTracer
 {
     public void receivedFrame(TransportFrame transportFrame);
     public void sentFrame(TransportFrame transportFrame);
+    default void receivedSaslBody(SaslFrameBody saslFrameBody) {}
+    default void sentSaslBody(SaslFrameBody saslFrameBody) {}
 }
