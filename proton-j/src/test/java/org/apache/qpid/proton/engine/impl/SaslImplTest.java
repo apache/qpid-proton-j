@@ -20,12 +20,24 @@
 */
 package org.apache.qpid.proton.engine.impl;
 
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.security.SaslFrameBody;
+import org.apache.qpid.proton.amqp.security.SaslMechanisms;
+import org.apache.qpid.proton.framing.TransportFrame;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class SaslImplTest {
 
@@ -51,4 +63,55 @@ public class SaslImplTest {
         assertEquals("Unexpected response data", new Binary(expectedResponseBytes), sasl.getChallengeResponse());
     }
 
+    @Test
+    public void testProtocolTracingLogsToTracer() {
+        TransportImpl transport = new TransportImpl();
+        List<SaslFrameBody> bodies = new ArrayList<>();
+        transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void receivedSaslBody(final SaslFrameBody saslFrameBody)
+            {
+                bodies.add(saslFrameBody);
+            }
+
+            @Override
+            public void receivedFrame(TransportFrame transportFrame) { }
+
+            @Override
+            public void sentFrame(TransportFrame transportFrame) { }
+        });
+
+        SaslImpl sasl = new SaslImpl(transport, 512);
+
+        SaslMechanisms mechs = new SaslMechanisms();
+        mechs.setSaslServerMechanisms(Symbol.valueOf("TESTMECH"));
+
+        assertEquals(0, bodies.size());
+        sasl.handle(mechs, null);
+        assertEquals(1, bodies.size());
+        assertTrue(bodies.get(0) instanceof SaslMechanisms);
+    }
+
+    @Test
+    public void testProtocolTracingLogsToSystem() {
+        TransportImpl transport = new TransportImpl();
+        transport.trace(2);
+
+        TransportImpl spy = spy(transport);
+
+        final String testMechName = "TESTMECH";
+        SaslMechanisms mechs = new SaslMechanisms();
+        mechs.setSaslServerMechanisms(Symbol.valueOf(testMechName));
+
+        SaslImpl sasl = new SaslImpl(spy, 512);
+
+        sasl.handle(mechs, null);
+
+        ArgumentCaptor<SaslMechanisms> frameBodyCatcher = ArgumentCaptor.forClass(SaslMechanisms.class);
+        verify(spy).log(eq(TransportImpl.INCOMING), frameBodyCatcher.capture());
+
+        Symbol[] expectedMechs = new Symbol[] { Symbol.valueOf(testMechName)};
+        assertArrayEquals(expectedMechs, frameBodyCatcher.getValue().getSaslServerMechanisms());
+    }
 }

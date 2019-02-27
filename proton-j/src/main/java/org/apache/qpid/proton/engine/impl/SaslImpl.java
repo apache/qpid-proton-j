@@ -317,6 +317,14 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     @Override
     public void handle(SaslFrameBody frameBody, Binary payload)
     {
+        _transport.log(TransportImpl.INCOMING, frameBody);
+
+        ProtocolTracer tracer = _transport.getProtocolTracer();
+        if( tracer != null )
+        {
+            tracer.receivedSaslBody(frameBody);
+        }
+
         frameBody.invoke(this, payload, null);
     }
 
