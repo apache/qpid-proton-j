@@ -30,6 +30,10 @@ public interface ProtocolTracer
 {
     public void receivedFrame(TransportFrame transportFrame);
     public void sentFrame(TransportFrame transportFrame);
+
     default void receivedSaslBody(SaslFrameBody saslFrameBody) {}
     default void sentSaslBody(SaslFrameBody saslFrameBody) {}
+
+    default void receivedHeader(String header) {}
+    default void sentHeader(String header) {}
 }

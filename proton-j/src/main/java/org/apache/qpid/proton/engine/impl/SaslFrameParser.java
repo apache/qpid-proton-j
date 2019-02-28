@@ -33,6 +33,8 @@ import org.apache.qpid.proton.engine.TransportException;
 
 class SaslFrameParser
 {
+    private static final String HEADER_DESCRIPTION = "SASL";
+
     private SaslFrameHandler _sasl;
 
     enum State
@@ -62,12 +64,14 @@ class SaslFrameParser
 
     private final ByteBufferDecoder _decoder;
     private int _frameSizeLimit;
+    private TransportImpl _transport;
 
-    SaslFrameParser(SaslFrameHandler sasl, ByteBufferDecoder decoder, int frameSizeLimit)
+    SaslFrameParser(SaslFrameHandler sasl, ByteBufferDecoder decoder, int frameSizeLimit, TransportImpl transport)
     {
         _sasl = sasl;
         _decoder = decoder;
         _frameSizeLimit = frameSizeLimit;
+        _transport = transport;
     }
 
     /**
@@ -206,6 +210,9 @@ class SaslFrameParser
                             state = State.ERROR;
                             break;
                         }
+
+                        logHeader();
+
                         state = State.SIZE_0;
                     }
                     else
@@ -412,5 +419,19 @@ class SaslFrameParser
     {
         _size = 0;
         _state = State.SIZE_0;
+    }
+
+    private void logHeader()
+    {
+        if (_transport.isFrameTracingEnabled())
+        {
+            _transport.log(TransportImpl.INCOMING, HEADER_DESCRIPTION);
+
+            ProtocolTracer tracer = _transport.getProtocolTracer();
+            if (tracer != null)
+            {
+                tracer.receivedHeader(HEADER_DESCRIPTION);
+            }
+        }
     }
 }

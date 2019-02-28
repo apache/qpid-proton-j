@@ -82,6 +82,7 @@ public class TransportImpl extends EndpointImpl
 
     private static final boolean FRM_ENABLED = getBooleanEnv("PN_TRACE_FRM");
     private static final int TRACE_FRAME_PAYLOAD_LENGTH = Integer.getInteger("proton.trace_frame_payload_length", 1024);
+    private static final String HEADER_DESCRIPTION = "AMQP";
 
     // trace levels
     private int _levels = (FRM_ENABLED ? TRACE_FRM : 0);
@@ -179,7 +180,7 @@ public class TransportImpl extends EndpointImpl
         if(!_init)
         {
             _init = true;
-            _frameParser = new FrameParser(_frameHandler , _decoder, _maxFrameSize);
+            _frameParser = new FrameParser(_frameHandler , _decoder, _maxFrameSize, this);
             _inputProcessor = _frameParser;
             _outputProcessor = new TransportOutputAdaptor(this, _maxFrameSize, isUseReadOnlyOutputBuffer());
         }
@@ -865,8 +866,24 @@ public class TransportImpl extends EndpointImpl
     {
         if(!_headerWritten)
         {
+            outputHeaderDescription();
+
             _frameWriter.writeHeader(AmqpHeader.HEADER);
             _headerWritten = true;
+        }
+    }
+
+    private void outputHeaderDescription()
+    {
+        if (isFrameTracingEnabled())
+        {
+            log(TransportImpl.OUTGOING, HEADER_DESCRIPTION);
+
+            ProtocolTracer tracer = getProtocolTracer();
+            if (tracer != null)
+            {
+                tracer.sentHeader(HEADER_DESCRIPTION);
+            }
         }
     }
 
@@ -1723,6 +1740,12 @@ public class TransportImpl extends EndpointImpl
     void log(final String event, final SaslFrameBody frameBody) {
         if (isTraceFramesEnabled()) {
             outputMessage(event, 0, frameBody, null);
+        }
+    }
+
+    void log(final String event, final String headerDescription) {
+        if (isTraceFramesEnabled()) {
+            outputMessage(event, 0, headerDescription, null);
         }
     }
 

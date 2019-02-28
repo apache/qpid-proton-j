@@ -47,8 +47,9 @@ public class SaslFrameParserTest
 {
     private final SaslFrameHandler _mockSaslFrameHandler = mock(SaslFrameHandler.class);
     private final ByteBufferDecoder _mockDecoder = mock(ByteBufferDecoder.class);
+    private final TransportImpl mockTransport = mock(TransportImpl.class);
     private final SaslFrameParser _frameParser;
-    private final SaslFrameParser _frameParserWithMockDecoder = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder, Transport.MIN_MAX_FRAME_SIZE);
+    private final SaslFrameParser _frameParserWithMockDecoder = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder, Transport.MIN_MAX_FRAME_SIZE, mockTransport);
     private final AmqpFramer _amqpFramer = new AmqpFramer();
 
     private final SaslInit _saslFrameBody;
@@ -60,7 +61,7 @@ public class SaslFrameParserTest
         EncoderImpl encoder = new EncoderImpl(decoder);
         AMQPDefinedTypes.registerAllTypes(decoder,encoder);
 
-        _frameParser = new SaslFrameParser(_mockSaslFrameHandler, decoder, Transport.MIN_MAX_FRAME_SIZE);
+        _frameParser = new SaslFrameParser(_mockSaslFrameHandler, decoder, Transport.MIN_MAX_FRAME_SIZE, mockTransport);
         _saslFrameBody = new SaslInit();
         _saslFrameBody.setMechanism(Symbol.getSymbol("unused"));
         _saslFrameBytes = ByteBuffer.wrap(_amqpFramer.generateSaslFrame(0, new byte[0], _saslFrameBody));
@@ -106,7 +107,7 @@ public class SaslFrameParserTest
     @Test
     public void testInputOfFrameWithInvalidSizeWhenSpecifyingLargeMaxFrameSize()
     {
-        SaslFrameParser frameParserWithLargeMaxSize = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder, 2017);
+        SaslFrameParser frameParserWithLargeMaxSize = new SaslFrameParser(_mockSaslFrameHandler, _mockDecoder, 2017, mockTransport);
         sendAmqpSaslHeader(frameParserWithLargeMaxSize);
 
         // http://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.html#doc-idp43536
@@ -248,8 +249,9 @@ public class SaslFrameParserTest
     private void doInputOfInvalidHeaderTestImpl(int invalidIndex) {
         SaslFrameHandler mockSaslFrameHandler = mock(SaslFrameHandler.class);
         ByteBufferDecoder mockDecoder = mock(ByteBufferDecoder.class);
+        TransportImpl mockTransport = mock(TransportImpl.class);
 
-        SaslFrameParser saslFrameParser = new SaslFrameParser(mockSaslFrameHandler, mockDecoder, Transport.MIN_MAX_FRAME_SIZE);
+        SaslFrameParser saslFrameParser = new SaslFrameParser(mockSaslFrameHandler, mockDecoder, Transport.MIN_MAX_FRAME_SIZE, mockTransport);
 
         byte[] header = Arrays.copyOf(AmqpHeader.SASL_HEADER, AmqpHeader.SASL_HEADER.length);
         header[invalidIndex] = 'X';

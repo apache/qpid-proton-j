@@ -51,6 +51,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     private static final Logger _logger = Logger.getLogger(SaslImpl.class.getName());
 
     public static final byte SASL_FRAME_TYPE = (byte) 1;
+    private static final String HEADER_DESCRIPTION = "SASL";
 
     private final DecoderImpl _decoder = new DecoderImpl();
     private final EncoderImpl _encoder = new EncoderImpl(_decoder);
@@ -98,7 +99,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         _maxFrameSize = maxFrameSize;
 
         AMQPDefinedTypes.registerAllTypes(_decoder,_encoder);
-        _frameParser = new SaslFrameParser(this, _decoder, maxFrameSize);
+        _frameParser = new SaslFrameParser(this, _decoder, maxFrameSize, _transport);
         _frameWriter = new FrameWriter(_encoder, maxFrameSize, FrameWriter.SASL_FRAME_TYPE, _transport);
     }
 
@@ -212,6 +213,8 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     {
         if(!_headerWritten)
         {
+            logHeader();
+
             _frameWriter.writeHeader(AmqpHeader.SASL_HEADER);
             _headerWritten = true;
             return AmqpHeader.SASL_HEADER.length;
@@ -219,6 +222,20 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         else
         {
             return 0;
+        }
+    }
+
+    private void logHeader()
+    {
+        if (_transport.isFrameTracingEnabled())
+        {
+            _transport.log(TransportImpl.OUTGOING, HEADER_DESCRIPTION);
+
+            ProtocolTracer tracer = _transport.getProtocolTracer();
+            if (tracer != null)
+            {
+                tracer.sentHeader(HEADER_DESCRIPTION);
+            }
         }
     }
 

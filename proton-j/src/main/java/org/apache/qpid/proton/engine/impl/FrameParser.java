@@ -40,6 +40,7 @@ import org.apache.qpid.proton.framing.TransportFrame;
 class FrameParser implements TransportInput
 {
     private static final Logger TRACE_LOGGER = Logger.getLogger("proton.trace");
+    private static final String HEADER_DESCRIPTION = "AMQP";
 
     private static final ByteBuffer _emptyInputBuffer = newWriteableBuffer(0);
 
@@ -67,6 +68,7 @@ class FrameParser implements TransportInput
     private final ByteBufferDecoder _decoder;
     private final int _inputBufferSize;
     private final int _localMaxFrameSize;
+    private final TransportImpl _transport;
 
     private ByteBuffer _inputBuffer = null;
     private boolean _tail_closed = false;
@@ -89,12 +91,13 @@ class FrameParser implements TransportInput
      * We store the last result when processing input so that
      * we know not to process any more input if it was an error.
      */
-    FrameParser(FrameHandler frameHandler, ByteBufferDecoder decoder, int localMaxFrameSize)
+    FrameParser(FrameHandler frameHandler, ByteBufferDecoder decoder, int localMaxFrameSize, TransportImpl transport)
     {
         _frameHandler = frameHandler;
         _decoder = decoder;
         _localMaxFrameSize = localMaxFrameSize;
         _inputBufferSize = _localMaxFrameSize > 0 ? _localMaxFrameSize : 16*1024;
+        _transport = transport;
     }
 
     private void input(ByteBuffer in) throws TransportException
@@ -238,6 +241,9 @@ class FrameParser implements TransportInput
                             state = State.ERROR;
                             break;
                         }
+
+                        logHeader();
+
                         state = State.SIZE_0;
                     }
                     else
@@ -582,5 +588,16 @@ class FrameParser implements TransportInput
     long getFramesInput()
     {
         return _framesInput;
+    }
+
+    private void logHeader() {
+        if (_transport.isFrameTracingEnabled()) {
+            _transport.log(TransportImpl.INCOMING, HEADER_DESCRIPTION);
+
+            ProtocolTracer tracer = _transport.getProtocolTracer();
+            if (tracer != null) {
+                tracer.receivedHeader(HEADER_DESCRIPTION);
+            }
+        }
     }
 }

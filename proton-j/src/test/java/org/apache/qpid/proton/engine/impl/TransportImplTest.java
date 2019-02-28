@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Binary;
@@ -3643,7 +3644,7 @@ public class TransportImplTest
     }
 
     @Test
-    public void testProtocolTracingLogsToTracer()
+    public void testProtocolTracingLogsFrameToTracer()
     {
         Connection connection = new ConnectionImpl();
         List<TransportFrame> frames = new ArrayList<>();
@@ -3673,7 +3674,8 @@ public class TransportImplTest
     }
 
     @Test
-    public void testProtocolTracingLogsToSystem() {
+    public void testProtocolTracingLogsFrameToSystem()
+    {
         Connection connection = new ConnectionImpl();
         TransportImpl spy = spy(_transport);
 
@@ -3690,5 +3692,186 @@ public class TransportImplTest
         assertEquals(TRANSPORT_FRAME_OPEN.getChannel(), frameCatcher.getValue().getChannel());
         assertTrue(frameCatcher.getValue().getBody() instanceof Open);
         assertNull(frameCatcher.getValue().getPayload());
+    }
+
+    @Test
+    public void testProtocolTracingLogsHeaderToTracer()
+    {
+        doProtocolTracingLogsHeaderToTracerTestImpl(false);
+    }
+
+    @Test
+    public void testProtocolTracingLogsHeaderSaslToTracer()
+    {
+        doProtocolTracingLogsHeaderToTracerTestImpl(true);
+    }
+
+    private void doProtocolTracingLogsHeaderToTracerTestImpl(boolean sasl)
+    {
+        Connection connection = new ConnectionImpl();
+        AtomicReference<String> headerRef = new AtomicReference<>();
+        _transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void receivedHeader(String header)
+            {
+                assertTrue(headerRef.compareAndSet(null, header));
+            }
+
+            @Override
+            public void receivedFrame(TransportFrame transportFrame) { }
+            @Override
+            public void sentFrame(TransportFrame transportFrame) { }
+
+        });
+
+        if (sasl)
+        {
+            _transport.sasl();
+        }
+
+        assertTrue(_transport.isHandlingFrames());
+        _transport.bind(connection);
+
+        assertTrue(_transport.isHandlingFrames());
+        _transport.getInputBuffer().put(sasl ? AmqpHeader.SASL_HEADER : AmqpHeader.HEADER);
+        _transport.process();
+        assertTrue(_transport.isHandlingFrames());
+
+        assertNotNull(headerRef.get());
+        assertEquals(sasl ? "SASL" : "AMQP", headerRef.get());
+    }
+
+    @Test
+    public void testProtocolTracingLogsHeaderToSystem()
+    {
+        doProtocolTracingLogsHeaderToSystemTestImpl(false);
+    }
+
+    @Test
+    public void testProtocolTracingLogsHeaderSaslToSystem()
+    {
+        doProtocolTracingLogsHeaderToSystemTestImpl(true);
+    }
+
+    private void doProtocolTracingLogsHeaderToSystemTestImpl(boolean sasl)
+    {
+        Connection connection = new ConnectionImpl();
+
+        AtomicReference<String> headerRef = new AtomicReference<>();
+        AtomicReference<String> eventRef = new AtomicReference<>();
+        TransportImpl transport = new TransportImpl()
+        {
+            @Override
+            public void log(String event, String header) {
+                assertTrue(eventRef.compareAndSet(null, event));
+                assertTrue(headerRef.compareAndSet(null, header));
+            }
+        };
+        transport.trace(2);
+
+        if (sasl)
+        {
+            transport.sasl();
+        }
+
+        transport.bind(connection);
+
+        transport.getInputBuffer().put(sasl ? AmqpHeader.SASL_HEADER : AmqpHeader.HEADER);
+        transport.process();
+
+        assertEquals(TransportImpl.INCOMING, eventRef.get());
+        assertEquals(sasl ? "SASL" : "AMQP", headerRef.get());
+    }
+
+    @Test
+    public void testProtocolTracingLogsOutboundHeaderToTracer()
+    {
+        doProtocolTracingLogsOutboundHeaderToTracerTestImpl(false);
+    }
+
+    @Test
+    public void testProtocolTracingLogsOutboundHeaderSaslToTracer()
+    {
+        doProtocolTracingLogsOutboundHeaderToTracerTestImpl(true);
+    }
+
+    private void doProtocolTracingLogsOutboundHeaderToTracerTestImpl(boolean sasl)
+    {
+        Connection connection = new ConnectionImpl();
+        AtomicReference<String> headerRef = new AtomicReference<>();
+        _transport.setProtocolTracer(new ProtocolTracer()
+        {
+            @Override
+            public void sentHeader(String header)
+            {
+                assertTrue(headerRef.compareAndSet(null, header));
+            }
+
+            @Override
+            public void receivedFrame(TransportFrame transportFrame) { }
+            @Override
+            public void sentFrame(TransportFrame transportFrame) { }
+
+        });
+
+        if (sasl)
+        {
+            _transport.sasl();
+        }
+
+        _transport.bind(connection);
+
+        ByteBuffer expected = ByteBuffer.wrap(sasl ? AmqpHeader.SASL_HEADER : AmqpHeader.HEADER);
+
+        _transport.pending();
+        assertEquals(expected, _transport.getOutputBuffer());
+
+        assertEquals(sasl ? "SASL" : "AMQP", headerRef.get());
+    }
+
+    @Test
+    public void testProtocolTracingLogsOutboundHeaderToSystem()
+    {
+        doProtocolTracingLogsOutboundHeaderToSystemTestImpl(false);
+    }
+
+    @Test
+    public void testProtocolTracingLogsOutboundHeaderSaslToSystem()
+    {
+        doProtocolTracingLogsOutboundHeaderToSystemTestImpl(true);
+    }
+
+    private void doProtocolTracingLogsOutboundHeaderToSystemTestImpl(boolean sasl)
+    {
+        Connection connection = new ConnectionImpl();
+
+        AtomicReference<String> headerRef = new AtomicReference<>();
+        AtomicReference<String> eventRef = new AtomicReference<>();
+        TransportImpl transport = new TransportImpl()
+        {
+            @Override
+            public void log(String event, String header)
+            {
+                assertTrue(eventRef.compareAndSet(null, event));
+                assertTrue(headerRef.compareAndSet(null, header));
+            }
+        };
+        transport.trace(2);
+
+        if (sasl)
+        {
+            transport.sasl();
+        }
+
+        transport.bind(connection);
+
+        ByteBuffer expected = ByteBuffer.wrap(sasl ? AmqpHeader.SASL_HEADER : AmqpHeader.HEADER);
+
+        transport.pending();
+        assertEquals(expected, transport.getOutputBuffer());
+
+        assertEquals(TransportImpl.OUTGOING, eventRef.get());
+        assertEquals(sasl ? "SASL" : "AMQP", headerRef.get());
     }
 }

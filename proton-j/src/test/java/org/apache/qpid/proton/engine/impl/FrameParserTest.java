@@ -52,7 +52,7 @@ public class FrameParserTest
     private FrameHandler _mockFrameHandler = mock(FrameHandler.class);
     private DecoderImpl _decoder = new DecoderImpl();
     private EncoderImpl _encoder = new EncoderImpl(_decoder);
-    private final FrameParser _frameParser = new FrameParser(_mockFrameHandler, _decoder, DEFAULT_MAX_FRAME_SIZE);
+    private final FrameParser _frameParser = new FrameParser(_mockFrameHandler, _decoder, DEFAULT_MAX_FRAME_SIZE, new TransportImpl());
 
     private final AmqpFramer _amqpFramer = new AmqpFramer();
 
