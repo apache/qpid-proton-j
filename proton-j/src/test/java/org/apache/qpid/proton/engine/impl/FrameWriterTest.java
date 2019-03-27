@@ -61,6 +61,7 @@ public class FrameWriterTest {
     private final EncoderImpl encoder = new EncoderImpl(decoder);
 
     private ReadableBuffer bigPayload;
+    private ReadableBuffer littlePayload;
     private ByteBuffer buffer;
 
     @Before
@@ -76,6 +77,11 @@ public class FrameWriterTest {
         bigPayload = ReadableBuffer.ByteBufferReader.allocate(4096);
         for (int i = 0; i < bigPayload.remaining(); ++i) {
             bigPayload.array()[i] = (byte) random.nextInt(127);
+        }
+
+        littlePayload = ReadableBuffer.ByteBufferReader.allocate(16);
+        for (int i = 0; i < littlePayload.remaining(); ++i) {
+            littlePayload.array()[i] = (byte) random.nextInt(127);
         }
     }
 
@@ -298,9 +304,9 @@ public class FrameWriterTest {
         FrameWriter framer = new FrameWriter(encoder, Integer.MAX_VALUE, (byte) 0, spy);
 
         int channel = 16;
-        int payloadLength = bigPayload.capacity();
+        int payloadLength = littlePayload.capacity();
 
-        framer.writeFrame(channel, transfer, bigPayload, new PartialTransferHandler(transfer));
+        framer.writeFrame(channel, transfer, littlePayload, new PartialTransferHandler(transfer));
 
         ArgumentCaptor<TransportFrame> frameCatcher = ArgumentCaptor.forClass(TransportFrame.class);
         Mockito.verify(spy).log(eq(TransportImpl.OUTGOING), frameCatcher.capture());
