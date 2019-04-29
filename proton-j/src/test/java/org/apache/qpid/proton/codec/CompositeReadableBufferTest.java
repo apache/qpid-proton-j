@@ -26,13 +26,17 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.*;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.InvalidMarkException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.message.impl.MessageImpl;
 import org.junit.Test;
 
 /**
@@ -3024,6 +3028,26 @@ public class CompositeReadableBufferTest {
             emptySlice.append(new byte[] { 10 });
             fail("Should not be allowed to append to empty slice, must throw IllegalStateException");
         } catch (IllegalStateException ise) {}
+    }
+
+    @Test
+    public void testPositionMovedOnArrayBounderies() {
+        CompositeReadableBuffer buf = new CompositeReadableBuffer();
+        byte[] d1 = new byte[] { 1, 2, 3, 4 };
+        byte[] d2 = new byte[] { 5, 6 };
+        byte[] d3 = new byte[] { 7, 8, 9, 10, 11, 12, 13, 14 };
+        byte[] d4 = new byte[] { 15 };
+        buf.append(d1);
+        buf.append(d2);
+        buf.append(d3);
+        buf.append(d4);
+
+        buf.getInt();
+        assertEquals(5, buf.get(4));
+        buf.get();
+        buf.get();
+        buf.getLong();
+        assertEquals(15, buf.get(14));
     }
 
     @Test
