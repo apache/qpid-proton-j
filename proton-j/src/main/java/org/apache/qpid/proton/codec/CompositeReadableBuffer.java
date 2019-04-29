@@ -213,6 +213,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
                      (int)(currentArray[currentOffset++] & 0xFF) << 16 |
                      (int)(currentArray[currentOffset++] & 0xFF) << 8 |
                      (int)(currentArray[currentOffset++] & 0xFF) << 0;
+            maybeMoveToNextArray();
         } else {
             for (int i = INT_BYTES - 1; i >= 0; --i) {
                 result |= (int)(currentArray[currentOffset++] & 0xFF) << (i * Byte.SIZE);
@@ -242,6 +243,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
                      (long)(currentArray[currentOffset++] & 0xFF) << 16 |
                      (long)(currentArray[currentOffset++] & 0xFF) << 8 |
                      (long)(currentArray[currentOffset++] & 0xFF) << 0;
+            maybeMoveToNextArray();
         } else {
             for (int i = LONG_BYTES - 1; i >= 0; --i) {
                 result |= (long)(currentArray[currentOffset++] & 0xFF) << (i * Byte.SIZE);
