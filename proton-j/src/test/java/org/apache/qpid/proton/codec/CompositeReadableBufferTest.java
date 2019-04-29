@@ -3027,6 +3027,31 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
+    public void testPositionMovedOnArrayBounderies() {
+        CompositeReadableBuffer buffer = new CompositeReadableBuffer();
+
+        buffer.append(new byte[] { 1, 2, 3, 4 });
+        buffer.append(new byte[] { 5, 6 });
+        buffer.append(new byte[] { 7, 8, 9, 10, 11, 12, 13, 14 });
+        buffer.append(new byte[] { 15 });
+
+        buffer.getInt();
+        assertEquals(5, buffer.get(4));
+        buffer.get();
+        buffer.get();
+        buffer.getLong();
+        assertEquals(15, buffer.get(14));
+        assertEquals(15, buffer.get(14));
+
+        try {
+            buffer.get(15);
+        } catch (IndexOutOfBoundsException aiobe) {}
+
+        buffer.position(4);
+        assertEquals(5, buffer.get(4));
+    }
+
+    @Test
     public void testSliceRefusesAppends() {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
         buffer.append(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
