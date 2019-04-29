@@ -1,4 +1,3 @@
-
 /*
 *
 * Licensed to the Apache Software Foundation (ASF) under one
@@ -19,12 +18,11 @@
 * under the License.
 *
 */
-
-
 package org.apache.qpid.proton.codec.messaging;
 
 import java.util.AbstractList;
 import java.util.List;
+
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedLong;
@@ -34,8 +32,7 @@ import org.apache.qpid.proton.codec.Decoder;
 import org.apache.qpid.proton.codec.DescribedTypeConstructor;
 import org.apache.qpid.proton.codec.EncoderImpl;
 
-
-public final class ReceivedType extends AbstractDescribedType<Received,List> implements DescribedTypeConstructor<Received>
+public final class ReceivedType extends AbstractDescribedType<Received, List> implements DescribedTypeConstructor<Received>
 {
     private static final Object[] DESCRIPTORS =
     {
@@ -49,6 +46,7 @@ public final class ReceivedType extends AbstractDescribedType<Received,List> imp
         super(encoder);
     }
 
+    @Override
     public UnsignedLong getDescriptor()
     {
         return DESCRIPTOR;
@@ -60,7 +58,6 @@ public final class ReceivedType extends AbstractDescribedType<Received,List> imp
         return new ReceivedWrapper(val);
     }
 
-
     private static final class ReceivedWrapper extends AbstractList
     {
         private final Received _impl;
@@ -70,9 +67,9 @@ public final class ReceivedType extends AbstractDescribedType<Received,List> imp
             _impl = impl;
         }
 
+        @Override
         public Object get(final int index)
         {
-
             switch(index)
             {
                 case 0:
@@ -82,45 +79,42 @@ public final class ReceivedType extends AbstractDescribedType<Received,List> imp
             }
 
             throw new IllegalStateException("Unknown index " + index);
-
         }
 
+        @Override
         public int size()
         {
             return _impl.getSectionOffset() != null
                       ? 2
-                      : _impl.getSectionOffset() != null
+                      : _impl.getSectionNumber() != null
                       ? 1
                       : 0;
-
         }
     }
 
+    @Override
     public Received newInstance(Object described)
     {
-        List l = (List) described;
+        List<?> l = (List<?>) described;
 
         Received o = new Received();
 
-
         switch(2 - l.size())
         {
-
             case 0:
-                o.setSectionOffset( (UnsignedLong) l.get( 1 ) );
+                o.setSectionOffset((UnsignedLong) l.get( 1 ));
             case 1:
-                o.setSectionNumber( (UnsignedInteger) l.get( 0 ) );
+                o.setSectionNumber((UnsignedInteger) l.get( 0 ));
         }
-
 
         return o;
     }
 
+    @Override
     public Class<Received> getTypeClass()
     {
         return Received.class;
     }
-
 
     public static void register(Decoder decoder, EncoderImpl encoder)
     {
@@ -132,4 +126,3 @@ public final class ReceivedType extends AbstractDescribedType<Received,List> imp
         encoder.register(type);
     }
 }
-  
