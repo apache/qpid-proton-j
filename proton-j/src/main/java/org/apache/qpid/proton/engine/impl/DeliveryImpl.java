@@ -132,6 +132,10 @@ public class DeliveryImpl implements Delivery
     @Override
     public void disposition(final DeliveryState state)
     {
+        if (_settled) {
+            return;
+        }
+
         _deliveryState = state;
         if(!_remoteSettled)
         {
