@@ -42,6 +42,8 @@ public interface Delivery extends Extendable
     /**
      * updates the state of the delivery
      *
+     * The new state may have no on-the-wire effect, if delivery settlement was already communicated to/from the peer.
+     *
      * @param state the new delivery state
      */
     public void disposition(DeliveryState state);
