@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>19</version>
+    <version>21</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -43,7 +43,6 @@
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>4.1.0</maven-bundle-plugin-version>
     <jacoco-plugin-version>0.8.2</jacoco-plugin-version>
-    <surefire.version>2.21.0</surefire.version>
 
     <!-- surefire forked jvm arguments -->
     <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
