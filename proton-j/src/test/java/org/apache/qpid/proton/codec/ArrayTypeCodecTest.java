@@ -16,15 +16,20 @@
  */
 package org.apache.qpid.proton.codec;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
 import org.apache.qpid.proton.amqp.Symbol;
@@ -300,5 +305,79 @@ public class ArrayTypeCodecTest extends CodecTestSupport {
 
         // Check that the ArrayType tries to reserve space, actual encoding size not computed here.
         Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
+    }
+
+    @Test
+    public void testEncodeDecodeByteArray() throws IOException {
+        int count = 100;
+        byte[] source = createPayloadArrayBytes(count);
+
+        try {
+            assertEquals("Unexpected source array length", count, source.length);
+
+            int encodingWidth = count < 254 ? 1 : 4; // less than 254 and not 256, since we also need 1 byte for element count, and (in this case) 1 byte for primitive element type constructor.
+            int arrayPayloadSize =  encodingWidth + 1 + count; // variable width for element count + byte type descriptor + number of elements
+            int expectedEncodedArraySize = 1 + encodingWidth + arrayPayloadSize; // array type code +  variable width for array size + other encoded payload
+            byte[] expectedEncoding = new byte[expectedEncodedArraySize];
+            ByteBuffer expectedEncodingWrapper = ByteBuffer.wrap(expectedEncoding);
+
+            // Write the array encoding code, array size, and element count
+            if(count < 254) {
+                expectedEncodingWrapper.put((byte) 0xE0); // 'array8' type descriptor code
+                expectedEncodingWrapper.put((byte) arrayPayloadSize);
+                expectedEncodingWrapper.put((byte) count);
+            } else {
+                expectedEncodingWrapper.put((byte) 0xF0); // 'array32' type descriptor code
+                expectedEncodingWrapper.putInt(arrayPayloadSize);
+                expectedEncodingWrapper.putInt(count);
+            }
+
+            // Write the type descriptor
+            expectedEncodingWrapper.put((byte) 0x51); // 'byte' type descriptor code
+
+            // Write the elements
+            for (int i = 0; i < count; i++) {
+                expectedEncodingWrapper.put(source[i]);
+            }
+
+            assertFalse("Should have filled expected encoding array", expectedEncodingWrapper.hasRemaining());
+
+            // Now verify against the actual encoding of the array
+            assertEquals("Unexpected buffer position", 0, buffer.position());
+            encoder.writeArray(source);
+            assertEquals("Unexpected encoded payload length", expectedEncodedArraySize, buffer.position());
+
+            byte[] actualEncoding = new byte[expectedEncodedArraySize];
+            buffer.flip();
+            buffer.get(actualEncoding);
+            assertFalse("Should have drained the encoder buffer contents", buffer.hasRemaining());
+
+            assertArrayEquals("Unexpected actual array encoding", expectedEncoding, actualEncoding);
+
+            // Now verify against the decoding
+            buffer.flip();
+            Object decoded = decoder.readObject();
+            assertNotNull(decoded);
+            assertTrue(decoded.getClass().isArray());
+            assertTrue(decoded.getClass().getComponentType().isPrimitive());
+            assertEquals(byte.class, decoded.getClass().getComponentType());
+
+            assertArrayEquals("Unexpected decoding", source, (byte[]) decoded);
+        }
+        catch (Throwable t) {
+            System.err.println("Error during test, source array: " + Arrays.toString(source));
+            throw t;
+        }
+    }
+
+    private static byte[] createPayloadArrayBytes(int length) {
+        Random rand = new Random(System.currentTimeMillis());
+
+        byte[] payload = new byte[length];
+        for (int i = 0; i < length; i++) {
+            payload[i] = (byte) (64 + 1 + rand.nextInt(9));
+        }
+
+        return payload;
     }
 }

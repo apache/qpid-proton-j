@@ -717,6 +717,7 @@ public class ArrayType implements PrimitiveType<Object[]>
                                     a.length * underlyingEncoder.getValueSize(null));
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
             getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(byte b : a)
             {
