@@ -697,10 +697,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final boolean[] a)
         {
             BooleanType.BooleanEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(boolean b : a)
@@ -713,10 +713,11 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final byte[] a)
         {
             ByteType.ByteEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
+            getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(byte b : a)
             {
@@ -728,10 +729,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final short[] a)
         {
             ShortType.ShortEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(short b : a)
@@ -744,10 +745,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final int[] a)
         {
             IntegerType.IntegerEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(int b : a)
@@ -760,10 +761,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final long[] a)
         {
             LongType.LongEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(long b : a)
@@ -776,10 +777,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final float[] a)
         {
             FloatType.FloatEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(float b : a)
@@ -792,10 +793,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final double[] a)
         {
             DoubleType.DoubleEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(double b : a)
@@ -808,10 +809,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         public void writeValue(final char[] a)
         {
             CharacterType.CharacterEncoding underlyingEncoder = getUnderlyingEncoding(a);
-            byte encodedValueSize = (byte)(1 + underlyingEncoder.getConstructorSize() +
-                                    a.length * underlyingEncoder.getValueSize(null));
+            int encodedValueSize = 1 + underlyingEncoder.getConstructorSize() +
+                                    a.length * underlyingEncoder.getValueSize(null);
             getEncoder().getBuffer().ensureRemaining(encodedValueSize);
-            getEncoder().writeRaw(encodedValueSize);
+            getEncoder().writeRaw((byte)encodedValueSize);
             getEncoder().writeRaw((byte)a.length);
             underlyingEncoder.writeConstructor();
             for(char b : a)
