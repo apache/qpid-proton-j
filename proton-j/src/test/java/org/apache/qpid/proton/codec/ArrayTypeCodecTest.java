@@ -1102,4 +1102,97 @@ public class ArrayTypeCodecTest extends CodecTestSupport {
         return payload;
     }
 
+    @Test
+    public void testEncodeDecodeSmallSymbolArray50() throws Throwable {
+        // sym8 array8 less than 128 bytes
+        doEncodeDecodeSmallSymbolArrayTestImpl(50);
+    }
+
+    @Test
+    public void testEncodeDecodeSmallSymbolArray100() throws Throwable {
+        // sym8 array8 greater than 128 bytes
+        doEncodeDecodeSmallSymbolArrayTestImpl(100);
+    }
+
+    @Test
+    public void testEncodeDecodeSmallSymbolArray384() throws Throwable {
+        // sym8 array32
+        doEncodeDecodeSmallSymbolArrayTestImpl(384);
+    }
+
+    private void doEncodeDecodeSmallSymbolArrayTestImpl(int count) throws Throwable {
+        Symbol[] source = createPayloadArraySmallSymbols(count);
+
+        try {
+            assertEquals("Unexpected source array length", count, source.length);
+
+            int encodingWidth = count < 127 ? 1 : 4; // less than 127, since each element is 2 bytes (1 length, 1 content char), but we also need 1 byte for element count, and (in this case) 1 byte for primitive element type constructor.
+            int arrayPayloadSize =  encodingWidth + 1 + (count * 2); // variable width for element count + byte type descriptor + (number of elements * size[=length+content-char])
+            int expectedEncodedArraySize = 1 + encodingWidth + arrayPayloadSize; // array type code +  variable width for array size + other encoded payload
+            byte[] expectedEncoding = new byte[expectedEncodedArraySize];
+            ByteBuffer expectedEncodingWrapper = ByteBuffer.wrap(expectedEncoding);
+
+            // Write the array encoding code, array size, and element count
+            if(count < 254) {
+                expectedEncodingWrapper.put((byte) 0xE0); // 'array8' type descriptor code
+                expectedEncodingWrapper.put((byte) arrayPayloadSize);
+                expectedEncodingWrapper.put((byte) count);
+            } else {
+                expectedEncodingWrapper.put((byte) 0xF0); // 'array32' type descriptor code
+                expectedEncodingWrapper.putInt(arrayPayloadSize);
+                expectedEncodingWrapper.putInt(count);
+            }
+
+            // Write the type descriptor
+            expectedEncodingWrapper.put((byte) 0xA3); // 'sym8' type descriptor code
+
+            // Write the elements
+            for (int i = 0; i < count; i++) {
+                Symbol symbol = source[i];
+                assertEquals("Unexpected length", 1, symbol.length());
+
+                expectedEncodingWrapper.put((byte) 1); // Length
+                expectedEncodingWrapper.put((byte) symbol.toString().charAt(0)); // Content
+            }
+
+            assertFalse("Should have filled expected encoding array", expectedEncodingWrapper.hasRemaining());
+
+            // Now verify against the actual encoding of the array
+            assertEquals("Unexpected buffer position", 0, buffer.position());
+            encoder.writeArray(source);
+            assertEquals("Unexpected encoded payload length", expectedEncodedArraySize, buffer.position());
+
+            byte[] actualEncoding = new byte[expectedEncodedArraySize];
+            buffer.flip();
+            buffer.get(actualEncoding);
+            assertFalse("Should have drained the encoder buffer contents", buffer.hasRemaining());
+
+            assertArrayEquals("Unexpected actual array encoding", expectedEncoding, actualEncoding);
+
+            // Now verify against the decoding
+            buffer.flip();
+            Object decoded = decoder.readObject();
+            assertNotNull(decoded);
+            assertTrue(decoded.getClass().isArray());
+            assertEquals(Symbol.class, decoded.getClass().getComponentType());
+
+            assertArrayEquals("Unexpected decoding", source, (Symbol[]) decoded);
+        }
+        catch (Throwable t) {
+            System.err.println("Error during test, source array: " + Arrays.toString(source));
+            throw t;
+        }
+    }
+
+    // Creates 1 char Symbols with chars of 0-9, for encoding as sym8
+    private static Symbol[] createPayloadArraySmallSymbols(int length) {
+        Random rand = new Random(System.currentTimeMillis());
+
+        Symbol[] payload = new Symbol[length];
+        for (int i = 0; i < length; i++) {
+            payload[i] = Symbol.valueOf(String.valueOf(rand.nextInt(9)));
+        }
+
+        return payload;
+    }
 }
