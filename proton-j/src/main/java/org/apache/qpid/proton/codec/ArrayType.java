@@ -1112,6 +1112,10 @@ public class ArrayType implements PrimitiveType<Object[]>
             {
                 return decodeDoubleArray((DoubleType.DoubleEncoding)constructor, count);
             }
+            else if(constructor instanceof CharacterType.CharacterEncoding)
+            {
+                return decodeCharArray((CharacterType.CharacterEncoding)constructor, count);
+            }
             else
             {
                 throw new ClassCastException("Unexpected class " + constructor.getClass().getName());
@@ -1198,6 +1202,18 @@ public class ArrayType implements PrimitiveType<Object[]>
     private static double[] decodeDoubleArray(DoubleType.DoubleEncoding constructor, final int count)
     {
         double[] array = new double[count];
+
+        for(int i = 0; i < count; i++)
+        {
+            array[i] = constructor.readPrimitiveValue();
+        }
+
+        return array;
+    }
+
+    private static char[] decodeCharArray(CharacterType.CharacterEncoding constructor, final int count)
+    {
+        char[] array = new char[count];
 
         for(int i = 0; i < count; i++)
         {

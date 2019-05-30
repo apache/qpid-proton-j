@@ -1023,24 +1023,24 @@ public class ArrayTypeCodecTest extends CodecTestSupport {
     }
 
     @Test
-    public void testEncodeCharArray25() throws Throwable {
+    public void testEncodeDecodeCharArray25() throws Throwable {
         // char array8 less than 128 bytes
-        doEncodeCharArrayTestImpl(25);
+        doEncodeDecodeCharArrayTestImpl(25);
     }
 
     @Test
-    public void testEncodeCharArray50() throws Throwable {
+    public void testEncodeDecodeCharArray50() throws Throwable {
         // char array8 greater than 128 bytes
-        doEncodeCharArrayTestImpl(50);
+        doEncodeDecodeCharArrayTestImpl(50);
     }
 
     @Test
-    public void testEncodeCharArray384() throws Throwable {
+    public void testEncodeDecodeCharArray384() throws Throwable {
         // char array32
-        doEncodeCharArrayTestImpl(384);
+        doEncodeDecodeCharArrayTestImpl(384);
     }
 
-    private void doEncodeCharArrayTestImpl(int count) throws Throwable {
+    private void doEncodeDecodeCharArrayTestImpl(int count) throws Throwable {
         char[] source = createPayloadArrayChars(count);
 
         try {
@@ -1084,6 +1084,16 @@ public class ArrayTypeCodecTest extends CodecTestSupport {
             assertFalse("Should have drained the encoder buffer contents", buffer.hasRemaining());
 
             assertArrayEquals("Unexpected actual array encoding", expectedEncoding, actualEncoding);
+
+            // Now verify against the decoding
+            buffer.flip();
+            Object decoded = decoder.readObject();
+            assertNotNull(decoded);
+            assertTrue(decoded.getClass().isArray());
+            assertTrue(decoded.getClass().getComponentType().isPrimitive());
+            assertEquals(char.class, decoded.getClass().getComponentType());
+
+            assertArrayEquals("Unexpected decoding", source, (char[]) decoded);
         }
         catch (Throwable t) {
             System.err.println("Error during test, source array: " + Arrays.toString(source));
