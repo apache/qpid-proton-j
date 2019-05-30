@@ -189,9 +189,9 @@
     <module>apache-qpid-proton-j</module>
   </modules>
 
-  <url>http://qpid.apache.org/proton</url>
+  <url>https://qpid.apache.org/proton</url>
   <scm>
-    <connection>scm:git:http://gitbox.apache.org/repos/asf/qpid-proton-j.git</connection>
+    <connection>scm:git:https://gitbox.apache.org/repos/asf/qpid-proton-j.git</connection>
     <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/qpid-proton-j.git</developerConnection>
     <url>https://gitbox.apache.org/repos/asf?p=qpid-proton-j.git</url>
     <tag>HEAD</tag>
