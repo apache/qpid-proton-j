@@ -42,7 +42,8 @@
 
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>4.1.0</maven-bundle-plugin-version>
-    <jacoco-plugin-version>0.8.2</jacoco-plugin-version>
+    <jacoco-plugin-version>0.8.4</jacoco-plugin-version>
+    <surefire.version>2.22.2</surefire.version>
 
     <!-- surefire forked jvm arguments -->
     <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
