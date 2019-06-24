@@ -1,8 +1,14 @@
 language: java
-sudo: false
 matrix:
   include:
     - os: linux
       jdk: openjdk8
+      dist: xenial
     - os: linux
       jdk: openjdk11
+      dist: xenial
+cache:
+  directories:
+  - $HOME/.m2
+  before_cache:
+  - rm -rf $HOME/.m2/repository/org/apache/qpid/*
