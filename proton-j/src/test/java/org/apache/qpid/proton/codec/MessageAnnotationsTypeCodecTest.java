@@ -23,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedByte;
@@ -51,14 +52,13 @@ public class MessageAnnotationsTypeCodecTest extends CodecTestSupport {
         doTestDecodeMessageAnnotationsSeries(1);
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
     private void doTestDecodeMessageAnnotationsSeries(int size) throws IOException {
 
         final Symbol SYMBOL_1 = Symbol.valueOf("test1");
         final Symbol SYMBOL_2 = Symbol.valueOf("test2");
         final Symbol SYMBOL_3 = Symbol.valueOf("test3");
 
-        MessageAnnotations annotations = new MessageAnnotations(new HashMap());
+        MessageAnnotations annotations = new MessageAnnotations(new HashMap<>());
         annotations.getValue().put(SYMBOL_1, UnsignedByte.valueOf((byte) 128));
         annotations.getValue().put(SYMBOL_2, UnsignedShort.valueOf((short) 128));
         annotations.getValue().put(SYMBOL_3, UnsignedInteger.valueOf(128));
@@ -84,5 +84,46 @@ public class MessageAnnotationsTypeCodecTest extends CodecTestSupport {
             assertEquals(resultMap.get(SYMBOL_2), UnsignedShort.valueOf((short) 128));
             assertEquals(resultMap.get(SYMBOL_3), UnsignedInteger.valueOf(128));
         }
+    }
+
+    @Test
+    public void testEncodeAndDecodeAnnoationsWithEmbeddedMaps() throws IOException {
+        final Symbol SYMBOL_1 = Symbol.valueOf("x-opt-test1");
+        final Symbol SYMBOL_2 = Symbol.valueOf("x-opt-test2");
+
+        final String VALUE_1 = "string";
+        final UnsignedInteger VALUE_2 = UnsignedInteger.valueOf(42);
+        final UUID VALUE_3 = UUID.randomUUID();
+
+        Map<String, Object> stringKeyedMap = new HashMap<>();
+        stringKeyedMap.put("key1", VALUE_1);
+        stringKeyedMap.put("key2", VALUE_2);
+        stringKeyedMap.put("key3", VALUE_3);
+
+        Map<Symbol, Object> symbolKeyedMap = new HashMap<>();
+        symbolKeyedMap.put(Symbol.valueOf("key1"), VALUE_1);
+        symbolKeyedMap.put(Symbol.valueOf("key2"), VALUE_2);
+        symbolKeyedMap.put(Symbol.valueOf("key3"), VALUE_3);
+
+        MessageAnnotations annotations = new MessageAnnotations(new HashMap<>());
+        annotations.getValue().put(SYMBOL_1, stringKeyedMap);
+        annotations.getValue().put(SYMBOL_2, symbolKeyedMap);
+
+        encoder.writeObject(annotations);
+
+        buffer.clear();
+
+        final Object result = decoder.readObject();
+
+        assertNotNull(result);
+        assertTrue(result instanceof MessageAnnotations);
+
+        MessageAnnotations readAnnotations = (MessageAnnotations) result;
+
+        Map<Symbol, Object> resultMap = readAnnotations.getValue();
+
+        assertEquals(annotations.getValue().size(), resultMap.size());
+        assertEquals(resultMap.get(SYMBOL_1), stringKeyedMap);
+        assertEquals(resultMap.get(SYMBOL_2), symbolKeyedMap);
     }
 }
