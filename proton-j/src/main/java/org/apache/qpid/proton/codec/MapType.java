@@ -82,27 +82,29 @@ public class MapType extends AbstractPrimitiveType<Map>
         // Clear existing fixed key type encoding to prevent application to nested Maps
         setKeyEncoding(null);
 
-        while (iter.hasNext())
-        {
-            final Map.Entry<?, ?> element = iter.next();
-            TypeEncoding elementEncoding;
-
-            if (fixedKeyType == null)
+        try {
+            while (iter.hasNext())
             {
-                elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
-            }
-            else
-            {
-                elementEncoding = fixedKeyType.getEncoding(element.getKey());
-            }
+                final Map.Entry<?, ?> element = iter.next();
+                TypeEncoding elementEncoding;
 
-            len += elementEncoding.getConstructorSize() + elementEncoding.getValueSize(element.getKey());
-            elementEncoding = _encoder.getType(element.getValue()).getEncoding(element.getValue());
-            len += elementEncoding.getConstructorSize() + elementEncoding.getValueSize(element.getValue());
+                if (fixedKeyType == null)
+                {
+                    elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
+                }
+                else
+                {
+                    elementEncoding = fixedKeyType.getEncoding(element.getKey());
+                }
+
+                len += elementEncoding.getConstructorSize() + elementEncoding.getValueSize(element.getKey());
+                elementEncoding = _encoder.getType(element.getValue()).getEncoding(element.getValue());
+                len += elementEncoding.getConstructorSize() + elementEncoding.getValueSize(element.getValue());
+            }
+        } finally {
+            // Reset Existing key type encoding for later encode step or reuse until cleared by caller
+            setKeyEncoding(fixedKeyType);
         }
-
-        // Reset Existing key type encoding for later encode step or reuse until cleared by caller
-        setKeyEncoding(fixedKeyType);
 
         return len;
     }
@@ -175,29 +177,31 @@ public class MapType extends AbstractPrimitiveType<Map>
             // Clear existing fixed key type encoding to prevent application to nested Maps
             setKeyEncoding(null);
 
-            while (iter.hasNext())
-            {
-                final Map.Entry<?, ?> element = iter.next();
-                TypeEncoding elementEncoding;
-
-                if (fixedKeyType == null)
+            try {
+                while (iter.hasNext())
                 {
-                    elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
-                }
-                else
-                {
-                    elementEncoding = fixedKeyType.getEncoding(element.getKey());
-                }
+                    final Map.Entry<?, ?> element = iter.next();
+                    TypeEncoding elementEncoding;
 
-                elementEncoding.writeConstructor();
-                elementEncoding.writeValue(element.getKey());
-                elementEncoding = getEncoder().getType(element.getValue()).getEncoding(element.getValue());
-                elementEncoding.writeConstructor();
-                elementEncoding.writeValue(element.getValue());
+                    if (fixedKeyType == null)
+                    {
+                        elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
+                    }
+                    else
+                    {
+                        elementEncoding = fixedKeyType.getEncoding(element.getKey());
+                    }
+
+                    elementEncoding.writeConstructor();
+                    elementEncoding.writeValue(element.getKey());
+                    elementEncoding = getEncoder().getType(element.getValue()).getEncoding(element.getValue());
+                    elementEncoding.writeConstructor();
+                    elementEncoding.writeValue(element.getValue());
+                }
+            } finally {
+                // Reset Existing key type encoding for later encode step or reuse until cleared by caller
+                setKeyEncoding(fixedKeyType);
             }
-
-            // Reset Existing key type encoding for later encode step or reuse until cleared by caller
-            setKeyEncoding(fixedKeyType);
         }
 
         @Override
@@ -325,29 +329,31 @@ public class MapType extends AbstractPrimitiveType<Map>
             // Clear existing fixed key type encoding to prevent application to nested Maps
             setKeyEncoding(null);
 
-            while (iter.hasNext())
-            {
-                final Map.Entry<?, ?> element = iter.next();
-                TypeEncoding elementEncoding;
-
-                if (fixedKeyType == null)
+            try {
+                while (iter.hasNext())
                 {
-                    elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
-                }
-                else
-                {
-                    elementEncoding = fixedKeyType.getEncoding(element.getKey());
-                }
+                    final Map.Entry<?, ?> element = iter.next();
+                    TypeEncoding elementEncoding;
 
-                elementEncoding.writeConstructor();
-                elementEncoding.writeValue(element.getKey());
-                elementEncoding = getEncoder().getType(element.getValue()).getEncoding(element.getValue());
-                elementEncoding.writeConstructor();
-                elementEncoding.writeValue(element.getValue());
+                    if (fixedKeyType == null)
+                    {
+                        elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
+                    }
+                    else
+                    {
+                        elementEncoding = fixedKeyType.getEncoding(element.getKey());
+                    }
+
+                    elementEncoding.writeConstructor();
+                    elementEncoding.writeValue(element.getKey());
+                    elementEncoding = getEncoder().getType(element.getValue()).getEncoding(element.getValue());
+                    elementEncoding.writeConstructor();
+                    elementEncoding.writeValue(element.getValue());
+                }
+            } finally {
+                // Reset Existing key type encoding for later encode step or reuse until cleared by caller
+                setKeyEncoding(fixedKeyType);
             }
-
-            // Reset Existing key type encoding for later encode step or reuse until cleared by caller
-            setKeyEncoding(fixedKeyType);
         }
 
         @Override

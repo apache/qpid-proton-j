@@ -169,8 +169,11 @@ public class FastPathDeliveryAnnotationsType implements AMQPType<DeliveryAnnotat
         MapType mapType = (MapType) getEncoder().getType(val.getValue());
 
         mapType.setKeyEncoding(symbolType);
-        mapType.write(val.getValue());
-        mapType.setKeyEncoding(null);
+        try {
+            mapType.write(val.getValue());
+        } finally {
+            mapType.setKeyEncoding(null);
+        }
     }
 
     public static void register(Decoder decoder, EncoderImpl encoder) {
