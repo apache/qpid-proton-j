@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 github:
-  description: "Mirror of Apache Qpid Proton J"
+  description: "Mirror of Apache Qpid Proton-J"
   homepage: https://qpid.apache.org/proton
   labels:
     - qpid
