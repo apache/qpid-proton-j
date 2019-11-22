@@ -29,6 +29,7 @@ import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 import org.apache.qpid.proton.codec.ByteBufferDecoder;
 import org.apache.qpid.proton.codec.DecodeException;
+import org.apache.qpid.proton.engine.TransportDecodeException;
 import org.apache.qpid.proton.engine.TransportException;
 
 class SaslFrameParser
@@ -390,7 +391,9 @@ class SaslFrameParser
                     catch (DecodeException ex)
                     {
                         state = State.ERROR;
-                        frameParsingError = new TransportException(ex);
+                        String message = ex.getMessage() == null ? ex.toString(): ex.getMessage();
+
+                        frameParsingError = new TransportDecodeException(message, ex);
                     }
                     break;
                 case ERROR:

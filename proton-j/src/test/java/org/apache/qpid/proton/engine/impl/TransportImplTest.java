@@ -49,6 +49,7 @@ import org.apache.qpid.proton.amqp.UnsignedShort;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.Released;
+import org.apache.qpid.proton.amqp.transport.AmqpError;
 import org.apache.qpid.proton.amqp.transport.Attach;
 import org.apache.qpid.proton.amqp.transport.Begin;
 import org.apache.qpid.proton.amqp.transport.Close;
@@ -3612,6 +3613,8 @@ public class TransportImplTest
         assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
         assertEquals("Unexpected ErrorCondition returned", origErrorCondition, transport.getCondition());
 
+        // ---------------------------------------------------------------- //
+
         // Set an error condition, then call 'closed' without an error.
         // Expect the original condition which was set to remain.
         transport = new TransportImpl();
@@ -3622,15 +3625,18 @@ public class TransportImplTest
         assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
         assertEquals("Unexpected ErrorCondition returned", origErrorCondition, transport.getCondition());
 
+        // ---------------------------------------------------------------- //
+
         // Without having set an error condition, call 'closed' specifying an error.
         // Expect a condition to be set.
-        String errorDescription = "some-error-description";
         transport = new TransportImpl();
-        transport.closed(new TransportException(errorDescription));
+        transport.closed(new TransportException(description));
 
         assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
         assertEquals("Unexpected condition returned", ConnectionError.FRAMING_ERROR, transport.getCondition().getCondition());
-        assertEquals("Unexpected description returned", "org.apache.qpid.proton.engine.TransportException: " + errorDescription, transport.getCondition().getDescription());
+        assertEquals("Unexpected description returned", "org.apache.qpid.proton.engine.TransportException: " + description, transport.getCondition().getDescription());
+
+        // ---------------------------------------------------------------- //
 
         // Without having set an error condition, call 'closed' without an error.
         // Expect a condition to be set.
@@ -3641,6 +3647,171 @@ public class TransportImplTest
         assertNotNull("Expected an ErrorCondition to be returned", transport.getCondition());
         assertEquals("Unexpected ErrorCondition returned", ConnectionError.FRAMING_ERROR, transport.getCondition().getCondition());
         assertEquals("Unexpected description returned", "connection aborted", transport.getCondition().getDescription());
+    }
+
+    @Test
+    public void testCloseFrameErrorAfterTransportClosed() {
+        MockTransportImpl transport = new MockTransportImpl();
+        Connection connection = Proton.connection();
+        prepareAndOpenConnection(transport, connection);
+
+        Symbol condition = Symbol.getSymbol("some-error");
+        String description = "some-error-description";
+        ErrorCondition origErrorCondition = new ErrorCondition();
+        origErrorCondition.setCondition(condition);
+        origErrorCondition.setDescription(description);
+        assertNotNull("Expected a Condition", origErrorCondition.getCondition());
+
+        // Set an error condition, then call 'closed' specifying an error.
+        // Expect the original condition which was set to be emitted
+        // in the close frame generated.
+
+        transport.setCondition(origErrorCondition);
+        transport.closed(new TransportException("my-ignored-exception"));
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        FrameBody frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type", frameBody instanceof Close);
+        assertEquals("Unexpected condition", origErrorCondition, ((Close) frameBody).getError());
+
+        // ---------------------------------------------------------------- //
+
+        // Set an error condition, then call 'closed' without an error.
+        // Expect the original condition which was set to be emitted
+        // in the close frame generated.
+
+        transport = new MockTransportImpl();
+        connection = Proton.connection();
+        prepareAndOpenConnection(transport, connection);
+
+        transport.setCondition(origErrorCondition);
+        transport.closed(null);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type", frameBody instanceof Close);
+        assertEquals("Unexpected condition", origErrorCondition, ((Close) frameBody).getError());
+
+        // ---------------------------------------------------------------- //
+
+        // Without having set an error condition, call 'closed' specifying an error.
+        // Expect a condition to be emitted in the close frame generated.
+        transport = new MockTransportImpl();
+        connection = Proton.connection();
+        prepareAndOpenConnection(transport, connection);
+
+        transport.closed(new TransportException(description));
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type", frameBody instanceof Close);
+        ErrorCondition expectedCondition = new ErrorCondition(ConnectionError.FRAMING_ERROR, "org.apache.qpid.proton.engine.TransportException: " + description);
+        assertEquals("Unexpected condition", expectedCondition, ((Close) frameBody).getError());
+
+        // ---------------------------------------------------------------- //
+
+        // Without having set an error condition, call 'closed' without an error.
+        // Expect a condition to be emitted in the close frame generated.
+        transport = new MockTransportImpl();
+        connection = Proton.connection();
+        prepareAndOpenConnection(transport, connection);
+
+        transport.closed(null);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type", frameBody instanceof Close);
+        expectedCondition = new ErrorCondition(ConnectionError.FRAMING_ERROR, "connection aborted");
+        assertEquals("Unexpected condition", expectedCondition, ((Close) frameBody).getError());
+
+        // ---------------------------------------------------------------- //
+
+        // Without having set an error condition on the transport, call 'closed' with an error,
+        // but then also set a condition on the connection, and expect the connection error
+        // condition to be emitted in the close frame generated.
+        transport = new MockTransportImpl();
+        connection = Proton.connection();
+        prepareAndOpenConnection(transport, connection);
+
+        transport.closed(new TransportException("some other transport exception"));
+        connection.setCondition(origErrorCondition);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type", frameBody instanceof Close);
+        assertEquals("Unexpected condition", origErrorCondition, ((Close) frameBody).getError());
+    }
+
+    @Test
+    public void testCloseFrameErrorAfterDecodeError() {
+        MockTransportImpl transport = new MockTransportImpl();
+        Connection connection = Proton.connection();
+
+        Collector collector = Collector.Factory.create();
+        connection.collect(collector);
+
+        transport.bind(connection);
+        connection.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+
+        assertEvents(collector, Event.Type.CONNECTION_INIT, Event.Type.CONNECTION_BOUND, Event.Type.CONNECTION_LOCAL_OPEN, Event.Type.TRANSPORT);
+
+        // Provide the response bytes for the header
+        transport.tail().put(AmqpHeader.HEADER);
+        transport.process();
+
+        // Provide the bytes for Open, but omit the mandatory container-id to provoke a decode error.
+        byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x0C, // Frame size = 12 bytes.
+                                     0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
+                                     0x00, 0x53, 0x10, 0x45};// Described-type, ulong type, open descriptor, list0.
+
+        int capacity = transport.capacity();
+        assertTrue("Unexpected transport capacity: " + capacity, capacity > bytes.length);
+
+        transport.tail().put(bytes);
+        transport.process();
+
+        assertEvents(collector, Event.Type.TRANSPORT_ERROR, Event.Type.TRANSPORT_TAIL_CLOSED);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        FrameBody frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type", frameBody instanceof Close);
+
+        // Expect the close frame generated to contain a decode error condition referencing the missing container-id.
+        ErrorCondition expectedCondition = new ErrorCondition();
+        expectedCondition.setCondition(AmqpError.DECODE_ERROR);
+        expectedCondition.setDescription("The container-id field cannot be omitted");
+
+        assertEquals("Unexpected condition", expectedCondition, ((Close) frameBody).getError());
+    }
+
+    private void prepareAndOpenConnection(MockTransportImpl transport, Connection connection) {
+        transport.bind(connection);
+        connection.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+
+        // Give the necessary response to open
+        transport.handleFrame(new TransportFrame(0, new Open(), null));
     }
 
     @Test

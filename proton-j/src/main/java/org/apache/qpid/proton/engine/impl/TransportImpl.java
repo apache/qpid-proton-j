@@ -31,6 +31,7 @@ import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedShort;
 import org.apache.qpid.proton.amqp.security.SaslFrameBody;
+import org.apache.qpid.proton.amqp.transport.AmqpError;
 import org.apache.qpid.proton.amqp.transport.Attach;
 import org.apache.qpid.proton.amqp.transport.Begin;
 import org.apache.qpid.proton.amqp.transport.Close;
@@ -57,6 +58,7 @@ import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.Ssl;
 import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.SslPeerDetails;
+import org.apache.qpid.proton.engine.TransportDecodeException;
 import org.apache.qpid.proton.engine.TransportException;
 import org.apache.qpid.proton.engine.TransportResult;
 import org.apache.qpid.proton.engine.TransportResultFactory;
@@ -260,14 +262,18 @@ public class TransportImpl extends EndpointImpl
         // condition had been set (by TransportImpl itself) rather than the 'empty' ErrorCondition
         // object historically used in the other areas.
         ErrorCondition errorCondition = super.getCondition();
-        return errorCondition.getCondition() != null ? errorCondition : null;
+        return isConditionPopulated(errorCondition) ? errorCondition : null;
     }
 
     @Override
     public void setCondition(ErrorCondition error)
     {
         super.setCondition(error);
-        _conditionSet = error != null && error.getCondition() != null;
+        _conditionSet = isConditionPopulated(error);
+    }
+
+    private boolean isConditionPopulated(ErrorCondition error) {
+        return error != null && error.getCondition() != null;
     }
 
     @Override
@@ -1097,13 +1103,14 @@ public class TransportImpl extends EndpointImpl
 
                 ErrorCondition localError;
 
-                if (_connectionEndpoint == null) {
-                    localError = getCondition();
-                } else {
+                if (_connectionEndpoint != null && isConditionPopulated(_connectionEndpoint.getCondition())) {
                     localError =  _connectionEndpoint.getCondition();
+                } else {
+                    // Connection is null or didn't have a condition set, use transport condition.
+                    localError = getCondition();
                 }
 
-                if(localError != null && localError.getCondition() != null)
+                if(isConditionPopulated(localError))
                 {
                     close.setError(localError);
                 }
@@ -1466,8 +1473,13 @@ public class TransportImpl extends EndpointImpl
         if (!_closeReceived || error != null) {
             // Set an error condition, but only if one was not already set
             if(!_conditionSet) {
-                String description =  error == null ? "connection aborted" : error.toString();
-                setCondition(new ErrorCondition(ConnectionError.FRAMING_ERROR, description));
+                if(error instanceof TransportDecodeException) {
+                    setCondition(new ErrorCondition(AmqpError.DECODE_ERROR, error.getMessage()));
+                } else {
+                    String description =  error == null ? "connection aborted" : error.toString();
+
+                    setCondition(new ErrorCondition(ConnectionError.FRAMING_ERROR, description));
+                }
             }
 
             _head_closed = true;

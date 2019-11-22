@@ -70,6 +70,7 @@ public class FrameParserTest
         ByteBuffer buffer = _frameParser.tail();
         buffer.put("hello".getBytes());
         _frameParser.process();
+        verify(_mockFrameHandler).closed(any(TransportException.class));
         assertEquals(_frameParser.capacity(), Transport.END_OF_STREAM);
     }
 
