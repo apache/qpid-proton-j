@@ -52,7 +52,7 @@
 rm -f *.pem *.pkcs12
 
 # Create a self-signed certificate for the CA, and a private key to sign certificate requests:
-keytool -storetype pkcs12 -keystore ca.pkcs12 -storepass ca-password -alias ca -keypass ca-password -genkey -keyalg "RSA" -keysize 2048 -dname "O=Trust Me Inc.,CN=Trusted.CA.com" -validity 99999
+keytool -storetype pkcs12 -keystore ca.pkcs12 -storepass ca-password -alias ca -keypass ca-password -genkey -keyalg "RSA" -keysize 2048 -dname "O=Trust Me Inc.,CN=Trusted.CA.com" -validity 99999 -ext bc:c=ca:true
 openssl pkcs12 -nokeys -passin pass:ca-password -in ca.pkcs12 -passout pass:ca-password -out ca-certificate.pem
 
 # Create a certificate request for the server certificate.  Use the CA's certificate to sign it:
