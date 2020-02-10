@@ -23,14 +23,19 @@ package org.apache.qpid.proton.amqp;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
 public final class Symbol implements Comparable<Symbol>, CharSequence
 {
+    private static final int[] NOT_INITIALIZED_JUMP_TABLE = new int[] {};
     private final String _underlying;
     private final byte[] _underlyingBytes;
+    // Used by indexOf
+    private volatile int[] _jumpTable;
 
     private static final ConcurrentHashMap<String, Symbol> _symbols = new ConcurrentHashMap<String, Symbol>(2048);
 
@@ -38,6 +43,7 @@ public final class Symbol implements Comparable<Symbol>, CharSequence
     {
         _underlying = underlying;
         _underlyingBytes = underlying.getBytes(StandardCharsets.US_ASCII);
+        _jumpTable = NOT_INITIALIZED_JUMP_TABLE;
     }
 
     public int length()
@@ -58,6 +64,82 @@ public final class Symbol implements Comparable<Symbol>, CharSequence
     public CharSequence subSequence(int beginIndex, int endIndex)
     {
         return _underlying.subSequence(beginIndex, endIndex);
+    }
+
+    /**
+     * https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm jump table
+     */
+    private static int[] createJumpTable(byte[] needle) {
+        final int[] jumpTable = new int[needle.length + 1];
+        int j = 0;
+        for (int i = 1; i < needle.length; i++) {
+            while (j > 0 && needle[j] != needle[i]) {
+                j = jumpTable[j];
+            }
+            if (needle[j] == needle[i]) {
+                j++;
+            }
+            jumpTable[i + 1] = j;
+        }
+        for (int i = 1; i < jumpTable.length; i++) {
+            if (jumpTable[i] != 0) {
+                return jumpTable;
+            }
+        }
+        // optimization over the original algorithm: it would save from accessing any jump table
+        return null;
+    }
+
+    private int[] racyGerOrCreateJumpTable() {
+        int[] jumpTable = this._jumpTable;
+        if (jumpTable == NOT_INITIALIZED_JUMP_TABLE) {
+            jumpTable = createJumpTable(this._underlyingBytes);
+            _jumpTable = jumpTable;
+        }
+        return jumpTable;
+    }
+
+    /**
+     * Returns the index on buffer of the first encoded occurrence of this {@code symbol} within the specified range.<br>
+     * If none is found, then {@code -1} is returned.
+     *
+     * @param buffer the buffer where to search in
+     * @return the index of the first occurrence of this symbol or {@code -1} if it won't occur.
+     * <p>
+     * @throws IllegalArgumentException if any of the indexes of the specified range is negative
+     */
+    public int searchFirst(ReadableBuffer buffer, int from, int to)
+    {
+        Objects.requireNonNull(buffer, "buffer cannot be null");
+        if (from < 0 || to < 0)
+        {
+            throw new IllegalArgumentException("range indexes cannot be negative!");
+        }
+        int j = 0;
+        final int[] jumpTable = racyGerOrCreateJumpTable();
+        final byte[] needle = _underlyingBytes;
+        final long length = to - from;
+        final ReadableBuffer haystack = buffer;
+        final int needleLength = needle.length;
+        for (int i = 0; i < length; i++)
+        {
+            final int index = from + i;
+            final byte value = haystack.get(index);
+            while (j > 0 && needle[j] != value)
+            {
+                j = jumpTable == null ? 0 : jumpTable[j];
+            }
+            if (needle[j] == value)
+            {
+                j++;
+            }
+            if (j == needleLength)
+            {
+                final int startMatch = index - needleLength + 1;
+                return startMatch;
+            }
+        }
+        return -1;
     }
 
     @Override

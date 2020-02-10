@@ -21,6 +21,8 @@ import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.apache.qpid.proton.amqp.Symbol;
+import org.hamcrest.core.IsInstanceOf;
+import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -60,4 +62,71 @@ public class SymbolTypeTest extends CodecTestSupport {
         // Check that the SymbolType tries to reserve space, actual encoding size not computed here.
         Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
     }
+
+    @Test
+    public void testSymbolSearchFirstNoJumpTable()
+    {
+        Symbol symbol = Symbol.getSymbol("a");
+        byte[] b = new byte[symbol.length()];
+        WritableBuffer writable = WritableBuffer.ByteBufferWrapper.wrap(b);
+        ReadableBuffer readable = ReadableBuffer.ByteBufferReader.wrap(b);
+        symbol.writeTo(writable);
+        readable.limit(writable.limit());
+        Assert.assertEquals(0, symbol.searchFirst(readable, 0, writable.limit()));
+    }
+
+    @Test
+    public void testSymbolSearchFirstWithJumpTable()
+    {
+        Symbol haystack = Symbol.getSymbol("aabbaaa");
+        byte[] b = new byte[haystack.length()];
+        WritableBuffer writable = WritableBuffer.ByteBufferWrapper.wrap(b);
+        ReadableBuffer readable = ReadableBuffer.ByteBufferReader.wrap(b);
+        Symbol needle = Symbol.getSymbol("aaa");
+        haystack.writeTo(writable);
+        readable.limit(writable.limit());
+        Assert.assertEquals(4, needle.searchFirst(readable, 0, writable.limit()));
+    }
+
+    @Test
+    public void testNegativeRangesSymbolSearchFirst()
+    {
+        Symbol symbol = Symbol.getSymbol("a");
+        byte[] b = new byte[symbol.length()];
+        WritableBuffer writable = WritableBuffer.ByteBufferWrapper.wrap(b);
+        ReadableBuffer readable = ReadableBuffer.ByteBufferReader.wrap(b);
+        symbol.writeTo(writable);
+        readable.limit(writable.limit());
+        try
+        {
+            Assert.assertEquals(0, symbol.searchFirst(readable, 0, -1));
+            Assert.fail("An exception should be thrown here");
+        }
+        catch (Throwable throwed)
+        {
+            Assert.assertThat(throwed, IsInstanceOf.instanceOf(IllegalArgumentException.class));
+        }
+        try
+        {
+            Assert.assertEquals(0, symbol.searchFirst(readable, -1, 0));
+            Assert.fail("An exception should be thrown here");
+        }
+        catch (Throwable throwed)
+        {
+            Assert.assertThat(throwed, IsInstanceOf.instanceOf(IllegalArgumentException.class));
+        }
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void testOutOfRangeSymbolSearchFirst()
+    {
+        Symbol symbol = Symbol.getSymbol("a");
+        byte[] b = new byte[symbol.length()];
+        WritableBuffer writable = WritableBuffer.ByteBufferWrapper.wrap(b);
+        ReadableBuffer readable = ReadableBuffer.ByteBufferReader.wrap(b);
+        symbol.writeTo(writable);
+        readable.limit(writable.limit());
+        symbol.searchFirst(readable, 1, 2);
+    }
+
 }
