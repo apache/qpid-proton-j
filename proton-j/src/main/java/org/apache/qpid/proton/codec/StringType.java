@@ -40,7 +40,7 @@ public class StringType extends AbstractPrimitiveType<String>
                 }
                 catch (CharacterCodingException e)
                 {
-                    throw new IllegalArgumentException("Cannot parse String");
+                    throw new IllegalArgumentException("Cannot parse String", e);
                 }
                 finally
                 {
