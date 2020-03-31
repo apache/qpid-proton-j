@@ -69,6 +69,10 @@
             <manifestEntries>
               <Automatic-Module-Name>org.apache.qpid.proton.j</Automatic-Module-Name>
             </manifestEntries>
+            <manifest>
+              <addDefaultSpecificationEntries>false</addDefaultSpecificationEntries>
+              <addDefaultImplementationEntries>false</addDefaultImplementationEntries>
+            </manifest>
           </archive>
         </configuration>
       </plugin>
