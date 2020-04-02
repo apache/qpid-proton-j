@@ -16,9 +16,12 @@
  */
 package org.apache.qpid.proton.codec;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -122,5 +125,61 @@ public class MapTypeCodecTest extends CodecTestSupport {
 
         // Check that the MapType tries to reserve space, actual encoding size not computed here.
         Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
+    }
+
+    @Test
+    public void testEncodeMapWithUnknownEntryValueType() throws Exception {
+        Map<String, Object> map = new HashMap<>();
+        map.put("unknown", new MyUnknownTestType());
+
+        doTestEncodeMapWithUnknownEntryValueTypeTestImpl(map);
+    }
+
+    @Test
+    public void testEncodeSubMapWithUnknownEntryValueType() throws Exception {
+        Map<String, Object> subMap = new HashMap<>();
+        subMap.put("unknown", new MyUnknownTestType());
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("submap", subMap);
+
+        doTestEncodeMapWithUnknownEntryValueTypeTestImpl(map);
+    }
+
+    private void doTestEncodeMapWithUnknownEntryValueTypeTestImpl(Map<String, Object> map) {
+        try {
+            encoder.writeMap(map);
+            fail("Expected exception to be thrown");
+        } catch (IllegalArgumentException iae) {
+            assertThat(iae.getMessage(), containsString("No encoding is known for map entry value of type: org.apache.qpid.proton.codec.MyUnknownTestType"));
+        }
+    }
+
+    @Test
+    public void testEncodeMapWithUnknownEntryKeyType() throws Exception {
+        Map<Object, String> map = new HashMap<>();
+        map.put(new MyUnknownTestType(), "unknown");
+
+        doTestEncodeMapWithUnknownEntryKeyTypeTestImpl(map);
+    }
+
+    @Test
+    public void testEncodeSubMapWithUnknownEntryKeyType() throws Exception {
+        Map<Object, String> subMap = new HashMap<>();
+        subMap.put(new MyUnknownTestType(), "unknown");
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("submap", subMap);
+
+        doTestEncodeMapWithUnknownEntryKeyTypeTestImpl(map);
+    }
+
+    private void doTestEncodeMapWithUnknownEntryKeyTypeTestImpl(Map<?, ?> map) {
+        try {
+            encoder.writeMap(map);
+            fail("Expected exception to be thrown");
+        } catch (IllegalArgumentException iae) {
+            assertThat(iae.getMessage(), containsString("No encoding is known for map entry key of type: org.apache.qpid.proton.codec.MyUnknownTestType"));
+        }
     }
 }

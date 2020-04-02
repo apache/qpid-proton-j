@@ -90,7 +90,12 @@ public class MapType extends AbstractPrimitiveType<Map>
 
                 if (fixedKeyType == null)
                 {
-                    elementEncoding = _encoder.getType(element.getKey()).getEncoding(element.getKey());
+                    AMQPType keyType = _encoder.getType(element.getKey());
+                    if(keyType == null) {
+                        throw new IllegalArgumentException(
+                                "No encoding is known for map entry key of type: " + element.getKey().getClass().getName());
+                    }
+                    elementEncoding = keyType.getEncoding(element.getKey());
                 }
                 else
                 {
@@ -98,7 +103,14 @@ public class MapType extends AbstractPrimitiveType<Map>
                 }
 
                 len += elementEncoding.getConstructorSize() + elementEncoding.getValueSize(element.getKey());
-                elementEncoding = _encoder.getType(element.getValue()).getEncoding(element.getValue());
+
+                AMQPType valueType = _encoder.getType(element.getValue());
+                if(valueType == null) {
+                    throw new IllegalArgumentException(
+                            "No encoding is known for map entry value of type: " + element.getValue().getClass().getName());
+                }
+
+                elementEncoding = valueType.getEncoding(element.getValue());
                 len += elementEncoding.getConstructorSize() + elementEncoding.getValueSize(element.getValue());
             }
         } finally {

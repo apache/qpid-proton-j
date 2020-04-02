@@ -16,9 +16,12 @@
  */
 package org.apache.qpid.proton.codec;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -143,5 +146,33 @@ public class ListTypeCodecTest extends CodecTestSupport {
 
         // Check that the ListType tries to reserve space, actual encoding size not computed here.
         Mockito.verify(spy).ensureRemaining(Mockito.anyInt());
+    }
+
+    @Test
+    public void testEncodeListWithUnknownEntryType() throws Exception {
+        List<Object> list = new ArrayList<>();
+        list.add(new MyUnknownTestType());
+
+        doTestEncodeListWithUnknownEntryTypeTestImpl(list);
+    }
+
+    @Test
+    public void testEncodeSubListWithUnknownEntryType() throws Exception {
+        List<Object> subList = new ArrayList<>();
+        subList.add(new MyUnknownTestType());
+
+        List<Object> list = new ArrayList<>();
+        list.add(subList);
+
+        doTestEncodeListWithUnknownEntryTypeTestImpl(list);
+    }
+
+    private void doTestEncodeListWithUnknownEntryTypeTestImpl(List<Object> list) {
+        try {
+            encoder.writeList(list);
+            fail("Expected exception to be thrown");
+        } catch (IllegalArgumentException iae) {
+            assertThat(iae.getMessage(), containsString("No encoding defined for type: class org.apache.qpid.proton.codec.MyUnknownTestType"));
+        }
     }
 }
