@@ -32,9 +32,6 @@
   <name>Proton-J Parent</name>
 
   <properties>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
-
     <!-- Test dependency versions -->
     <junit-version>4.12</junit-version>
     <mockito-version>2.23.4</mockito-version>
@@ -44,6 +41,10 @@
     <maven-bundle-plugin-version>4.1.0</maven-bundle-plugin-version>
     <jacoco-plugin-version>0.8.4</jacoco-plugin-version>
     <surefire.version>2.22.2</surefire.version>
+
+    <!-- See also maven.compiler.release in the java9on profile -->
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
 
     <!-- surefire forked jvm arguments -->
     <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
@@ -269,6 +270,16 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <id>java9on</id>
+      <activation>
+        <jdk>[9,)</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.release>8</maven.compiler.release>
+      </properties>
     </profile>
   </profiles>
 </project>
