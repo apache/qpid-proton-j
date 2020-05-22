@@ -116,6 +116,18 @@ public class FastPathDispositionType implements AMQPType<Disposition>, FastPathD
                 throw new DecodeException("Incorrect type found in Disposition encoding: " + typeCode);
         }
 
+        if (count < 2) {
+            throw new DecodeException("The 'first' field cannot be omitted");
+        }
+
+        try {
+            return readFields(decoder, count);
+        } catch (NullPointerException npe) {
+            throw new DecodeException("Unexpected null value - mandatory field not set? (" + npe.getMessage() + ")", npe);
+        }
+    }
+
+    private final Disposition readFields(DecoderImpl decoder, int count) {
         Disposition disposition = new Disposition();
 
         for (int index = 0; index < count; ++index) {

@@ -85,6 +85,18 @@ public class FastPathTransferType implements AMQPType<Transfer>, FastPathDescrib
                 throw new DecodeException("Incorrect type found in Transfer encoding: " + typeCode);
         }
 
+        if (count < 1) {
+            throw new DecodeException("The handle field cannot be omitted");
+        }
+
+        try {
+            return readFields(decoder, count);
+        } catch (NullPointerException npe) {
+            throw new DecodeException("Unexpected null value - mandatory field not set? (" + npe.getMessage() + ")", npe);
+        }
+    }
+
+    private final Transfer readFields(DecoderImpl decoder, int count) {
         Transfer transfer = new Transfer();
 
         for (int index = 0; index < count; ++index) {

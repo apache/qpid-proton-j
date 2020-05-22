@@ -104,6 +104,18 @@ public class FastPathFlowType implements AMQPType<Flow>, FastPathDescribedTypeCo
                 throw new DecodeException("Incorrect type found in Flow encoding: " + typeCode);
         }
 
+        if (count < 4) {
+            throw new DecodeException("The outgoing-window field cannot be omitted");
+        }
+
+        try {
+            return readFields(decoder, count);
+        } catch (NullPointerException npe) {
+            throw new DecodeException("Unexpected null value - mandatory field not set? (" + npe.getMessage() + ")", npe);
+        }
+    }
+
+    private final Flow readFields(DecoderImpl decoder, int count) {
         Flow flow = new Flow();
 
         for (int index = 0; index < count; ++index) {
