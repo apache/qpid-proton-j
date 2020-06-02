@@ -33,7 +33,9 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
+import org.apache.qpid.proton.ProtonException;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -207,6 +209,74 @@ public class StringTypeTest
 
         String result = (String) stringType.readValue();
         assertEquals("", result);
+    }
+
+    @Test
+    public void testDecodeNonStringWhenStringExpectedReportsUsefulError() {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+        final UUID encoded = UUID.randomUUID();
+
+        buffer.put(EncodingCodes.UUID);
+        buffer.putLong(encoded.getMostSignificantBits());
+        buffer.putLong(encoded.getLeastSignificantBits());
+        buffer.flip();
+
+        byte[] copy = new byte[buffer.remaining()];
+        buffer.get(copy);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(copy);
+
+        decoder.setBuffer(composite);
+
+        TypeConstructor<?> stringType = decoder.peekConstructor();
+        assertEquals(UUID.class, stringType.getTypeClass());
+
+        composite.mark();
+
+        try {
+            decoder.readString();
+        } catch (ProtonException ex) {
+            // Should indicate the type that it found in the error
+            assertTrue(ex.getMessage().contains(EncodingCodes.toString(EncodingCodes.UUID)));
+        }
+
+        composite.reset();
+        UUID actual = decoder.readUUID();
+        assertEquals(encoded, actual);
+    }
+
+    @Test
+    public void testDecodeUnknownTypeWhenStringExpectedReportsUsefulError() {
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+
+        final ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        buffer.put((byte) 0x01);
+        buffer.flip();
+
+        byte[] copy = new byte[buffer.remaining()];
+        buffer.get(copy);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(copy);
+
+        decoder.setBuffer(composite);
+
+        try {
+            decoder.readString();
+        } catch (ProtonException ex) {
+            // Should indicate the type that it found in the error
+            assertTrue(ex.getMessage().contains("Unknown-Type:0x01"));
+        }
     }
 
     // build up some test data with a set of suitable Unicode characters

@@ -189,7 +189,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected boolean type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Boolean type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -209,7 +209,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected boolean type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Boolean type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -230,7 +230,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected byte type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Byte type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -274,7 +274,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected Short type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Short type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -320,7 +320,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected Integer type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Integer type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -366,7 +366,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected Long type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Long type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -410,7 +410,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected unsigned byte type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected UnsignedByte type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -432,7 +432,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected UnsignedShort type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected UnsignedShort type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -458,7 +458,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected UnsignedInteger type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected UnsignedInteger type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -484,7 +484,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected UnsignedLong type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected UnsignedLong type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -506,7 +506,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected Character type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Character type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -522,7 +522,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new DecodeException("Expected Character type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Character type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -544,7 +544,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new ProtonException("Expected Float type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Float type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -588,7 +588,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new ProtonException("Expected Double type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Double type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -632,7 +632,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultVal;
             default:
-                throw new ProtonException("Expected UUID type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected UUID type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -654,7 +654,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected Decimal32 type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Decimal32 type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -676,7 +676,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected Decimal64 type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Decimal64 type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -698,7 +698,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected Decimal128 type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Decimal128 type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -720,7 +720,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected Timestamp type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Timestamp type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -744,7 +744,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected Binary type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Binary type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -768,7 +768,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected Symbol type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Symbol type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -792,7 +792,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return defaultValue;
             default:
-                throw new ProtonException("Expected String type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected String type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -813,7 +813,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return null;
             default:
-                throw new ProtonException("Expected List type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected List type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -838,7 +838,7 @@ public class DecoderImpl implements ByteBufferDecoder
             case EncodingCodes.NULL:
                 return null;
             default:
-                throw new ProtonException("Expected Map type but found encoding: " + encodingCode);
+                throw new ProtonException("Expected Map type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
