@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.qpid.proton.ProtonException;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -241,7 +240,7 @@ public class StringTypeTest
 
         try {
             decoder.readString();
-        } catch (ProtonException ex) {
+        } catch (DecodeException ex) {
             // Should indicate the type that it found in the error
             assertTrue(ex.getMessage().contains(EncodingCodes.toString(EncodingCodes.UUID)));
         }
@@ -273,7 +272,7 @@ public class StringTypeTest
 
         try {
             decoder.readString();
-        } catch (ProtonException ex) {
+        } catch (DecodeException ex) {
             // Should indicate the type that it found in the error
             assertTrue(ex.getMessage().contains("Unknown-Type:0x01"));
         }

@@ -4004,6 +4004,17 @@ public class TransportImplTest
         doInvalidTransferProvokesDecodeErrorTestImpl(bytes, "Unexpected null value - mandatory field not set? (the handle field is mandatory)");
     }
 
+    @Test
+    public void testTransferWithWrongHandleTypeCodeProvokesDecodeError() {
+        // Provide the bytes for Transfer, but give the wrong type code for a not-really-present handle. Provokes a decode error.
+        byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x0F, // Frame size = 15 bytes.
+                0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
+                0x00, 0x53, 0x14, (byte) 0xC0, // Described-type, ulong type, Transfer descriptor, list8.
+                0x03, 0x01, (byte) 0xA3 }; // size (3), count (1), handle (invalid sym8 type constructor given, not really present).
+
+        doInvalidTransferProvokesDecodeErrorTestImpl(bytes, "Expected UnsignedInteger type but found encoding: SYM8:0xa3");
+    }
+
     private void doInvalidTransferProvokesDecodeErrorTestImpl(byte[] bytes, String description) {
         MockTransportImpl transport = new MockTransportImpl();
         Connection connection = Proton.connection();
