@@ -39,7 +39,7 @@
 
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>5.1.1</maven-bundle-plugin-version>
-    <jacoco-plugin-version>0.8.4</jacoco-plugin-version>
+    <jacoco-plugin-version>0.8.6</jacoco-plugin-version>
     <surefire.version>2.22.2</surefire.version>
 
     <!-- See also maven.compiler.release in the java9on profile -->
