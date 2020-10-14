@@ -54,7 +54,8 @@ class TransportSession
 
     private final Map<UnsignedInteger, TransportLink<?>> _remoteHandlesMap = new HashMap<UnsignedInteger, TransportLink<?>>();
     private final Map<UnsignedInteger, TransportLink<?>> _localHandlesMap = new HashMap<UnsignedInteger, TransportLink<?>>();
-    private final Map<String, TransportLink> _halfOpenLinks = new HashMap<String, TransportLink>();
+    private final Map<String, TransportLink> _halfOpenSenderLinks = new HashMap<String, TransportLink>();
+    private final Map<String, TransportLink> _halfOpenReceiverLinks = new HashMap<String, TransportLink>();
 
 
     private UnsignedInteger _incomingDeliveryId = null;
@@ -251,14 +252,28 @@ class TransportSession
         _remoteHandlesMap.remove(handle);
     }
 
-    public TransportLink resolveHalfOpenLink(String name)
+    public TransportLink resolveHalfOpenLink(String name, boolean isSender)
     {
-        return _halfOpenLinks.remove(name);
+        if(isSender)
+        {
+            return _halfOpenSenderLinks.remove(name);
+        }
+        else
+        {
+            return _halfOpenReceiverLinks.remove(name);
+        }
     }
 
-    public void addHalfOpenLink(TransportLink link)
+    public void addHalfOpenLink(TransportLink link, boolean isSender)
     {
-        _halfOpenLinks.put(link.getName(), link);
+        if(isSender)
+        {
+            _halfOpenSenderLinks.put(link.getName(), link);
+        }
+        else
+        {
+            _halfOpenReceiverLinks.put(link.getName(), link);
+        }
     }
 
     public void handleTransfer(Transfer transfer, Binary payload)

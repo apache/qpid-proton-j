@@ -800,11 +800,12 @@ public class TransportImpl extends EndpointImpl
                             && !transportLink.isLocalHandleSet()) || link.getRemoteState() == EndpointState.UNINITIALIZED)
                         {
 
+                            Role role = endpoint instanceof ReceiverImpl ? Role.RECEIVER : Role.SENDER;
                             UnsignedInteger localHandle = transportSession.allocateLocalHandle(transportLink);
 
                             if(link.getRemoteState() == EndpointState.UNINITIALIZED)
                             {
-                                transportSession.addHalfOpenLink(transportLink);
+                                transportSession.addHalfOpenLink(transportLink, Role.SENDER == role);
                             }
 
                             Attach attach = new Attach();
@@ -851,7 +852,7 @@ public class TransportImpl extends EndpointImpl
                                 attach.setMaxMessageSize(link.getMaxMessageSize());
                             }
 
-                            attach.setRole(endpoint instanceof ReceiverImpl ? Role.RECEIVER : Role.SENDER);
+                            attach.setRole(role);
 
                             if(link instanceof SenderImpl)
                             {
@@ -1268,7 +1269,8 @@ public class TransportImpl extends EndpointImpl
             }
             else
             {
-                transportLink = transportSession.resolveHalfOpenLink(attach.getName());
+                // We flip the peer role to determine our local role, and try to resolve an existing half-open link
+                transportLink = transportSession.resolveHalfOpenLink(attach.getName(), Role.RECEIVER == attach.getRole());
                 if(transportLink == null)
                 {
 
