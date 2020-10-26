@@ -56,8 +56,9 @@
         <configuration>
           <instructions>
             <Import-Package>
-              javax.net.ssl*;resolution:=optional,*
+              javax.net.ssl*;resolution:=optional,!org.bouncycastle*,*
             </Import-Package>
+            <Automatic-Module-Name>org.apache.qpid.proton.j</Automatic-Module-Name>
           </instructions>
         </configuration>
       </plugin>
