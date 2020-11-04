@@ -145,6 +145,13 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             throw new IndexOutOfBoundsException("The given index is not valid: " + index);
         }
 
+        return _get(index);
+    }
+
+    /**
+     * Unchecked ie no bound-checks get
+     */
+    private byte _get(int index) {
         byte result = 0;
 
         if (index == position) {
@@ -813,8 +820,8 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         int remaining = remaining();
 
         if (currentArrayIndex < 0 || remaining <= currentArray.length - currentOffset) {
-            while (remaining > 0) {
-                hash = 31 * hash + currentArray[currentOffset + --remaining];
+            if (remaining > 0) {
+                hash = Hashing.byteBufferCompatibleHashCode(currentArray, currentOffset, currentOffset + remaining);
             }
         } else {
             hash = hashCodeFromComponents();
@@ -875,7 +882,7 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             return true;
         }
 
-        if (hasArray() || remaining <= currentArray.length - currentOffset) {
+        if (remaining <= currentArray.length - currentOffset || hasArray()) {
             // Either there is only one array, or the span to compare is within a single chunk of this buffer,
             // allowing the compare to directly access the underlying array instead of using slower get methods.
             return equals(currentArray, currentOffset, remaining, buffer);
@@ -885,6 +892,40 @@ public class CompositeReadableBuffer implements ReadableBuffer {
     }
 
     private static boolean equals(byte[] buffer, int start, int length, ReadableBuffer other) {
+        if (other.hasArray()) {
+            // fast-path: jdk 11 has a vectorized Arrays::equals for ranged comparisons, but
+            // sadly JDK 8 nope so let's try to save at least bound checks
+            final int otherStart = other.arrayOffset() + other.position();
+            return equals(buffer, start, other.array(), otherStart, length);
+        } else if (other instanceof ByteBufferReader) {
+            return rawEquals(buffer, start, length, other.byteBuffer());
+        }
+        return rawEquals(buffer, start, length, other);
+    }
+
+    private static boolean uncheckedEquals(byte[] buffer, int start, int length, CompositeReadableBuffer other) {
+        final int position = other.position();
+        for (int i = 0; i < length; i++) {
+            if (buffer[start + i] != other._get(position + i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean uncheckedEquals(CompositeReadableBuffer buffer, ByteBuffer other, int length) {
+        assert buffer.remaining() >= length;
+        final int otherPosition = other.position();
+        final int bufferPosition = buffer.position();
+        for (int i = 0; i < length; i++) {
+            if (buffer._get(bufferPosition + i) != other.get(otherPosition + i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean rawEquals(byte[] buffer, int start, int length, ByteBuffer other) {
         final int position = other.position();
         for (int i = 0; i < length; i++) {
             if (buffer[start + i] != other.get(position + i)) {
@@ -894,18 +935,47 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         return true;
     }
 
-    private static boolean equals(ReadableBuffer buffer, ReadableBuffer other) {
-        final int origPos = buffer.position();
-        try {
-            for (int i = other.position(); buffer.hasRemaining(); i++) {
-                if (!equals(buffer.get(), other.get(i))) {
-                    return false;
-                }
+    private static boolean rawEquals(byte[] buffer, int start, int length, ReadableBuffer other) {
+        final int position = other.position();
+        for (int i = 0; i < length; i++) {
+            if (buffer[start + i] != other.get(position + i)) {
+                return false;
             }
-            return true;
-        } finally {
-            buffer.position(origPos);
         }
+        return true;
+    }
+
+    private static boolean equals(byte[] a, int aStart, byte[] b, int bStart, int length) {
+        for (int i = 0; i < length; i++) {
+            if (a[aStart + i] != b[bStart + i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean equals(CompositeReadableBuffer buffer, ReadableBuffer other) {
+        final int bufferRemaining = buffer.remaining();
+        if (other.hasArray()) {
+            final int otherStart = other.arrayOffset() + other.position();
+            // check if otherEnd is beyond other limits, because the underline array is just limited by the capacity
+            if (other.limit() < otherStart + bufferRemaining) {
+                throw new BufferUnderflowException();
+            }
+            return uncheckedEquals(other.array(), otherStart, bufferRemaining, buffer);
+        }
+        if (other instanceof ByteBufferReader) {
+            return uncheckedEquals(buffer, other.byteBuffer(), bufferRemaining);
+        }
+        // slow path
+        final int bufferPosition = buffer.position();
+        final int otherPosition = other.position();
+        for (int i = 0; i < bufferRemaining; i++) {
+            if (buffer._get(bufferPosition + i) != other.get(otherPosition + i)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -921,10 +991,6 @@ public class CompositeReadableBuffer implements ReadableBuffer {
         builder.append(" }");
 
         return builder.toString();
-    }
-
-    private static boolean equals(byte x, byte y) {
-        return x == y;
     }
 
     private void maybeMoveToNextArray() {

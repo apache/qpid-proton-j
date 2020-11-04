@@ -330,7 +330,7 @@ public interface ReadableBuffer {
 
     final class ByteBufferReader implements ReadableBuffer {
 
-        private ByteBuffer buffer;
+        private final ByteBuffer buffer;
 
         public static ByteBufferReader allocate(int size) {
             ByteBuffer allocated = ByteBuffer.allocate(size);
@@ -522,7 +522,7 @@ public interface ReadableBuffer {
 
         @Override
         public int hashCode() {
-            return buffer.hashCode();
+            return Hashing.byteBufferCompatibleHashCode(buffer);
         }
 
         @Override

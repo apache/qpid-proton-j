@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.qpid.proton.codec.ReadableBuffer.ByteBufferReader;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
@@ -43,15 +44,16 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
+@Warmup(iterations = 5, time = 400, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 5, time = 400, timeUnit = TimeUnit.MILLISECONDS)
+@Fork(2)
 public class CompositeReadableBufferEqualsBenchmark {
 
     private CompositeReadableBuffer composite;
-    @Param({"8", "64", "1024"})
+    @Param({"8", "16", "64"})
     private int size;
     private ReadableBuffer.ByteBufferReader bufferReader;
-    @Param({"false", "true"})
+    @Param({ "false", "true" })
     private boolean direct;
     @Param({"1", "2"})
     private int chunks;
@@ -97,11 +99,6 @@ public class CompositeReadableBufferEqualsBenchmark {
     public static void runBenchmark(Class<?> benchmarkClass) throws RunnerException {
         final Options opt = new OptionsBuilder()
                 .include(benchmarkClass.getSimpleName())
-                .addProfiler(GCProfiler.class)
-                .shouldDoGC(true)
-                .warmupIterations(5)
-                .measurementIterations(5)
-                .forks(1)
                 .build();
         new Runner(opt).run();
     }
