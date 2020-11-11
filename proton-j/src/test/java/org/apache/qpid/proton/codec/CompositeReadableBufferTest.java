@@ -26,6 +26,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.InvalidMarkException;
@@ -3344,6 +3345,76 @@ public class CompositeReadableBufferTest {
         buffer.limit(1);
 
         assertEquals("T", buffer.readString(StandardCharsets.UTF_8.newDecoder()));
+    }
+
+    @Test
+    public void testReadUnicodeStringAcrossArrayBoundries() throws IOException {
+        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        byte[] slice1 = new byte[] { utf8[0] };
+        byte[] slice2 = new byte[utf8.length - 1];
+
+        System.arraycopy(utf8, 1, slice2, 0, slice2.length);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(slice1);
+        composite.append(slice2);
+
+        String result = composite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
+    public void testReadUnicodeStringAcrossMultipleArrayBoundries() throws IOException {
+        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        byte[] slice1 = new byte[] { utf8[0] };
+        byte[] slice2 = new byte[] { utf8[1], utf8[2] };
+        byte[] slice3 = new byte[] { utf8[3], utf8[4] };
+        byte[] slice4 = new byte[utf8.length - 5];
+
+        System.arraycopy(utf8, 5, slice4, 0, slice4.length);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(slice1);
+        composite.append(slice2);
+        composite.append(slice3);
+        composite.append(slice4);
+
+        String result = composite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
+    public void testReadUnicodeStringEachByteInOwnArray() throws IOException {
+        String expected = "\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        assertEquals(4, utf8.length);
+
+        byte[] slice1 = new byte[] { utf8[0] };
+        byte[] slice2 = new byte[] { utf8[1] };
+        byte[] slice3 = new byte[] { utf8[2] };
+        byte[] slice4 = new byte[] { utf8[3] };
+
+        System.arraycopy(utf8, 1, slice2, 0, slice2.length);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(slice1);
+        composite.append(slice2);
+        composite.append(slice3);
+        composite.append(slice4);
+
+        String result = composite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
     }
 
     //----- Tests for hashCode -----------------------------------------------//

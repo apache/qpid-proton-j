@@ -454,4 +454,43 @@ public class StringTypeTest
             delegate.put(src);
         }
     }
+
+    @Test
+    public void testEncodeAndDecodeLargeUnicodeString() throws IOException {
+        StringBuilder unicodeStringBuilder = new StringBuilder();
+
+        unicodeStringBuilder.append((char) 1000);
+        unicodeStringBuilder.append((char) 1001);
+        unicodeStringBuilder.append((char) 1002);
+        unicodeStringBuilder.append((char) 1003);
+
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+        final ByteBuffer bb = ByteBuffer.allocate(1024);
+
+        final AmqpValue inputValue = new AmqpValue(unicodeStringBuilder.toString());
+        encoder.setByteBuffer(bb);
+        encoder.writeObject(inputValue);
+
+        final int size1 = bb.position() / 2;
+        final int size2 = bb.position() - size1;
+
+        final byte[] slice1 = new byte[size1];
+        final byte[] slice2 = new byte[size2];
+
+        bb.flip();
+        bb.get(slice1);
+        bb.get(slice2);
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(slice1);
+        composite.append(slice2);
+
+        decoder.setBuffer(composite);
+
+        final AmqpValue outputValue = (AmqpValue) decoder.readObject();
+
+        assertEquals("Failed to round trip String correctly: ", unicodeStringBuilder.toString(), outputValue.getValue());
+    }
 }
