@@ -3423,6 +3423,108 @@ public class CompositeReadableBufferTest {
     }
 
     @Test
+    public void testReadSlicedWithInvalidEncodingsOutsideSlicedRange() throws IOException {
+        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        byte[] payload = new byte[utf8.length + 2];  // Add two for malformed UTF8
+
+        System.arraycopy(utf8, 0, payload, 0, utf8.length);
+
+        payload[utf8.length] = (byte) 0b11000111;     // Two byte utf8 encoding prefix
+        payload[utf8.length + 1] = (byte) 0b00110000; // invalid next byte encoding should be 0b10xxxxxx
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer().append(payload);
+        ReadableBuffer slicedComposite = composite.limit(utf8.length).slice();
+
+        String result = slicedComposite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
+    public void testReadSliceWithInvalidEncodingsOutsideSlicedRangeWithArraySpans() throws IOException {
+        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        byte[] span1 = new byte[] { utf8[0] };
+        byte[] span2 = new byte[utf8.length + 2];  // Add two for malformed UTF8
+
+        System.arraycopy(utf8, 1, span2, 0, utf8.length - 1);
+
+        span2[utf8.length] = (byte) 0b11000111;     // Two byte utf8 encoding prefix
+        span2[utf8.length + 1] = (byte) 0b00110000; // invalid next byte encoding should be 0b10xxxxxx
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(span1);
+        composite.append(span2);
+
+        ReadableBuffer slicedComposite = composite.limit(utf8.length).slice();
+
+        String result = slicedComposite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
+    public void testReadSliceWithInvalidEncodingsOutsideSlicedRangeWithArraySpansAndEarlySpan() throws IOException {
+        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        byte[] span1 = new byte[] { 0, 1, 2, 3, 4 };
+        byte[] span2 = new byte[] { utf8[0] };
+        byte[] span3 = new byte[utf8.length + 2];  // Add two for malformed UTF8
+
+        System.arraycopy(utf8, 1, span3, 0, utf8.length - 1);
+
+        span3[utf8.length] = (byte) 0b11000111;     // Two byte utf8 encoding prefix
+        span3[utf8.length + 1] = (byte) 0b00110000; // invalid next byte encoding should be 0b10xxxxxx
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(span1);
+        composite.append(span2);
+        composite.append(span3);
+
+        ReadableBuffer slicedComposite = composite.position(span1.length).limit(span1.length + utf8.length).slice();
+
+        String result = slicedComposite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
+    public void testReadSliceWithInvalidEncodingsSurroundingSlicedSpanningRanges() throws IOException {
+        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+
+        byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
+
+        byte[] span1 = new byte[] { (byte) 0b11000111, 0b00110000, utf8[0] };
+        byte[] span2 = new byte[] { utf8[1] };
+        byte[] span3 = new byte[utf8.length];  // provides two slots for malformed UTF8
+
+        System.arraycopy(utf8, 2, span3, 0, utf8.length - 2);
+
+        span3[span3.length - 2] = (byte) 0b11000111;     // Two byte utf8 encoding prefix
+        span3[span3.length - 1] = (byte) 0b00110000; // invalid next byte encoding should be 0b10xxxxxx
+
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(span1);
+        composite.append(span2);
+        composite.append(span3);
+
+        ReadableBuffer slicedComposite = composite.position(span1.length - 1)             // Start at first utf8 byte
+                                                  .limit(span1.length + utf8.length - 1)  // run to end of span 2 minus the trailing
+                                                  .slice();
+
+        String result = slicedComposite.readUTF8();
+
+        assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
     public void testRoundtripUnicodeStringThatSpansArraySlicesButDoesntFillLastContainingArray() throws IOException {
         StringBuilder unicodeStringBuilder = new StringBuilder();
 
