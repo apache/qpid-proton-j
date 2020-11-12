@@ -32,8 +32,13 @@ import java.nio.ByteBuffer;
 import java.nio.InvalidMarkException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
+import org.apache.qpid.proton.amqp.messaging.Footer;
 import org.junit.Test;
 
 /**
@@ -3415,6 +3420,61 @@ public class CompositeReadableBufferTest {
         String result = composite.readUTF8();
 
         assertEquals("Failed to round trip String correctly: ", expected, result);
+    }
+
+    @Test
+    public void testRoundtripUnicodeStringThatSpansArraySlicesButDoesntFillLastContainingArray() throws IOException {
+        StringBuilder unicodeStringBuilder = new StringBuilder();
+
+        unicodeStringBuilder.append((char) 1000);
+        unicodeStringBuilder.append((char) 1001);
+        unicodeStringBuilder.append((char) 1002);
+        unicodeStringBuilder.append((char) 1003);
+
+        final DecoderImpl decoder = new DecoderImpl();
+        final EncoderImpl encoder = new EncoderImpl(decoder);
+        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
+        final ByteBuffer bb = ByteBuffer.allocate(1024);
+
+        final AmqpValue inputValue = new AmqpValue(unicodeStringBuilder.toString());
+        encoder.setByteBuffer(bb);
+        encoder.writeObject(inputValue);
+
+        assertTrue(bb.position() > 1);
+
+        // Now write some trailing content, which will fill the
+        // remainder of the last array after the end of the string
+        Map<Symbol, Object> footerValues = new HashMap<>();
+        footerValues.put(Symbol.valueOf("some-key"), "some-value");
+
+        int startOfFooter = bb.position();
+        encoder.writeObject(new Footer(footerValues));
+        assertTrue("position did not move as required", bb.position() > startOfFooter);
+
+        // Prepare the array slices
+        int firstSliceLength = startOfFooter - 1;
+
+        final byte[] slice1 = new byte[firstSliceLength];
+        int remainder = bb.position() - firstSliceLength;
+        final byte[] slice2 = new byte[remainder];
+
+        bb.flip();
+        bb.get(slice1);
+        bb.get(slice2);
+
+        // Create the buffer with them, then read the string and footer back
+        CompositeReadableBuffer composite = new CompositeReadableBuffer();
+        composite.append(slice1);
+        composite.append(slice2);
+
+        decoder.setBuffer(composite);
+
+        final AmqpValue outputValue = (AmqpValue) decoder.readObject();
+        assertEquals("Failed to round trip String correctly: ", unicodeStringBuilder.toString(), outputValue.getValue());
+
+        final Footer footer = (Footer) decoder.readObject();
+        assertNotNull(footer);
+        assertEquals("Failed to round trip Footer correctly: ", footerValues, footer.getValue());
     }
 
     //----- Tests for hashCode -----------------------------------------------//

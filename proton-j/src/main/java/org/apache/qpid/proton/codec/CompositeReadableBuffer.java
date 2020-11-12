@@ -587,10 +587,13 @@ public class CompositeReadableBuffer implements ReadableBuffer {
                     final int unprocessed = wrapper.remaining();
                     final byte[] next = contents.get(++arrayIndex);
                     final ByteBuffer previous = wrapper;
-                    wrapper = ByteBuffer.allocate(unprocessed + next.length);
+                    final int nextAmount = Math.min(next.length, viewSpan - processed);
+                    wrapper = ByteBuffer.allocate(unprocessed + nextAmount);
+
                     wrapper.put(previous);
-                    wrapper.put(next);
-                    processed += wrapper.position() - unprocessed;
+                    wrapper.put(next, 0, nextAmount);
+                    processed += nextAmount;
+
                     wrapper.flip();
                 } else {
                     final byte[] next = contents.get(++arrayIndex);
