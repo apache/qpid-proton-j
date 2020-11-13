@@ -3354,7 +3354,7 @@ public class CompositeReadableBufferTest {
 
     @Test
     public void testReadUnicodeStringAcrossArrayBoundries() throws IOException {
-        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+        String expected = "\u1f4a9\u1f4a9\u1f4a9";
 
         byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
 
@@ -3374,7 +3374,7 @@ public class CompositeReadableBufferTest {
 
     @Test
     public void testReadUnicodeStringAcrossMultipleArrayBoundries() throws IOException {
-        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+        String expected = "\u1f4a9\u1f4a9\u1f4a9";
 
         byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
 
@@ -3424,7 +3424,7 @@ public class CompositeReadableBufferTest {
 
     @Test
     public void testReadSlicedWithInvalidEncodingsOutsideSlicedRange() throws IOException {
-        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+        String expected = "\u1f4a9\u1f4a9\u1f4a9";
 
         byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
 
@@ -3445,7 +3445,7 @@ public class CompositeReadableBufferTest {
 
     @Test
     public void testReadSliceWithInvalidEncodingsOutsideSlicedRangeWithArraySpans() throws IOException {
-        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+        String expected = "\u1f4a9\u1f4a9\u1f4a9";
 
         byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
 
@@ -3470,7 +3470,7 @@ public class CompositeReadableBufferTest {
 
     @Test
     public void testReadSliceWithInvalidEncodingsOutsideSlicedRangeWithArraySpansAndEarlySpan() throws IOException {
-        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+        String expected = "\u1f4a9\u1f4a9\u1f4a9";
 
         byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
 
@@ -3497,7 +3497,7 @@ public class CompositeReadableBufferTest {
 
     @Test
     public void testReadSliceWithInvalidEncodingsSurroundingSlicedSpanningRanges() throws IOException {
-        String expected = "\u1f4a9\\u1f4a9\\u1f4a9";
+        String expected = "\u1f4a9\u1f4a9\u1f4a9";
 
         byte[] utf8 = expected.getBytes(StandardCharsets.UTF_8);
 
