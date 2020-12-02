@@ -1,6 +1,6 @@
 # Apache Qpid Proton-J
 
-[![Linux Build Status](https://travis-ci.org/apache/qpid-proton-j.svg?branch=master)](https://travis-ci.com/github/apache/qpid-proton-j)
+[![Linux Build Status](https://travis-ci.com/apache/qpid-proton-j.svg?branch=master)](https://travis-ci.com/github/apache/qpid-proton-j)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/wh587qrxa3c22mh2/branch/master?svg=true)](https://ci.appveyor.com/project/ApacheSoftwareFoundation/qpid-proton-j/branch/master)
 
 
