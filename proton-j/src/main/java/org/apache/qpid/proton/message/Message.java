@@ -20,6 +20,9 @@
  */
 package org.apache.qpid.proton.message;
 
+import java.util.Collection;
+import java.util.function.Consumer;
+
 import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
 import org.apache.qpid.proton.amqp.messaging.DeliveryAnnotations;
 import org.apache.qpid.proton.amqp.messaging.Footer;
@@ -210,4 +213,58 @@ public interface Message
     void clear();
 
     MessageError getError();
+
+    /**
+     * @return the total number of body {@link Section} elements contained in this {@link Message}
+     */
+    int getBodySectionCount();
+
+    /**
+     * Sets the body {@link Section} instances to use when encoding this message.  The value
+     * given replaces any existing section(s) assigned to this message through the {@link Message#setBody(Section)}
+     * or {@link #addBodySection(Section)} methods.  Calling this method with a null or empty
+     * collection is equivalent to calling the {@link #clear()} method.  The collection passed is copied
+     * and any future changes to it have no affect on the contents of this message's body sections collection.
+     *
+     * @param sections
+     *      The {@link Collection} of {@link Section} instance to assign this message.
+     *
+     * @return this {@link Message} instance.
+     */
+    Message setBodySections(Collection<Section> sections);
+
+    /**
+     * Adds the given {@link Section} to the internal collection of sections that will be sent
+     * to the remote peer when this message is encoded.  If a previous section was added by a call
+     * to the {@link #setBody(Object)} method it should be retained as the first element of
+     * the running list of body sections contained in this message.
+     *
+     * @param bodySection
+     *      The {@link Section} instance to append to the internal collection.
+     *
+     * @return this {@link Message} instance.
+     *
+     * @throws NullPointerException if the body section value passed is null.
+     */
+    Message addBodySection(Section bodySection);
+
+    /**
+     * Create and return a unmodifiable {@link Collection} that contains the {@link Section} instances currently
+     * assigned to this message.  If there there is no body section(s) currently set an empty list is returned.
+     *
+     * @return an unmodifiable view of the currently set body section(s) or an empty collection if none set.
+     */
+    Collection<Section> getBodySections();
+
+    /**
+     * Performs the given action for each body {@link Section} of the {@link Message} until all sections
+     * have been presented to the given {@link Consumer} or the consumer throws an exception.
+     *
+     * @param consumer
+     *      the {@link Consumer} that will operate on each of the body sections in this message.
+     *
+     * @return this {@link Message} instance.
+     */
+    Message forEachBodySection(Consumer<Section> consumer);
+
 }

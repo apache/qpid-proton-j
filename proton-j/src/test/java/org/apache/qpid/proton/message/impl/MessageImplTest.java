@@ -22,11 +22,22 @@ package org.apache.qpid.proton.message.impl;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.Data;
+import org.apache.qpid.proton.amqp.messaging.Section;
 import org.apache.qpid.proton.codec.WritableBuffer;
 import org.apache.qpid.proton.codec.WritableBuffer.ByteBufferWrapper;
 import org.apache.qpid.proton.message.Message;
@@ -154,4 +165,246 @@ public class MessageImplTest
         return buffer.array();
     }
 
+    @Test
+    public void testBodySetGet() {
+        Message message = Message.Factory.create();
+
+        assertNull(message.getBody());
+        assertNotNull(message.getBodySections());
+        assertTrue(message.getBodySections().isEmpty());
+
+        message.setBody(new AmqpValue("test"));
+        assertEquals("test", ((AmqpValue) message.getBody()).getValue());
+
+        message.forEachBodySection(value -> {
+            assertEquals(new AmqpValue("test").getValue(), ((AmqpValue) value).getValue());
+        });
+
+        message.clear();
+
+        assertEquals(0, message.getBodySections().size());
+        assertNull(message.getBody());
+
+        final AtomicInteger count = new AtomicInteger();
+        message.getBodySections().forEach(value -> {
+            count.incrementAndGet();
+        });
+
+        assertEquals(0, count.get());
+    }
+
+    @Test
+    public void testAddMultipleBodySectionsPreservesOriginal() {
+        Message message = Message.Factory.create();
+
+        List<Data> expected = new ArrayList<>();
+        expected.add(new Data(new Binary(new byte[] { 1 })));
+        expected.add(new Data(new Binary(new byte[] { 2 })));
+        expected.add(new Data(new Binary(new byte[] { 3 })));
+
+        message.setBody(new Data(new Binary(new byte[] { 0 })));
+
+        assertNotNull(message.getBody());
+
+        for (Data value : expected) {
+            message.addBodySection(value);
+        }
+
+        assertEquals(expected.size() + 1, message.getBodySections().size());
+
+        final AtomicInteger counter = new AtomicInteger();
+        message.getBodySections().forEach(section -> {
+            assertTrue(section instanceof Data);
+            final Data dataView = (Data) section;
+            assertEquals(counter.getAndIncrement(), dataView.getValue().getArray()[0]);
+        });
+    }
+
+    @Test
+    public void testAddMultipleBodySections() {
+        Message message = Message.Factory.create();
+
+        List<Data> expected = new ArrayList<>();
+        expected.add(new Data(new Binary(new byte[] { 0 })));
+        expected.add(new Data(new Binary(new byte[] { 1 })));
+        expected.add(new Data(new Binary(new byte[] { 2 })));
+
+        assertNull(message.getBody());
+        assertNotNull(message.getBodySections());
+        assertTrue(message.getBodySections().isEmpty());
+
+        for (Data value : expected) {
+            message.addBodySection(value);
+        }
+
+        assertEquals(expected.size(), message.getBodySectionCount());
+        assertEquals(expected.size(), message.getBodySections().size());
+
+        final AtomicInteger count = new AtomicInteger();
+        message.forEachBodySection(value -> {
+            assertEquals(expected.get(count.get()), value);
+            count.incrementAndGet();
+        });
+
+        assertEquals(expected.size(), count.get());
+
+        count.set(0);
+        message.getBodySections().forEach(value -> {
+            assertEquals(expected.get(count.get()), value);
+            count.incrementAndGet();
+        });
+
+        assertEquals(expected.size(), count.get());
+
+        message.clear();
+
+        assertEquals(0, message.getBodySectionCount());
+        assertEquals(0, message.getBodySections().size());
+
+        count.set(0);
+        message.getBodySections().forEach(value -> {
+            count.incrementAndGet();
+        });
+
+        assertEquals(0, count.get());
+
+        for (Data value : expected) {
+            message.addBodySection(value);
+        }
+
+        assertEquals(expected.size(), message.getBodySections().size());
+        final Data replacement = new Data(new Binary(new byte[] { 3 }));
+        message.setBody(replacement);
+        assertEquals(1, message.getBodySections().size());
+        expected.set(0, replacement);
+
+        Iterator<?> expectations = expected.iterator();
+        message.getBodySections().forEach(section -> {
+            assertEquals(section, expectations.next());
+        });
+
+        message.setBody(null);
+        assertNull(message.getBody());
+        assertEquals(0, message.getBodySections().size());
+    }
+
+    @Test
+    public void testMixSingleAndMultipleSectionAccess() {
+        Message message = Message.Factory.create();
+
+        List<Data> expected = new ArrayList<>();
+        expected.add(new Data(new Binary(new byte[] { 0 })));
+        expected.add(new Data(new Binary(new byte[] { 1 })));
+        expected.add(new Data(new Binary(new byte[] { 2 })));
+
+        assertNull(message.getBody());
+        assertNotNull(message.getBodySections());
+        assertTrue(message.getBodySections().isEmpty());
+
+        message.setBody(expected.get(0));
+
+        assertEquals(1, message.getBodySectionCount());
+        assertEquals(expected.get(0), message.getBody());
+        assertNotNull(message.getBodySections());
+        assertFalse(message.getBodySections().isEmpty());
+        assertEquals(1, message.getBodySections().size());
+
+        message.addBodySection(expected.get(1));
+
+        assertEquals(2, message.getBodySectionCount());
+        assertEquals(expected.get(0), message.getBody());
+        assertNotNull(message.getBodySections());
+        assertFalse(message.getBodySections().isEmpty());
+        assertEquals(2, message.getBodySections().size());
+
+        message.addBodySection(expected.get(2));
+
+        assertEquals(3, message.getBodySectionCount());
+        assertEquals(expected.get(0), message.getBody());
+        assertNotNull(message.getBodySections());
+        assertFalse(message.getBodySections().isEmpty());
+        assertEquals(3, message.getBodySections().size());
+
+        final AtomicInteger count = new AtomicInteger();
+        message.getBodySections().forEach(value -> {
+            assertEquals(expected.get(count.get()), value);
+            count.incrementAndGet();
+        });
+
+        assertEquals(expected.size(), count.get());
+    }
+
+    @Test
+    public void testForEachMethodOnEmptyMessage() {
+        Message message = Message.Factory.create();
+
+        assertNull(message.getBody());
+        assertNotNull(message.getBodySections());
+        assertTrue(message.getBodySections().isEmpty());
+        assertEquals(0, message.getBodySectionCount());
+
+        message.forEachBodySection(value -> {
+            fail("Should not invoke any consumers since Message is empty");
+        });
+    }
+
+    @Test
+    public void testMessageEncodeAndDecodeWithSingleSectionInAddedList() {
+        Message message = Message.Factory.create();
+
+        List<Section> expected = new ArrayList<>();
+        expected.add(new Data(new Binary(new byte[] { 0 })));
+
+        // Check that single section value is cleared when list added
+        message.setBody(new AmqpValue("test"));
+
+        // Message should now encode as single body section of type Data.
+        message.setBodySections(expected);
+
+        final byte[] encodedBytes = new byte[8192];
+
+        int encodedLength = message.encode(encodedBytes, 0, encodedBytes.length);
+
+        Message decoded = Message.Factory.create();
+
+        decoded.decode(encodedBytes, 0, encodedLength);
+
+        final AtomicInteger count = new AtomicInteger();
+        assertEquals(expected.size(), decoded.getBodySectionCount());
+        assertEquals(expected.size(), decoded.getBodySections().size());
+        decoded.forEachBodySection(value -> {
+            assertTrue(value instanceof Data);
+            assertArrayEquals(((Data) expected.get(count.get())).getValue().getArray(), ((Data) value).getValue().getArray());
+            count.incrementAndGet();
+        });
+    }
+
+    @Test
+    public void testMessageEncodeAndDecodeWithMultipleDataSectionsInBody() {
+        Message message = Message.Factory.create();
+
+        List<Section> expected = new ArrayList<>();
+        expected.add(new Data(new Binary(new byte[] { 0 })));
+        expected.add(new Data(new Binary(new byte[] { 1 })));
+        expected.add(new Data(new Binary(new byte[] { 2 })));
+
+        message.setBodySections(expected);
+
+        final byte[] encodedBytes = new byte[8192];
+
+        int encodedLength = message.encode(encodedBytes, 0, encodedBytes.length);
+
+        Message decoded = Message.Factory.create();
+
+        decoded.decode(encodedBytes, 0, encodedLength);
+
+        final AtomicInteger count = new AtomicInteger();
+        assertEquals(expected.size(), decoded.getBodySectionCount());
+        assertEquals(expected.size(), decoded.getBodySections().size());
+        decoded.forEachBodySection(value -> {
+            assertTrue(value instanceof Data);
+            assertArrayEquals(((Data) expected.get(count.get())).getValue().getArray(), ((Data) value).getValue().getArray());
+            count.incrementAndGet();
+        });
+    }
 }

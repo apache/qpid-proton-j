@@ -22,14 +22,35 @@
 package org.apache.qpid.proton.message.impl;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedByte;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
-import org.apache.qpid.proton.amqp.messaging.*;
-import org.apache.qpid.proton.codec.*;
-import org.apache.qpid.proton.message.*;
+import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
+import org.apache.qpid.proton.amqp.messaging.DeliveryAnnotations;
+import org.apache.qpid.proton.amqp.messaging.Footer;
+import org.apache.qpid.proton.amqp.messaging.Header;
+import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
+import org.apache.qpid.proton.amqp.messaging.Properties;
+import org.apache.qpid.proton.amqp.messaging.Section;
+import org.apache.qpid.proton.codec.AMQPDefinedTypes;
+import org.apache.qpid.proton.codec.CompositeWritableBuffer;
+import org.apache.qpid.proton.codec.DecoderImpl;
+import org.apache.qpid.proton.codec.DroppingWritableBuffer;
+import org.apache.qpid.proton.codec.EncoderImpl;
+import org.apache.qpid.proton.codec.ReadableBuffer;
+import org.apache.qpid.proton.codec.WritableBuffer;
+import org.apache.qpid.proton.message.Message;
+import org.apache.qpid.proton.message.MessageError;
+import org.apache.qpid.proton.message.ProtonJMessage;
 
 public class MessageImpl implements ProtonJMessage
 {
@@ -40,6 +61,7 @@ public class MessageImpl implements ProtonJMessage
     private ApplicationProperties _applicationProperties;
     private Section _body;
     private Footer _footer;
+    private List<Section> _bodySections;
 
     private static class EncoderDecoderPair {
       DecoderImpl decoder = new DecoderImpl();
@@ -514,7 +536,32 @@ public class MessageImpl implements ProtonJMessage
     @Override
     public Section getBody()
     {
-        return _body;
+        Section section = _body;
+
+        if (_bodySections != null)
+        {
+            section = _bodySections.get(0);
+        }
+
+        return section;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<Section> getBodySections()
+    {
+        if (_body != null)
+        {
+            return Collections.singletonList(_body);
+        }
+        else if (_bodySections != null)
+        {
+            return Collections.unmodifiableList(_bodySections);
+        }
+        else
+        {
+            return Collections.EMPTY_LIST;
+        }
     }
 
     @Override
@@ -557,6 +604,76 @@ public class MessageImpl implements ProtonJMessage
     public void setBody(Section body)
     {
         _body = body;
+        _bodySections = null;
+    }
+
+    @Override
+    public Message setBodySections(Collection<Section> sections)
+    {
+        clear();
+        if (sections != null && !sections.isEmpty())
+        {
+            _bodySections = new ArrayList<>(sections);
+        }
+
+        return this;
+    }
+
+    @Override
+    public Message addBodySection(Section bodySection)
+    {
+        Objects.requireNonNull(bodySection, "Additional Body Section cannot be null");
+
+        if (_body == null && _bodySections == null)
+        {
+            _body = bodySection;
+        }
+        else
+        {
+            if (_bodySections == null)
+            {
+                _bodySections = new ArrayList<>();
+
+                // Preserve older section from original message creation.
+                if (_body != null)
+                {
+                    _bodySections.add(_body);
+                    _body = null;
+                }
+            }
+
+            _bodySections.add(bodySection);
+        }
+
+        return this;
+    }
+
+    @Override
+    public int getBodySectionCount()
+    {
+        if (_bodySections != null)
+        {
+            return _bodySections.size();
+        }
+        else
+        {
+            return _body == null ? 0 : 1;
+        }
+    }
+
+    @Override
+    public Message forEachBodySection(Consumer<Section> consumer)
+    {
+        if (_bodySections != null)
+        {
+            _bodySections.forEach(section -> consumer.accept(section));
+        }
+        else if (_body != null)
+        {
+            consumer.accept(_body);
+        }
+
+        return this;
     }
 
     @Override
@@ -579,6 +696,7 @@ public class MessageImpl implements ProtonJMessage
         decode(ReadableBuffer.ByteBufferReader.wrap(buffer));
     }
 
+    @Override
     public void decode(ReadableBuffer buffer)
     {
         DecoderImpl decoder = tlsCodec.get().decoder;
@@ -666,9 +784,9 @@ public class MessageImpl implements ProtonJMessage
             }
 
         }
-        if(section != null && !(section instanceof Footer))
+        while(section != null && !(section instanceof Footer))
         {
-            _body = section;
+            addBodySection(section);
 
             if(buffer.hasRemaining())
             {
@@ -735,10 +853,9 @@ public class MessageImpl implements ProtonJMessage
         {
             encoder.writeObject(getApplicationProperties());
         }
-        if(getBody() != null)
-        {
-            encoder.writeObject(getBody());
-        }
+
+        forEachBodySection(encoder::writeObject);
+
         if(getFooter() != null)
         {
             encoder.writeObject(getFooter());
@@ -752,6 +869,7 @@ public class MessageImpl implements ProtonJMessage
     public void clear()
     {
         _body = null;
+        _bodySections = null;
     }
 
     @Override
@@ -760,9 +878,10 @@ public class MessageImpl implements ProtonJMessage
         return MessageError.OK;
     }
 
+    @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         sb.append("Message{");
         if (_header != null) {
             sb.append("header=");
@@ -780,8 +899,11 @@ public class MessageImpl implements ProtonJMessage
             sb.append("body=");
             sb.append(_body);
         }
+        if (_bodySections != null) {
+            sb.append("body=");
+            _bodySections.forEach((section) -> sb.append(section).append(","));
+        }
         sb.append("}");
         return sb.toString();
     }
-
 }
