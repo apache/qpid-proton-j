@@ -30,7 +30,7 @@
     <name>Proton-J JMH Performance Tests</name>
 
     <properties>
-        <jmh-version>1.19</jmh-version>
+        <jmh-version>1.25.2</jmh-version>
     </properties>
 
     <dependencies>

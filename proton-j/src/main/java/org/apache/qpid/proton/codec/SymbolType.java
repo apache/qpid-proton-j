@@ -35,7 +35,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
     private final SymbolEncoding _shortSymbolEncoding;
 
     private final Map<ReadableBuffer, Symbol> _symbolCache = new HashMap<ReadableBuffer, Symbol>();
-    private DecoderImpl.TypeDecoder<Symbol> _symbolCreator =
+    private final DecoderImpl.TypeDecoder<Symbol> _symbolCreator =
         new DecoderImpl.TypeDecoder<Symbol>()
         {
             @Override
@@ -44,7 +44,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
                 Symbol symbol = _symbolCache.get(buffer);
                 if (symbol == null)
                 {
-                    byte[] bytes = new byte[buffer.limit()];
+                    byte[] bytes = new byte[buffer.remaining()];
                     buffer.get(bytes);
 
                     String str = new String(bytes, ASCII_CHARSET);
