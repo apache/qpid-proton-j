@@ -22,6 +22,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.spy;
@@ -29,14 +30,19 @@ import static org.mockito.Mockito.verify;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.security.SaslFrameBody;
 import org.apache.qpid.proton.amqp.security.SaslInit;
+import org.apache.qpid.proton.amqp.transport.Open;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.Transfer;
 import org.apache.qpid.proton.codec.AMQPDefinedTypes;
@@ -104,6 +110,38 @@ public class FrameWriterTest {
         assertEquals(UnsignedInteger.ONE, result.getHandle());
         assertEquals(UnsignedInteger.ZERO, result.getMessageFormat());
         assertEquals(UnsignedInteger.valueOf(127), result.getDeliveryId());
+    }
+
+    @Test
+    public void testFailToWriteFrame() {
+        FrameWriter framer = new FrameWriter(encoder, Integer.MAX_VALUE, (byte) 1, transport);
+
+        final class FailOnUnknownType implements Function<Boolean, Boolean> {
+            @Override
+            public Boolean apply(Boolean t) {
+                throw new IllegalStateException();
+            }
+        };
+
+        Open open = new Open();
+        Map<Symbol, Object> invalidProperties = new HashMap<>();
+        invalidProperties.put(Symbol.valueOf("invalid-unknown-type"), new FailOnUnknownType());
+        open.setProperties(invalidProperties);
+
+        try {
+            framer.writeFrame(0, open, null, null);
+            fail("should have thrown exception");
+        } catch (IllegalArgumentException e) {
+            // Expected
+            assertNotNull(e.getMessage());
+            assertTrue(e.getMessage().contains(FailOnUnknownType.class.getName()));
+        }
+
+        ByteBuffer destBuffer = ByteBuffer.allocate(16);
+        int read = framer.readBytes(destBuffer);
+
+        assertEquals("should not have been any output read", 0, read);
+        assertEquals("should not have been any output in buffer", 0, destBuffer.position());
     }
 
     @Test

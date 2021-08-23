@@ -99,25 +99,29 @@ class FrameWriter {
 
     void writeFrame(int channel, Object frameBody, ReadableBuffer payload, Runnable onPayloadTooLarge) {
         frameStart = frameBuffer.position();
+        try {
+            final int performativeSize = writePerformative(frameBody, payload, onPayloadTooLarge);
+            final int capacity = maxFrameSize > 0 ? maxFrameSize - performativeSize : Integer.MAX_VALUE;
+            final int payloadSize = Math.min(payload == null ? 0 : payload.remaining(), capacity);
 
-        final int performativeSize = writePerformative(frameBody, payload, onPayloadTooLarge);
-        final int capacity = maxFrameSize > 0 ? maxFrameSize - performativeSize : Integer.MAX_VALUE;
-        final int payloadSize = Math.min(payload == null ? 0 : payload.remaining(), capacity);
+            if (transport.isFrameTracingEnabled()) {
+                logFrame(channel, frameBody, payload, payloadSize);
+            }
 
-        if (transport.isFrameTracingEnabled()) {
-            logFrame(channel, frameBody, payload, payloadSize);
+            if (payloadSize > 0) {
+                int oldLimit = payload.limit();
+                payload.limit(payload.position() + payloadSize);
+                frameBuffer.put(payload);
+                payload.limit(oldLimit);
+            }
+
+            endFrame(channel);
+
+            framesOutput++;
+        } catch (Exception e) {
+            frameBuffer.position(frameStart);
+            throw e;
         }
-
-        if (payloadSize > 0) {
-            int oldLimit = payload.limit();
-            payload.limit(payload.position() + payloadSize);
-            frameBuffer.put(payload);
-            payload.limit(oldLimit);
-        }
-
-        endFrame(channel);
-
-        framesOutput++;
     }
 
     private int writePerformative(Object frameBody, ReadableBuffer payload, Runnable onPayloadTooLarge) {
