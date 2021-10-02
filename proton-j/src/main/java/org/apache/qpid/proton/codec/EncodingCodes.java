@@ -166,7 +166,7 @@ public interface EncodingCodes
             case MAP32:
                 return "MAP32:0xd1";
             case ARRAY8:
-                return "ARRAY32:0xe0";
+                return "ARRAY8:0xe0";
             case ARRAY32:
                 return "ARRAY32:0xf0";
             default:
