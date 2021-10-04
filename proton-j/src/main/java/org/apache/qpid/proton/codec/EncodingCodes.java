@@ -170,7 +170,7 @@ public interface EncodingCodes
             case ARRAY32:
                 return "ARRAY32:0xf0";
             default:
-                return "Unknown-Type:" + String.format("0x%02X ", encoding);
+                return "Unknown-Type:" + String.format("0x%02X", encoding);
         }
     }
 }
