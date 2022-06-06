@@ -3283,6 +3283,7 @@ public class CompositeReadableBufferTest {
         CompositeReadableBuffer buffer = new CompositeReadableBuffer();
 
         assertEquals("", buffer.readString(StandardCharsets.UTF_8.newDecoder()));
+        assertFalse(buffer.hasRemaining());
     }
 
     @Test
@@ -3295,6 +3296,7 @@ public class CompositeReadableBufferTest {
         buffer.append(encoded);
 
         assertEquals(testString, buffer.readString(StandardCharsets.UTF_8.newDecoder()));
+        assertFalse(buffer.hasRemaining());
     }
 
     @Test
@@ -3309,6 +3311,7 @@ public class CompositeReadableBufferTest {
         buffer.limit(1);
 
         assertEquals("T", buffer.readString(StandardCharsets.UTF_8.newDecoder()));
+        assertFalse(buffer.hasRemaining());
     }
 
     @Test
@@ -3329,6 +3332,7 @@ public class CompositeReadableBufferTest {
         String result = buffer.readString(StandardCharsets.UTF_8.newDecoder());
 
         assertEquals(testString, result);
+        assertFalse(buffer.hasRemaining());
     }
 
     @Test
@@ -3350,6 +3354,7 @@ public class CompositeReadableBufferTest {
         buffer.limit(1);
 
         assertEquals("T", buffer.readString(StandardCharsets.UTF_8.newDecoder()));
+        assertFalse(buffer.hasRemaining());
     }
 
     @Test
@@ -3370,6 +3375,7 @@ public class CompositeReadableBufferTest {
         String result = composite.readUTF8();
 
         assertEquals("Failed to round trip String correctly: ", expected, result);
+        assertFalse(composite.hasRemaining());
     }
 
     @Test
@@ -3394,6 +3400,7 @@ public class CompositeReadableBufferTest {
         String result = composite.readUTF8();
 
         assertEquals("Failed to round trip String correctly: ", expected, result);
+        assertFalse(composite.hasRemaining());
     }
 
     @Test
@@ -3420,6 +3427,7 @@ public class CompositeReadableBufferTest {
         String result = composite.readUTF8();
 
         assertEquals("Failed to round trip String correctly: ", expected, result);
+        assertFalse(composite.hasRemaining());
     }
 
     @Test
@@ -3441,6 +3449,7 @@ public class CompositeReadableBufferTest {
         String result = slicedComposite.readUTF8();
 
         assertEquals("Failed to round trip String correctly: ", expected, result);
+        assertFalse(slicedComposite.hasRemaining());
     }
 
     @Test

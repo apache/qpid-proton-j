@@ -561,6 +561,9 @@ public class CompositeReadableBuffer implements ReadableBuffer {
             decoded = readStringFromComponents(decoder);
         }
 
+        // Ensure that all currently readable bytes are consumed.
+        position(limit);
+
         return decoded.toString();
     }
 
