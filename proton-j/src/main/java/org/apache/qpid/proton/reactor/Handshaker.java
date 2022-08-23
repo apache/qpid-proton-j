@@ -86,4 +86,7 @@ public class Handshaker extends BaseHandler {
     public void onLinkRemoteClose(Event event) {
         close(event.getLink());
     }
+
+    @Override
+    public void onTransportError(Event event) { event.getReactor().free(); }
 }
