@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>23</version>
+    <version>27</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -41,7 +41,6 @@
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>5.1.2</maven-bundle-plugin-version>
     <jacoco-plugin-version>0.8.8</jacoco-plugin-version>
-    <surefire.version>2.22.2</surefire.version>
 
     <!-- See also maven.compiler.release in the java9on profile -->
     <maven.compiler.source>1.8</maven.compiler.source>
@@ -49,6 +48,8 @@
 
     <!-- surefire forked jvm arguments -->
     <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
+
+    <project.build.outputTimestamp>2022-08-29T15:29:01Z</project.build.outputTimestamp>
   </properties>
 
   <dependencyManagement>
