@@ -36,7 +36,7 @@
     <junit-version>4.13.2</junit-version>
     <mockito-version>4.7.0</mockito-version>
     <jython-version>2.7.2</jython-version>
-    <bcpkix-jdk15on-version>1.69</bcpkix-jdk15on-version>
+    <bcpkix-jdk15on-version>1.70</bcpkix-jdk15on-version>
 
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>5.1.2</maven-bundle-plugin-version>
