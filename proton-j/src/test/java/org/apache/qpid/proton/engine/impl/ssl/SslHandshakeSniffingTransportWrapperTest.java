@@ -24,7 +24,7 @@ import static org.apache.qpid.proton.engine.impl.TransportTestHelper.assertByteB
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
@@ -97,7 +97,7 @@ public class SslHandshakeSniffingTransportWrapperTest
         _sniffingWrapper.pop(consumed);
         verify(transportThatShouldBeUsed).pop(consumed);
 
-        verifyZeroInteractionsWithOtherTransport(transportThatShouldBeUsed);
+        verifyNoInteractionsWithOtherTransport(transportThatShouldBeUsed);
     }
 
     @Test
@@ -115,7 +115,7 @@ public class SslHandshakeSniffingTransportWrapperTest
         }
         finally
         {
-            verifyZeroInteractions(_secureTransportWrapper, _plainTransportWrapper);
+            verifyNoInteractions(_secureTransportWrapper, _plainTransportWrapper);
         }
     }
 
@@ -124,7 +124,7 @@ public class SslHandshakeSniffingTransportWrapperTest
     {
         assertEquals("Cipher name should be null", null, _sniffingWrapper.getCipherName());
         assertEquals("Protocol name should be null", null, _sniffingWrapper.getProtocolName());
-        verifyZeroInteractions(_secureTransportWrapper, _plainTransportWrapper);
+        verifyNoInteractions(_secureTransportWrapper, _plainTransportWrapper);
     }
 
     @Test
@@ -161,10 +161,10 @@ public class SslHandshakeSniffingTransportWrapperTest
         assertEquals(expectedCipherName, _sniffingWrapper.getCipherName());
         assertEquals(expectedProtocolName, _sniffingWrapper.getProtocolName());
 
-        verifyZeroInteractionsWithOtherTransport(transportThatShouldBeUsed);
+        verifyNoInteractionsWithOtherTransport(transportThatShouldBeUsed);
     }
 
-    private void verifyZeroInteractionsWithOtherTransport(TransportWrapper transportThatShouldBeUsed)
+    private void verifyNoInteractionsWithOtherTransport(TransportWrapper transportThatShouldBeUsed)
     {
         final TransportWrapper transportThatShouldNotBeUsed;
         if(transportThatShouldBeUsed == _plainTransportWrapper)
@@ -176,7 +176,7 @@ public class SslHandshakeSniffingTransportWrapperTest
             transportThatShouldNotBeUsed = _plainTransportWrapper;
         }
 
-        verifyZeroInteractions(transportThatShouldNotBeUsed);
+        verifyNoInteractions(transportThatShouldNotBeUsed);
     }
 
 }
