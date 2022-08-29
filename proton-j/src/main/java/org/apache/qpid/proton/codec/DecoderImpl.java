@@ -1075,8 +1075,18 @@ public class DecoderImpl implements ByteBufferDecoder
 
     <V> V readRaw(TypeDecoder<V> decoder, int size)
     {
-        V decode = decoder.decode(this, _buffer.slice().limit(size));
-        _buffer.position(_buffer.position()+size);
+        final int originalLimit = _buffer.limit();
+        final int originalPosition = _buffer.position();
+        final V decode;
+        try {
+            decode = decoder.decode(this, _buffer.limit(originalPosition + size));
+        } catch (Throwable t) {
+            _buffer.position(originalPosition);
+            throw t;
+        } finally {
+            _buffer.limit(originalLimit);
+        }
+        _buffer.position(originalPosition + size);
         return decode;
     }
 
