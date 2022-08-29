@@ -79,9 +79,7 @@ import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
 import org.apache.qpid.proton.framing.TransportFrame;
 import org.apache.qpid.proton.message.Message;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -94,9 +92,6 @@ public class TransportImplTest
     private static final TransportFrame TRANSPORT_FRAME_OPEN = new TransportFrame(CHANNEL_ID, new Open(), null);
 
     private static final int BUFFER_SIZE = 8 * 1024;
-
-    @Rule
-    public ExpectedException _expectedException = ExpectedException.none();
 
     @Test
     public void testInput()
@@ -140,9 +135,13 @@ public class TransportImplTest
     @Test
     public void testEmptyInputBeforeBindUsingOldApi_causesTransportException()
     {
-        _expectedException.expect(TransportException.class);
-        _expectedException.expectMessage("Unexpected EOS when remote connection not closed: connection aborted");
-        _transport.input(new byte [0], 0, 0);
+        try {
+            _transport.input(new byte [0], 0, 0);
+            fail("Expected an exception to be thrown");
+        } catch (TransportException te) {
+            final String msg = te.getMessage();
+            assertTrue("Unexpected message: " + msg, msg.endsWith("Unexpected EOS when remote connection not closed: connection aborted"));
+        }
     }
 
     /**
@@ -287,8 +286,12 @@ public class TransportImplTest
 
         assertFalse(_transport.isHandlingFrames());
 
-        _expectedException.expect(IllegalStateException.class);
-        _transport.handleFrame(TRANSPORT_FRAME_BEGIN);
+        try {
+            _transport.handleFrame(TRANSPORT_FRAME_BEGIN);
+            fail("Expected an exception to be thrown");
+        } catch (IllegalStateException ise) {
+            // Expected
+        }
     }
 
     @Test

@@ -22,6 +22,7 @@ package org.apache.qpid.proton.engine.impl.ssl;
 
 import static org.apache.qpid.proton.engine.impl.TransportTestHelper.assertByteBufferContentEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,9 +32,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.engine.TransportException;
 import org.apache.qpid.proton.engine.impl.TransportWrapper;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 public class SslHandshakeSniffingTransportWrapperTest
 {
@@ -43,9 +42,6 @@ public class SslHandshakeSniffingTransportWrapperTest
     private SslTransportWrapper _secureTransportWrapper = mock(SslTransportWrapper.class);
     private TransportWrapper _plainTransportWrapper = mock(TransportWrapper.class);
     private SslTransportWrapper _sniffingWrapper = new SslHandshakeSniffingTransportWrapper(_secureTransportWrapper, _plainTransportWrapper);
-
-    @Rule
-    public ExpectedException _expectedException = ExpectedException.none();
 
     @Test
     public void testGetInputBufferGetOutputBufferWithNonSsl()
@@ -110,8 +106,12 @@ public class SslHandshakeSniffingTransportWrapperTest
             _sniffingWrapper.tail().put(sourceBuffer);
             _sniffingWrapper.close_tail();
 
-            _expectedException.expect(TransportException.class);
-            _sniffingWrapper.process();
+            try {
+                _sniffingWrapper.process();
+                fail("Expected an exception to be thrown");
+            } catch (TransportException te) {
+                // Expected
+            }
         }
         finally
         {

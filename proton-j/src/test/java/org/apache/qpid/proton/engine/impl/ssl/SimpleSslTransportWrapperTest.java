@@ -36,9 +36,7 @@ import javax.net.ssl.SSLException;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 /**
  * TODO unit test handshaking
@@ -51,9 +49,6 @@ public class SimpleSslTransportWrapperTest
     private CannedTransportOutput _underlyingOutput;
     private SimpleSslTransportWrapper _sslWrapper;
     private CapitalisingDummySslEngine _dummySslEngine;
-
-    @Rule
-    public ExpectedException _expectedException = ExpectedException.none();
 
     @Before
     public void setUp()
