@@ -39,7 +39,7 @@
     <bcpkix-jdk15on-version>1.70</bcpkix-jdk15on-version>
 
     <!-- Plugin versions -->
-    <maven-bundle-plugin-version>5.1.2</maven-bundle-plugin-version>
+    <maven-bundle-plugin-version>5.1.8</maven-bundle-plugin-version>
     <jacoco-plugin-version>0.8.8</jacoco-plugin-version>
 
     <!-- See also maven.compiler.release in the java9on profile -->
