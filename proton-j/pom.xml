@@ -24,7 +24,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>proton-j</artifactId>
-  <packaging>bundle</packaging>
+  <packaging>jar</packaging>
 
   <name>Proton-J</name>
 
@@ -57,15 +57,24 @@
             <Import-Package>
               javax.net.ssl*;resolution:=optional,!org.bouncycastle*,*
             </Import-Package>
-            <Automatic-Module-Name>org.apache.qpid.proton.j</Automatic-Module-Name>
           </instructions>
         </configuration>
+        <executions>
+          <execution>
+            <id>bundle-manifest</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>manifest</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
           <archive>
+            <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
             <manifestEntries>
               <Automatic-Module-Name>org.apache.qpid.proton.j</Automatic-Module-Name>
             </manifestEntries>
