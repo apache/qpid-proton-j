@@ -38,6 +38,11 @@ public class PropertiesCodecTest extends CodecTestSupport {
     private final int SMALL_SIZE = 32;
 
     @Test
+    public void testDecodePropertiess() throws IOException {
+        doTestDecodePropertiesSeries(1);
+    }
+
+    @Test
     public void testDecodeSmallSeriesOfPropertiess() throws IOException {
         doTestDecodePropertiesSeries(SMALL_SIZE);
     }

@@ -44,6 +44,11 @@ public class ListTypeCodecTest extends CodecTestSupport {
     private final int SMALL_SIZE = 32;
 
     @Test
+    public void testDecodeList() throws IOException {
+        doTestDecodeListSeries(1);
+    }
+
+    @Test
     public void testDecodeSmallSeriesOfLists() throws IOException {
         doTestDecodeListSeries(SMALL_SIZE);
     }

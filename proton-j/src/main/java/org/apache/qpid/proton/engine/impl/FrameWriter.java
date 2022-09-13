@@ -158,13 +158,7 @@ class FrameWriter {
     private void logFrame(int channel, Object frameBody, ReadableBuffer payload, int payloadSize) {
         ProtocolTracer tracer = transport.getProtocolTracer();
         if (frameType == AMQP_FRAME_TYPE) {
-            ReadableBuffer originalPayload = null;
-            if (payload != null) {
-                originalPayload = payload.slice();
-                originalPayload.limit(payloadSize);
-            }
-
-            Binary payloadBin = Binary.create(originalPayload);
+            final Binary payloadBin = Binary.create(payload, payloadSize);
             FrameBody body = null;
             if (frameBody == null) {
                 body = EmptyFrame.INSTANCE;

@@ -167,15 +167,25 @@ public final class Binary
 
     public static Binary create(ReadableBuffer buffer)
     {
+        return create(buffer, buffer.remaining());
+    }
+
+    public static Binary create(ReadableBuffer buffer, int length)
+    {
         if (buffer == null)
         {
             return null;
         }
         else if (!buffer.hasArray())
         {
-            byte data[] = new byte [buffer.remaining()];
-            ReadableBuffer dup = buffer.duplicate();
-            dup.get(data);
+            final byte data[] = new byte [length];
+            final int oldPos = buffer.position();
+            try {
+                buffer.get(data, 0, length);
+            } finally {
+                buffer.position(oldPos);
+            }
+
             return new Binary(data);
         }
         else
@@ -192,9 +202,15 @@ public final class Binary
         }
         if (buffer.isDirect() || buffer.isReadOnly())
         {
-            byte data[] = new byte [buffer.remaining()];
-            ByteBuffer dup = buffer.duplicate();
-            dup.get(data);
+            final int length = buffer.remaining();
+            final byte data[] = new byte [length];
+            final int oldPos = buffer.position();
+            try {
+                buffer.get(data, 0, length);
+            } finally {
+                buffer.position(oldPos);
+            }
+
             return new Binary(data);
         }
         else
