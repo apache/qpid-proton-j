@@ -291,6 +291,12 @@ public class DeliveryImpl implements Delivery
 
     void addToTransportWorkList()
     {
+        TransportSession transportSession = getLink().getSession().getTransportSession();
+        if (transportSession != null && transportSession.endSent()) {
+            // Too late to action this work, dont add it to the transport work list.
+            return;
+        }
+
         getLink().getConnectionImpl().addTransportWork(this);
     }
 

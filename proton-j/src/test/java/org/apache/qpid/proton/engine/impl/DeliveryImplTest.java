@@ -735,7 +735,9 @@ public class DeliveryImplTest
     private DeliveryImpl createSenderDelivery() {
         LinkImpl link = Mockito.mock(SenderImpl.class);
         ConnectionImpl connection = Mockito.mock(ConnectionImpl.class);
+        SessionImpl session = Mockito.mock(SessionImpl.class);
 
+        Mockito.when(link.getSession()).thenReturn(session);
         Mockito.when(link.getConnectionImpl()).thenReturn(connection);
 
         return new DeliveryImpl(null, link, null);
