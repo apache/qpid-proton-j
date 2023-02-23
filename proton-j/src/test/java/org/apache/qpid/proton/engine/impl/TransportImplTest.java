@@ -4895,4 +4895,226 @@ public class TransportImplTest
 
         assertNoEvents(collector);
     }
+
+    /**
+     * Verify that the transport work list doesnt retain deliveries+link+session on when a session
+     * is closed and freed while there is an active receiver link with deliveries still outstanding.
+     */
+    @Test
+    public void testTransportWorkListDoesntLeakDeliveriesEtcFromSessionFreedWithActiveReceiverWithOutstandingDeliveries()
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        ConnectionImpl connection = new ConnectionImpl();
+        transport.bind(connection);
+
+        connection.open();
+
+        Session session = connection.session();
+        session.open();
+
+        String linkName = "myClientReceiver";
+        Receiver receiver = session.receiver(linkName);
+        receiver.flow(5);
+        receiver.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
+
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+        assertTrue("Unexpected frame type", transport.writes.get(1) instanceof Begin);
+        assertTrue("Unexpected frame type", transport.writes.get(2) instanceof Attach);
+        assertTrue("Unexpected frame type", transport.writes.get(3) instanceof Flow);
+
+        Delivery delivery = receiver.current();
+        assertNull("Should not yet have a delivery", delivery);
+
+        // Send the necessary responses to open/begin/attach as well as a transfer
+        transport.handleFrame(new TransportFrame(0, new Open(), null));
+
+        Begin begin = new Begin();
+        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        begin.setNextOutgoingId(UnsignedInteger.ONE);
+        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, begin, null));
+
+        Attach attach = new Attach();
+        attach.setHandle(UnsignedInteger.ZERO);
+        attach.setRole(Role.SENDER);
+        attach.setName(linkName);
+        attach.setInitialDeliveryCount(UnsignedInteger.ZERO);
+        transport.handleFrame(new TransportFrame(0, attach, null));
+
+        assertEndpointState(receiver, EndpointState.ACTIVE, EndpointState.ACTIVE);
+        assertEndpointState(session, EndpointState.ACTIVE, EndpointState.ACTIVE);
+
+        String deliveryTag = "tag1";
+        String messageContent = "content1";
+        handleTransfer(transport, 1, deliveryTag, messageContent);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
+
+        delivery = verifyDelivery(receiver, deliveryTag, messageContent);
+        assertNotNull("Should now have a delivery", delivery);
+
+        delivery.disposition(Accepted.getInstance());
+
+        assertEquals("Expected the delivery to be on the transport work list", delivery, connection.getTransportWorkHead());
+
+        pumpMockTransport(transport);
+
+        assertNull("Expected the delivery to cleared from the transport work list", connection.getTransportWorkHead());
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 5, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(4) instanceof Disposition);
+
+        session.close();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 6, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(5) instanceof End);
+
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+        assertEndpointState(session, EndpointState.CLOSED, EndpointState.ACTIVE);
+
+        // Send the necessary responses to End
+        End end = new End();
+        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        begin.setNextOutgoingId(UnsignedInteger.ONE);
+        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, end, null));
+
+        assertEndpointState(session, EndpointState.CLOSED, EndpointState.CLOSED);
+
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+
+        session.free();
+
+        pumpMockTransport(transport);
+
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 6, transport.writes.size());
+
+        connection.close();
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 7, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(6) instanceof Close);
+    }
+
+    /**
+     * Verify that the transport doesnt retain deliveries+link+session when a session is closed
+     * and freed while there is an active sender link with deliveries still outstanding.
+     */
+    @Test
+    public void testTransportWorkListDoesntLeakDeliveriesEtcFromSessionFreedWithActiveSenderWithOutstandingDeliveries()
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        ConnectionImpl connection = new ConnectionImpl();
+        transport.bind(connection);
+
+        connection.open();
+
+        Session session = connection.session();
+        session.open();
+
+        String linkName = "myClientSender";
+        Sender sender = session.sender(linkName);
+        sender.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+        assertTrue("Unexpected frame type", transport.writes.get(1) instanceof Begin);
+        assertTrue("Unexpected frame type", transport.writes.get(2) instanceof Attach);
+
+        assertNull("Should not yet have a delivery", sender.current());
+
+        // Send the necessary responses to open/begin/attach as well as a transfer
+        transport.handleFrame(new TransportFrame(0, new Open(), null));
+
+        Begin begin = new Begin();
+        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        begin.setNextOutgoingId(UnsignedInteger.ONE);
+        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, begin, null));
+
+        // Give the necessary response to attach for sender and grant some credit
+        Attach attach = new Attach();
+        attach.setHandle(UnsignedInteger.ZERO);
+        attach.setRole(Role.RECEIVER);
+        attach.setName(linkName);
+        attach.setInitialDeliveryCount(UnsignedInteger.ZERO);
+        transport.handleFrame(new TransportFrame(0, attach, null));
+
+        int credit = 10;
+        Flow flow = new Flow();
+        flow.setHandle(UnsignedInteger.ZERO);
+        flow.setDeliveryCount(UnsignedInteger.ZERO);
+        flow.setNextIncomingId(UnsignedInteger.ONE);
+        flow.setNextOutgoingId(UnsignedInteger.ZERO);
+        flow.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        flow.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        flow.setLinkCredit(UnsignedInteger.valueOf(credit));
+
+        transport.handleFrame(new TransportFrame(0, flow, null));
+
+        assertEndpointState(sender, EndpointState.ACTIVE, EndpointState.ACTIVE);
+        assertEndpointState(session, EndpointState.ACTIVE, EndpointState.ACTIVE);
+
+        assertEquals("Expected the sender to have credit", credit, sender.getCredit());
+
+        Delivery delivery = sendMessage(sender, "tag1", "content1");
+
+        assertEquals("Expected the delivery to be on the transport work list", delivery, connection.getTransportWorkHead());
+        assertEquals("Expected the sender to have 1 less credit", credit -1 , sender.getCredit());
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(3) instanceof Transfer);
+
+        assertNull("Expected the delivery to cleared from the transport work list", connection.getTransportWorkHead());
+
+        session.close();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 5, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(4) instanceof End);
+
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+        assertEndpointState(session, EndpointState.CLOSED, EndpointState.ACTIVE);
+
+        // Send the necessary responses to End
+        End end = new End();
+        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        begin.setNextOutgoingId(UnsignedInteger.ONE);
+        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, end, null));
+
+        assertEndpointState(session, EndpointState.CLOSED, EndpointState.CLOSED);
+
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+
+        session.free();
+
+        pumpMockTransport(transport);
+
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 5, transport.writes.size());
+
+        connection.close();
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 6, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(5) instanceof Close);
+    }
 }

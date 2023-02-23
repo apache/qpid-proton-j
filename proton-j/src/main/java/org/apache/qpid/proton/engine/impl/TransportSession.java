@@ -70,6 +70,7 @@ class TransportSession
     private int _unsettledIncomingSize;
     private boolean _endReceived;
     private boolean _beginSent;
+    private boolean _endSent;
 
     TransportSession(TransportImpl transport, SessionImpl session)
     {
@@ -526,5 +527,15 @@ class TransportSession
     public void sentBegin()
     {
         _beginSent = true;
+    }
+
+    public boolean endSent()
+    {
+        return _endSent;
+    }
+
+    public void sentEnd()
+    {
+        _endSent = true;
     }
 }
