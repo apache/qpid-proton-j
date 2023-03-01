@@ -4981,10 +4981,6 @@ public class TransportImplTest
 
         // Send the necessary responses to End
         End end = new End();
-        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
-        begin.setNextOutgoingId(UnsignedInteger.ONE);
-        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
-        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
         transport.handleFrame(new TransportFrame(0, end, null));
 
         assertEndpointState(session, EndpointState.CLOSED, EndpointState.CLOSED);
@@ -5035,7 +5031,7 @@ public class TransportImplTest
 
         assertNull("Should not yet have a delivery", sender.current());
 
-        // Send the necessary responses to open/begin/attach as well as a transfer
+        // Send the necessary responses to open/begin
         transport.handleFrame(new TransportFrame(0, new Open(), null));
 
         Begin begin = new Begin();
@@ -5094,10 +5090,6 @@ public class TransportImplTest
 
         // Send the necessary responses to End
         End end = new End();
-        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
-        begin.setNextOutgoingId(UnsignedInteger.ONE);
-        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
-        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
         transport.handleFrame(new TransportFrame(0, end, null));
 
         assertEndpointState(session, EndpointState.CLOSED, EndpointState.CLOSED);

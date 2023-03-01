@@ -561,18 +561,17 @@ public class TransportImpl extends EndpointImpl
         SessionImpl session = snd.getSession();
         TransportSession tpSession = session.getTransportSession();
 
-        if (tpSession.endSent()) {
+        if (tpSession != null && tpSession.endSent()) {
             // Too late to action this work, clear it.
             return true;
         }
 
-        boolean localChannelSet = tpSession.isLocalChannelSet();
         boolean wasDone = delivery.isDone();
 
         if(!delivery.isDone() &&
            (delivery.getDataLength() > 0 || delivery != snd.current()) &&
            tpSession.hasOutgoingCredit() && tpLink.hasCredit() &&
-           localChannelSet &&
+           tpSession.isLocalChannelSet() &&
            tpLink.getLocalHandle() != null && !_frameWriter.isFull())
         {
             DeliveryImpl inProgress = tpLink.getInProgressDelivery();
@@ -682,7 +681,7 @@ public class TransportImpl extends EndpointImpl
             }
         }
 
-        if(wasDone && delivery.getLocalState() != null && localChannelSet)
+        if(wasDone && delivery.getLocalState() != null && tpSession.isLocalChannelSet())
         {
             TransportDelivery tpDelivery = delivery.getTransportDelivery();
             // Use cached object as holder of data for immediate write to the FrameWriter
