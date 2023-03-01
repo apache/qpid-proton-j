@@ -5109,4 +5109,90 @@ public class TransportImplTest
         assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 6, transport.writes.size());
         assertTrue("Unexpected frame type", transport.writes.get(5) instanceof Close);
     }
+
+    /**
+     * Verify that the transport work list doesnt retain delivery (+link+session) object when a sender link is closed
+     * closed and freed while there a buffered/not-transferred message outstanding, as they can no longer be transferred.
+     */
+    @Test
+    public void testTransportWorkListDoesntLeakDeliveriesEtcFromSenderLinkFreedWithBufferedSend()
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        ConnectionImpl connection = new ConnectionImpl();
+        transport.bind(connection);
+
+        connection.open();
+
+        Session session = connection.session();
+        session.open();
+
+        String linkName = "myClientSender";
+        Sender sender = session.sender(linkName);
+        sender.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+        assertTrue("Unexpected frame type", transport.writes.get(1) instanceof Begin);
+        assertTrue("Unexpected frame type", transport.writes.get(2) instanceof Attach);
+
+        assertNull("Should not yet have a delivery", sender.current());
+
+        // Send the necessary responses to open/begin/attach. DO NOT give any credit.
+        transport.handleFrame(new TransportFrame(0, new Open(), null));
+
+        Begin begin = new Begin();
+        begin.setRemoteChannel(UnsignedShort.valueOf((short) 0));
+        begin.setNextOutgoingId(UnsignedInteger.ONE);
+        begin.setIncomingWindow(UnsignedInteger.valueOf(1024));
+        begin.setOutgoingWindow(UnsignedInteger.valueOf(1024));
+        transport.handleFrame(new TransportFrame(0, begin, null));
+
+        Attach attach = new Attach();
+        attach.setHandle(UnsignedInteger.ZERO);
+        attach.setRole(Role.RECEIVER);
+        attach.setName(linkName);
+        attach.setInitialDeliveryCount(UnsignedInteger.ZERO);
+        transport.handleFrame(new TransportFrame(0, attach, null));
+
+        assertEndpointState(sender, EndpointState.ACTIVE, EndpointState.ACTIVE);
+        assertEndpointState(session, EndpointState.ACTIVE, EndpointState.ACTIVE);
+
+        assertEquals("Expected the sender to have no credit", 0, sender.getCredit());
+
+        Delivery delivery = sendMessage(sender, "tag1", "content1");
+
+        assertEquals("Expected the delivery to be on the transport work list", delivery, connection.getTransportWorkHead());
+        assertEquals("Expected the sender to have queued message", 1 , sender.getQueued());
+
+        pumpMockTransport(transport);
+
+        // Expect no more frames to have been sent, delivery cant be sent without credit
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+
+        assertEquals("Expected the delivery to be on the transport work list", delivery, connection.getTransportWorkHead());
+
+        // Send a remote request to close the sender and action it
+        Detach detach = new Detach();
+        detach.setHandle(UnsignedInteger.ZERO);
+        detach.setClosed(true);
+        transport.handleFrame(new TransportFrame(0, detach, null));
+
+        assertEndpointState(sender, EndpointState.ACTIVE, EndpointState.CLOSED);
+
+        sender.close();
+        sender.free();
+
+        pumpMockTransport(transport);
+
+        assertEndpointState(sender, EndpointState.CLOSED, EndpointState.CLOSED);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 4, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(3) instanceof Detach);
+
+        // Check the delivery isnt in the work list as it clearly cant be sent now the sender is closed.
+        assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
+    }
 }
