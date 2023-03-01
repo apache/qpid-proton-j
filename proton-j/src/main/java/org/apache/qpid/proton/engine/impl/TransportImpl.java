@@ -469,6 +469,7 @@ public class TransportImpl extends EndpointImpl
                         }
 
                         writeFrame(transportSession.getLocalChannel(), detach, null, null);
+                        transportLink.sentDetach();
                     }
 
                     endpoint.clearModified();
@@ -697,6 +698,11 @@ public class TransportImpl extends EndpointImpl
             cachedDisposition.setState(delivery.getLocalState());
 
             writeFrame(tpSession.getLocalChannel(), cachedDisposition, null, null);
+        }
+
+        if(!wasDone && tpLink != null && tpLink.detachSent()) {
+            // Too late to action this work, clear it.
+            return true;
         }
 
         return !delivery.isBuffered();
