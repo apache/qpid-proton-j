@@ -55,6 +55,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.mockito.Mockito;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.*;
 
 @RunWith(Parameterized.class)
 public class ReactorTest {
@@ -385,19 +388,6 @@ public class ReactorTest {
     }
 
 
-    private static class SinkHandler extends BaseHandler {
-        protected int received = 0;
-
-        @Override
-        public void onDelivery(Event event) {
-            Delivery dlv = event.getDelivery();
-            if (!dlv.isPartial()) {
-                dlv.settle();
-                ++received;
-            }
-        }
-    }
-
     private static class SourceHandler extends BaseHandler {
         private int remaining;
 
@@ -446,7 +436,20 @@ public class ReactorTest {
         // XXX: a window of 1 doesn't work unless the flowcontroller is
         // added after the thing that settles the delivery
         sh.add(new FlowController(window));
-        SinkHandler snk = new SinkHandler();
+        // Create variables for tracking behaviors of mock object
+		int[] snkReceived = new int[] { 0 };
+		// Construct mock object
+		BaseHandler snk = spy(BaseHandler.class);
+		// Method Stubs
+		doAnswer((stubInvo) -> {
+			Event event = stubInvo.getArgument(0);
+			Delivery dlv = event.getDelivery();
+			if (!dlv.isPartial()) {
+				dlv.settle();
+				++snkReceived[0];
+			}
+			return null;
+		}).when(snk).onDelivery(any(Event.class));
         sh.add(snk);
 
         SourceHandler src = new SourceHandler(count);
@@ -454,7 +457,7 @@ public class ReactorTest {
                                  src);
         reactor.run();
         reactor.free();
-        assertEquals("Did not receive the expected number of messages", count, snk.received);
+        assertEquals("Did not receive the expected number of messages", count, snkReceived[0]);
         checkForLeaks();
     }
 
