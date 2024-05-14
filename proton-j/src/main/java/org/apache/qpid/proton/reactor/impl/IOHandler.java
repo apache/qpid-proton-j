@@ -327,6 +327,8 @@ public class IOHandler extends BaseHandler {
                     // Ignore
                 }
             }
+            Transport transport = ((SelectableImpl)selectable).getTransport();
+            transport.close_tail();
         }
     };
 
