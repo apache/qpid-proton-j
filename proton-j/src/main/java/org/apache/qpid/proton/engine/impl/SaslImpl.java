@@ -84,7 +84,7 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     private Symbol _chosenMechanism;
 
     private Role _role;
-    private boolean _allowSkip = true;
+    private boolean _allowSkip = false;
 
     private SaslListener _saslListener;
 

@@ -470,6 +470,28 @@ public class SaslTest extends EngineTestBase
         assertEquals(0, saslBodies.size());
     }
 
+    @Test
+    public void testSaslRequiredRefusesBare() throws Exception
+    {
+        getClient().transport = Proton.transport();
+        getServer().transport = Proton.transport();
+
+        Sasl serverSasl = getServer().transport.sasl();
+        serverSasl.server();
+        serverSasl.setMechanisms(TESTMECH1, TESTMECH2);
+        assertEquals("Server should not yet know the remote's chosen mechanism.",
+                     0,
+                     serverSasl.getRemoteMechanisms().length);
+
+        try {
+            pumpClientToServer();
+            fail("Expected exception");
+        } catch (TransportException te) {
+            assertNotNull(te.getMessage());
+            assertTrue(te.getMessage().contains("AMQP SASL header mismatch value 0, expecting 3. In state: HEADER4"));
+        }
+    }
+
     private byte[] fillBytes(String seedString, int length)
     {
         byte[] seed = seedString.getBytes(StandardCharsets.UTF_8);
