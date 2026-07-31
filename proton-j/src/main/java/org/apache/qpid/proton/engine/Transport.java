@@ -79,7 +79,7 @@ public interface Transport extends Endpoint
     public static final int TRACE_FRM = 2;
     public static final int TRACE_DRV = 4;
 
-    public static final int DEFAULT_MAX_FRAME_SIZE = -1;
+    public static final int DEFAULT_MAX_FRAME_SIZE = 65535;
 
     /** the lower bound for the agreed maximum frame size (in bytes). */
     public int MIN_MAX_FRAME_SIZE = 512;

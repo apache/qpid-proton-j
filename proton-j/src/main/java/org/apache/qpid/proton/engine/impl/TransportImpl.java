@@ -111,7 +111,7 @@ public class TransportImpl extends EndpointImpl
 
     private int _maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
     private int _remoteMaxFrameSize = MIN_MAX_FRAME_SIZE;
-    private int _outboundFrameSizeLimit = 0;
+    private int _outboundFrameSizeLimit = DEFAULT_MAX_FRAME_SIZE;
     private int _channelMax       = CHANNEL_MAX_LIMIT;
     private int _remoteChannelMax = CHANNEL_MAX_LIMIT;
     private int _maxTransfersPerDelivery = TRANSFERS_PER_DELIVERY_MAX_LIMIT;

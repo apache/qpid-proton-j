@@ -93,7 +93,7 @@ public class TransportImplTest
     private static final TransportFrame TRANSPORT_FRAME_BEGIN = new TransportFrame(CHANNEL_ID, new Begin(), null);
     private static final TransportFrame TRANSPORT_FRAME_OPEN = new TransportFrame(CHANNEL_ID, new Open(), null);
 
-    private static final int BUFFER_SIZE = 8 * 1024;
+    private static final int BUFFER_SIZE = 70 * 1024;
 
     @Test
     public void testInput()
@@ -1111,7 +1111,9 @@ public class TransportImplTest
         assertEquals("Unexpected session capacity", sessionCapacity, session.getIncomingCapacity());
 
         int expectedWindowSize = 2147483647;
-        if(setSessionCapacity && setFrameSize) {
+        if(setSessionCapacity && !setFrameSize) {
+            expectedWindowSize = (100*1024) / TransportImpl.DEFAULT_MAX_FRAME_SIZE;
+        } else if(setSessionCapacity && setFrameSize) {
             expectedWindowSize = (100*1024) / (5*1024); // capacity / frameSize
         }
 
@@ -2714,6 +2716,37 @@ public class TransportImplTest
         doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(512), 0, 5700, 12);
     }
 
+    @Test
+    public void testDefaultMaxFrameSize()
+    {
+        MockTransportImpl transport = new MockTransportImpl();
+        Connection connection = Proton.connection();
+        transport.bind(connection);
+        connection.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        final FrameBody frameBody = transport.writes.get(0);
+        assertTrue("Unexpected frame type", frameBody instanceof Open);
+
+        // Check emitted value on the Open
+        assertEquals(UnsignedInteger.valueOf(65535), ((Open) frameBody).getMaxFrameSize());
+    }
+
+    @Test
+    public void testDefaultMaxOutgoingFrameSize()
+    {
+        final int payloadLength = 65500;
+        // One transfer frame (allowing some space for transfer performative itself)
+        doMaxFrameSizeTestImpl(null, 0, payloadLength, 1);
+        // Two transfer frames with slightly bigger payload definitely pushing it over theoutgoing limit.
+        doMaxFrameSizeTestImpl(null, 0, payloadLength + 100, 2);
+
+        // Reduce the peer max frame size below the default outgoing frame.
+        // Now expecting two frames for the same payload size as originally.
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(64000), 0, payloadLength, 2);
+    }
 
     @Test
     public void testMaxFrameSizeOutgoingFrameSizeLimitHasEffect()
