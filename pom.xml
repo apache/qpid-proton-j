@@ -47,7 +47,8 @@
     <maven.compiler.target>1.8</maven.compiler.target>
 
     <!-- surefire forked jvm arguments -->
-    <argLine>-Xmx2g -enableassertions ${jacoco-config}</argLine>
+    <jacoco-config></jacoco-config>
+    <argLine>-Xmx2g -enableassertions @{jacoco-config}</argLine>
 
     <project.build.outputTimestamp>2022-08-30T16:53:30Z</project.build.outputTimestamp>
   </properties>
