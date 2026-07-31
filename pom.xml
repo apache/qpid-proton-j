@@ -36,7 +36,7 @@
     <junit-version>4.13.2</junit-version>
     <mockito-version>4.11.0</mockito-version>
     <jython-version>2.7.2</jython-version>
-    <bcpkix-jdk15on-version>1.70</bcpkix-jdk15on-version>
+    <bcpkix-jdk18on-version>1.85</bcpkix-jdk18on-version>
 
     <!-- Plugin versions -->
     <maven-bundle-plugin-version>5.1.8</maven-bundle-plugin-version>
@@ -81,8 +81,8 @@
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
-        <artifactId>bcpkix-jdk15on</artifactId>
-        <version>${bcpkix-jdk15on-version}</version>
+        <artifactId>bcpkix-jdk18on</artifactId>
+        <version>${bcpkix-jdk18on-version}</version>
         <scope>test</scope>
       </dependency>
     </dependencies>

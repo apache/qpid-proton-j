@@ -103,7 +103,7 @@ mvn test \
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk15on</artifactId>
+      <artifactId>bcpkix-jdk18on</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
