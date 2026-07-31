@@ -26,7 +26,7 @@
 
   <groupId>org.apache.qpid</groupId>
   <artifactId>proton-j-parent</artifactId>
-  <version>0.35.0-SNAPSHOT</version>
+  <version>0.35.0</version>
   <packaging>pom</packaging>
 
   <name>Proton-J Parent</name>
@@ -47,10 +47,10 @@
     <maven.compiler.target>1.8</maven.compiler.target>
 
     <!-- surefire forked jvm arguments -->
-    <jacoco-config></jacoco-config>
+    <jacoco-config />
     <argLine>-Xmx2g -enableassertions @{jacoco-config}</argLine>
 
-    <project.build.outputTimestamp>2022-08-30T16:53:30Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2026-07-31T17:43:40Z</project.build.outputTimestamp>
   </properties>
 
   <dependencyManagement>
@@ -212,7 +212,7 @@
     <connection>scm:git:https://gitbox.apache.org/repos/asf/qpid-proton-j.git</connection>
     <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/qpid-proton-j.git</developerConnection>
     <url>https://gitbox.apache.org/repos/asf?p=qpid-proton-j.git</url>
-    <tag>HEAD</tag>
+    <tag>0.35.0</tag>
   </scm>
   <issueManagement>
     <url>https://issues.apache.org/jira/browse/PROTON</url>
