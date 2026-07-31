@@ -161,4 +161,7 @@ public interface Data
     DescribedType getDescribedType();
 
     String format();
+
+    int getZeroWidthElementLimit();
+    void setZeroWidthElementLimit(int zeroWidthElementLimit);
 }

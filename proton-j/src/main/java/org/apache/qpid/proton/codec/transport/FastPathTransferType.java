@@ -16,6 +16,9 @@
  */
 package org.apache.qpid.proton.codec.transport;
 
+import static org.apache.qpid.proton.codec.ValidationSupport.validateListCount;
+import static org.apache.qpid.proton.codec.ValidationSupport.validateListSize;
+
 import java.util.Collection;
 
 import org.apache.qpid.proton.amqp.Symbol;
@@ -31,6 +34,7 @@ import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
 import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
@@ -63,36 +67,62 @@ public class FastPathTransferType implements AMQPType<Transfer>, FastPathDescrib
     @Override
     public Transfer readValue() {
         DecoderImpl decoder = getDecoder();
-        byte typeCode = decoder.getBuffer().get();
+        ReadableBuffer buffer = decoder.getBuffer();
 
-        @SuppressWarnings("unused")
-        int size = 0;
-        int count = 0;
-
-        switch (typeCode) {
-            case EncodingCodes.LIST0:
-                // TODO - Technically invalid however old decoder also allowed this.
-                break;
-            case EncodingCodes.LIST8:
-                size = ((int)decoder.getBuffer().get()) & 0xff;
-                count = ((int)decoder.getBuffer().get()) & 0xff;
-                break;
-            case EncodingCodes.LIST32:
-                size = decoder.getBuffer().getInt();
-                count = decoder.getBuffer().getInt();
-                break;
-            default:
-                throw new DecodeException("Incorrect type found in Transfer encoding: " + typeCode);
-        }
-
-        if (count < 1) {
-            throw new DecodeException("The handle field cannot be omitted");
-        }
-
+        decoder.increaseDecodeDepth();
         try {
-            return readFields(decoder, count);
-        } catch (NullPointerException npe) {
-            throw new DecodeException("Unexpected null value - mandatory field not set? (" + npe.getMessage() + ")", npe);
+            byte typeCode = buffer.get();
+
+            int size = 0;
+            int count = 0;
+
+            final int oldLimit = buffer.limit();
+            final int newLimit;
+
+            switch (typeCode) {
+                case EncodingCodes.LIST0:
+                    // Technically invalid however old decoder also allowed this. Is rejected by later field check.
+                    newLimit = buffer.position();
+                    break;
+                case EncodingCodes.LIST8:
+                    size = ((int) buffer.get()) & 0xff;
+                    validateListSize(size, buffer.remaining());
+                    newLimit = buffer.position() + size;
+                    count = ((int) buffer.get()) & 0xff;
+                    validateListCount(size, count, buffer.remaining());
+                    break;
+                case EncodingCodes.LIST32:
+                    size = buffer.getInt();
+                    validateListSize(size, buffer.remaining());
+                    newLimit = buffer.position() + size;
+                    count = buffer.getInt();
+                    validateListCount(size, count, buffer.remaining());
+                    break;
+                default:
+                    throw new DecodeException("Incorrect type found in Transfer encoding: " + typeCode);
+            }
+
+            if (count < 1) {
+                throw new DecodeException("The handle field cannot be omitted");
+            }
+
+            try {
+                buffer.limit(newLimit);
+
+                final Transfer transfer = readFields(decoder, count);
+
+                if (buffer.position() != newLimit) {
+                    throw new DecodeException("Transfer incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                }
+
+                return transfer;
+            } catch (NullPointerException npe) {
+                throw new DecodeException("Unexpected null value - mandatory field not set? (" + npe.getMessage() + ")", npe);
+            } finally {
+                buffer.limit(oldLimit);
+            }
+        } finally {
+            decoder.decreaseDecodeDepth();
         }
     }
 
@@ -145,7 +175,15 @@ public class FastPathTransferType implements AMQPType<Transfer>, FastPathDescrib
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

@@ -83,6 +83,7 @@ public class FastPathDataType implements AMQPType<Data>, FastPathDescribedTypeCo
 
     @Override
     public Data readValue() {
+        // No depth as this is a [described] binary primitive read with fixed decoding
         ReadableBuffer buffer = getDecoder().getBuffer();
         byte encodingCode = buffer.get();
 
@@ -114,7 +115,15 @@ public class FastPathDataType implements AMQPType<Data>, FastPathDescribedTypeCo
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

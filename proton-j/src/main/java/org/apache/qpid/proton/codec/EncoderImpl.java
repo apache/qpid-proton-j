@@ -80,7 +80,12 @@ public final class EncoderImpl implements ByteBufferEncoder
 
     private final ArrayType             _arrayType;
 
-    public EncoderImpl(DecoderImpl decoder)
+    public EncoderImpl(final DecoderImpl decoder)
+    {
+        this(decoder, false);
+    }
+
+    public EncoderImpl(final DecoderImpl decoder, final boolean sasl)
     {
         _decoder                = decoder;
         _nullType               = new NullType(this, decoder);
@@ -107,7 +112,7 @@ public final class EncoderImpl implements ByteBufferEncoder
 
 
         _binaryType             = new BinaryType(this, decoder);
-        _symbolType             = new SymbolType(this, decoder);
+        _symbolType             = new SymbolType(this, decoder, sasl);
         _stringType             = new StringType(this, decoder);
 
         _listType               = new ListType(this, decoder);

@@ -327,4 +327,14 @@ public interface Transport extends Endpoint
     void setOutboundFrameSizeLimit(int size);
 
     int getOutboundFrameSizeLimit();
+
+    /**
+     * Set an upper bound on the number of transfer frames per incoming delivery that
+     * are permitted. Defaults to 65535. 0 means no limit.
+     *
+     * @param maxTransfersPerDelivery the max number of transfers per delivery
+     */
+    void setMaxTransfersPerDelivery(int maxTransfersPerDelivery);
+
+    int getMaxTransfersPerDelivery();
 }

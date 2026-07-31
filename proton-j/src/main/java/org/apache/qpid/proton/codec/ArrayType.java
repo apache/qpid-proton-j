@@ -111,6 +111,10 @@ public class ArrayType implements PrimitiveType<Object[]>
         }
         else
         {
+            if (val[0] == null) {
+                throw new IllegalArgumentException("Cannot encode array with null first element");
+            }
+
             AMQPType underlyingType = encoder.getTypeFromClass(val.getClass().getComponentType());
             boolean checkTypes = false;
 
@@ -161,8 +165,26 @@ public class ArrayType implements PrimitiveType<Object[]>
                     checkTypes = true;
                     underlyingType = encoder.getType(val[0]);
                 }
-                TypeEncoding underlyingEncoding = underlyingType.getEncoding(val[0]);
+
                 TypeEncoding canonicalEncoding = underlyingType.getCanonicalEncoding();
+                if (checkTypes && canonicalEncoding != null)
+                {
+                    for (int i = 0; i < val.length; i++)
+                    {
+                        if (encoder.getType(val[i]) != underlyingType)
+                        {
+                            throw new IllegalArgumentException("Non matching types " + underlyingType + " and "
+                                    + encoder.getType(val[i]) + " in array");
+                        }
+                    }
+                }
+
+                if (canonicalEncoding != null)
+                {
+                    return canonicalEncoding;
+                }
+
+                TypeEncoding underlyingEncoding = underlyingType.getEncoding(val[0]);
 
                 for(int i = 0; i < val.length && (checkTypes || underlyingEncoding != canonicalEncoding); i++)
                 {
@@ -281,6 +303,27 @@ public class ArrayType implements PrimitiveType<Object[]>
         return size;
     }
 
+    private static void validateSizeInitial(int size, DecoderImpl decoder)
+    {
+        if (size < 0)
+        {
+            throw new DecodeException("Array size " + size + " cant be negative");
+        }
+
+        if (size > decoder.getByteBufferRemaining())
+        {
+            throw new DecodeException("Array size " + size + " cant be more than remaining bytes " + decoder.getByteBufferRemaining());
+        }
+    }
+
+    private static void validateCountInitial(int count)
+    {
+        if (count < 0)
+        {
+            throw new DecodeException("Array element count " + count + " cant be negative");
+        }
+    }
+
     @Override
     public ArrayEncoding getCanonicalEncoding()
     {
@@ -310,20 +353,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private ArrayEncoding getEncoding(final boolean[] a)
     {
-        return a.length < 254 || a.length <= 255 && allSameValue(a) ? _shortArrayEncoding : _arrayEncoding;
-    }
-
-    private boolean allSameValue(final boolean[] a)
-    {
-        boolean val = a[0];
-        for(int i = 1; i < a.length; i++)
-        {
-            if(val != a[i])
-            {
-                return false;
-            }
-        }
-        return true;
+        return a.length < 254 ? _shortArrayEncoding : _arrayEncoding;
     }
 
     public void write(byte[] a)
@@ -359,19 +389,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private ArrayEncoding getEncoding(final int[] a)
     {
-        return a.length < 63 || (a.length < 254 && allSmallInts(a)) ? _shortArrayEncoding : _arrayEncoding;
-    }
-
-    private boolean allSmallInts(final int[] a)
-    {
-        for(int i = 0; i < a.length; i++)
-        {
-            if(a[i] < -128 || a[i] > 127)
-            {
-                return false;
-            }
-        }
-        return true;
+        return a.length < 64 ? _shortArrayEncoding : _arrayEncoding;
     }
 
     public void write(long[] a)
@@ -383,19 +401,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private ArrayEncoding getEncoding(final long[] a)
     {
-        return a.length < 31 || (a.length < 254 && allSmallLongs(a)) ? _shortArrayEncoding : _arrayEncoding;
-    }
-
-    private boolean allSmallLongs(final long[] a)
-    {
-        for(int i = 0; i < a.length; i++)
-        {
-            if(a[i] < -128L || a[i] > 127L)
-            {
-                return false;
-            }
-        }
-        return true;
+        return a.length < 32 ? _shortArrayEncoding : _arrayEncoding;
     }
 
     public void write(float[] a)
@@ -407,7 +413,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private ArrayEncoding getEncoding(final float[] a)
     {
-        return a.length < 63 ? _shortArrayEncoding : _arrayEncoding;
+        return a.length < 64 ? _shortArrayEncoding : _arrayEncoding;
     }
 
     public void write(double[] a)
@@ -419,7 +425,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private ArrayEncoding getEncoding(final double[] a)
     {
-        return a.length < 31 ? _shortArrayEncoding : _arrayEncoding;
+        return a.length < 32 ? _shortArrayEncoding : _arrayEncoding;
     }
 
     public void write(char[] a)
@@ -431,7 +437,7 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private ArrayEncoding getEncoding(final char[] a)
     {
-        return a.length < 63 ? _shortArrayEncoding : _arrayEncoding;
+        return a.length < 64 ? _shortArrayEncoding : _arrayEncoding;
     }
 
     private class AllArrayEncoding
@@ -648,18 +654,82 @@ public class ArrayType implements PrimitiveType<Object[]>
         public Object[] readValue()
         {
             DecoderImpl decoder = getDecoder();
-            int size = decoder.readRawInt();
-            int count = decoder.readRawInt();
-            return decodeArray(decoder, count);
+            ReadableBuffer buffer = decoder.getBuffer();
+
+            decoder.increaseDecodeDepth();
+            try
+            {
+                int size = decoder.readRawInt();
+                validateSizeInitial(size, decoder);
+                final int oldLimit = buffer.limit();
+                final int newLimit = buffer.position() + size;
+
+                try
+                {
+                    buffer.limit(newLimit);
+
+                    int count = decoder.readRawInt();
+                    validateCountInitial(count);
+
+                    final Object[] decodedArray = decodeArray(decoder, count, size);
+
+                    if (buffer.position() != newLimit)
+                    {
+                        throw new DecodeException("Array incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                    }
+
+                    return decodedArray;
+                }
+                finally
+                {
+                    buffer.limit(oldLimit);
+                }
+            }
+            finally
+            {
+                decoder.decreaseDecodeDepth();
+            }
         }
 
         @Override
         public Object readValueArray()
         {
             DecoderImpl decoder = getDecoder();
-            int size = decoder.readRawInt();
-            int count = decoder.readRawInt();
-            return decodeArrayAsObject(decoder, count);
+            ReadableBuffer buffer = decoder.getBuffer();
+
+            decoder.increaseDecodeDepth();
+            try
+            {
+                int size = decoder.readRawInt();
+                validateSizeInitial(size, decoder);
+                final int oldLimit = buffer.limit();
+                final int newLimit = buffer.position() + size;
+
+                try
+                {
+                    buffer.limit(newLimit);
+
+                    int count = decoder.readRawInt();
+                    validateCountInitial(count);
+
+                    final Object decodedArray = decodeArrayAsObject(decoder, count, size);
+
+                    if (buffer.position() != newLimit)
+                    {
+                        throw new DecodeException("Array incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                    }
+
+                    return decodedArray;
+                }
+                finally
+                {
+                    buffer.limit(oldLimit);
+                }
+            }
+            finally
+            {
+                decoder.decreaseDecodeDepth();
+            }
         }
 
         @Override
@@ -668,6 +738,7 @@ public class ArrayType implements PrimitiveType<Object[]>
             DecoderImpl decoder = getDecoder();
             ReadableBuffer buffer = decoder.getBuffer();
             int size = decoder.readRawInt();
+            validateSizeInitial(size, decoder);
             buffer.position(buffer.position() + size);
         }
     }
@@ -941,18 +1012,80 @@ public class ArrayType implements PrimitiveType<Object[]>
         public Object[] readValue()
         {
             DecoderImpl decoder = getDecoder();
-            int size = ((int)decoder.readRawByte()) & 0xFF;
-            int count = ((int)decoder.readRawByte()) & 0xFF;
-            return decodeArray(decoder, count);
+            ReadableBuffer buffer = decoder.getBuffer();
+
+            decoder.increaseDecodeDepth();
+            try
+            {
+                int size = ((int)decoder.readRawByte()) & 0xFF;
+                validateSizeInitial(size, decoder);
+
+                final int oldLimit = buffer.limit();
+                final int newLimit = buffer.position() + size;
+
+                try
+                {
+                    buffer.limit(newLimit);
+                    int count = ((int)decoder.readRawByte()) & 0xFF;
+                    validateCountInitial(count);
+
+                    Object[] decodedArray = decodeArray(decoder, count, size);
+                    if (buffer.position() != newLimit)
+                    {
+                        throw new DecodeException("Array incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                    }
+
+                    return decodedArray;
+                }
+                finally
+                {
+                    buffer.limit(oldLimit);
+                }
+            }
+            finally
+            {
+                decoder.decreaseDecodeDepth();
+            }
         }
 
         @Override
         public Object readValueArray()
         {
             DecoderImpl decoder = getDecoder();
-            int size = ((int)decoder.readRawByte()) & 0xFF;
-            int count = ((int)decoder.readRawByte()) & 0xFF;
-            return decodeArrayAsObject(decoder, count);
+            ReadableBuffer buffer = decoder.getBuffer();
+
+            decoder.increaseDecodeDepth();
+            try
+            {
+                int size = ((int)decoder.readRawByte()) & 0xFF;
+                validateSizeInitial(size, decoder);
+
+                final int oldLimit = buffer.limit();
+                final int newLimit = buffer.position() + size;
+
+                try
+                {
+                    buffer.limit(newLimit);
+                    int count = ((int)decoder.readRawByte()) & 0xFF;
+                    validateCountInitial(count);
+
+                    Object decodedArray = decodeArrayAsObject(decoder, count, size);
+                    if (buffer.position() != newLimit)
+                    {
+                        throw new DecodeException("Array incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                    }
+
+                    return decodedArray;
+                }
+                finally
+                {
+                    buffer.limit(oldLimit);
+                }
+            }
+            finally
+            {
+                decoder.decreaseDecodeDepth();
+            }
         }
 
         @Override
@@ -961,28 +1094,14 @@ public class ArrayType implements PrimitiveType<Object[]>
             DecoderImpl decoder = getDecoder();
             ReadableBuffer buffer = decoder.getBuffer();
             int size = ((int)decoder.readRawByte()) & 0xFF;
+            validateSizeInitial(size, decoder);
             buffer.position(buffer.position() + size);
         }
     }
 
     private BooleanType.BooleanEncoding getUnderlyingEncoding(final boolean[] a)
     {
-        if(a.length == 0)
-        {
-            return _booleanType.getCanonicalEncoding();
-        }
-        else
-        {
-            boolean val = a[0];
-            for(int i = 1; i < a.length; i++)
-            {
-                if(val != a[i])
-                {
-                    return _booleanType.getCanonicalEncoding();
-                }
-            }
-            return _booleanType.getEncoding(val);
-        }
+        return _booleanType.getCanonicalEncoding();
     }
 
     private ByteType.ByteEncoding getUnderlyingEncoding(final byte[] a)
@@ -997,26 +1116,12 @@ public class ArrayType implements PrimitiveType<Object[]>
 
     private IntegerType.IntegerEncoding getUnderlyingEncoding(final int[] a)
     {
-        if(a.length == 0 || !allSmallInts(a))
-        {
-            return _integerType.getCanonicalEncoding();
-        }
-        else
-        {
-            return _integerType.getEncoding(a[0]);
-        }
+        return _integerType.getCanonicalEncoding();
     }
 
     private LongType.LongEncoding getUnderlyingEncoding(final long[] a)
     {
-        if(a.length == 0 || !allSmallLongs(a))
-        {
-            return _longType.getCanonicalEncoding();
-        }
-        else
-        {
-            return _longType.getEncoding(a[0]);
-        }
+        return _longType.getCanonicalEncoding();
     }
 
     private FloatType.FloatEncoding getUnderlyingEncoding(final float[] a)
@@ -1034,20 +1139,18 @@ public class ArrayType implements PrimitiveType<Object[]>
         return _characterType.getCanonicalEncoding();
     }
 
-    private static Object[] decodeArray(final DecoderImpl decoder, final int count)
+    private static Object[] decodeArray(final DecoderImpl decoder, final int count, final int size)
     {
         TypeConstructor constructor = decoder.readConstructor(true);
-        return decodeNonPrimitive(decoder, constructor, count);
+        return decodeNonPrimitive(decoder, constructor, count, size);
     }
 
     private static Object[] decodeNonPrimitive(final DecoderImpl decoder,
                                                final TypeConstructor constructor,
-                                               final int count)
+                                               final int count,
+                                               final int size)
     {
-        if (count > decoder.getByteBufferRemaining()) {
-            throw new IllegalArgumentException("Array element count "+count+" is specified to be greater than the amount of data available ("+
-                                               decoder.getByteBufferRemaining()+")");
-        }
+        checkSizeCountConstructor(decoder, constructor, count, size);
 
         if(constructor instanceof ArrayEncoding)
         {
@@ -1074,15 +1177,60 @@ public class ArrayType implements PrimitiveType<Object[]>
         }
     }
 
-    private static Object decodeArrayAsObject(final DecoderImpl decoder, final int count)
+    private static void checkSizeCountConstructor(final DecoderImpl decoder, final TypeConstructor constructor, final int count, final int size)
+    {
+        TypeConstructor constructorToCheck = constructor;
+
+        if(!constructor.encodesJavaPrimitive() && constructor instanceof DynamicTypeConstructor)
+        {
+            constructorToCheck = ((DynamicTypeConstructor) constructor).getUnderlyingEncoding();
+        }
+
+        if(constructorToCheck instanceof PrimitiveTypeEncoding<?>)
+        {
+            PrimitiveTypeEncoding<?> primitiveType = (PrimitiveTypeEncoding<?>) constructorToCheck;
+
+            final byte encodingCode = primitiveType.getEncodingCode();
+            if (isZeroWidthEncoding(encodingCode))
+            {
+                if (count > decoder.getZeroWidthArrayElementLimit())
+                {
+                    throw new DecodeException("Array element count " + count + " is specified to be greater than the allowed 0-width-element limit for arrays ("
+                                                                                                                + decoder.getZeroWidthArrayElementLimit() + ")");
+                }
+                else
+                {
+                    // Remaining checks are not valid for these cases, return
+                    return;
+                }
+            }
+        }
+
+        if (count > size)
+        {
+            throw new DecodeException("Array element count " + count + " is specified to be greater than the size of array (" + size +")");
+        }
+
+        if (count > decoder.getByteBufferRemaining())
+        {
+            throw new DecodeException("Array element count " + count + " is specified to be greater than the amount of data available ("+
+                    decoder.getByteBufferRemaining()+")");
+        }
+    }
+
+    private static boolean isZeroWidthEncoding(final byte encodingCode)
+    {
+        return encodingCode == EncodingCodes.LIST0 || encodingCode == EncodingCodes.ULONG0
+                || encodingCode == EncodingCodes.UINT0 || encodingCode == EncodingCodes.NULL
+                || encodingCode == EncodingCodes.BOOLEAN_FALSE || encodingCode == EncodingCodes.BOOLEAN_TRUE;
+    }
+
+    private static Object decodeArrayAsObject(final DecoderImpl decoder, final int count, final int size)
     {
         TypeConstructor constructor = decoder.readConstructor(true);
         if(constructor.encodesJavaPrimitive())
         {
-            if (count > decoder.getByteBufferRemaining()) {
-                throw new IllegalArgumentException("Array element count "+count+" is specified to be greater than the amount of data available ("+
-                                                   decoder.getByteBufferRemaining()+")");
-            }
+            checkSizeCountConstructor(decoder, constructor, count, size);
 
             if(constructor instanceof BooleanType.BooleanEncoding)
             {
@@ -1123,7 +1271,7 @@ public class ArrayType implements PrimitiveType<Object[]>
         }
         else
         {
-            return decodeNonPrimitive(decoder, constructor, count);
+            return decodeNonPrimitive(decoder, constructor, count, size);
         }
     }
 

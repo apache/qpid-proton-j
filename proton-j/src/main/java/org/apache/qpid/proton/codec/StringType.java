@@ -27,6 +27,8 @@ import java.util.Collection;
 
 public class StringType extends AbstractPrimitiveType<String>
 {
+    private static final String TYPE_NAME = "string";
+
     private static final DecoderImpl.TypeDecoder<String> _stringCreator =
         new DecoderImpl.TypeDecoder<String>()
         {
@@ -180,9 +182,10 @@ public class StringType extends AbstractPrimitiveType<String>
         @Override
         public String readValue()
         {
-            DecoderImpl decoder = getDecoder();
-            int size = decoder.readRawInt();
-            return size == 0 ? "" : decoder.readRaw(_stringCreator, size);
+            final DecoderImpl decoder = getDecoder();
+            final int size = decoder.readRawInt();
+
+            return size == 0 ? "" : decoder.readRaw(_stringCreator, size, TYPE_NAME);
         }
 
         @Override
@@ -198,6 +201,7 @@ public class StringType extends AbstractPrimitiveType<String>
             DecoderImpl decoder = getDecoder();
             ReadableBuffer buffer = decoder.getBuffer();
             int size = decoder.readRawInt();
+            ValidationSupport.validateLength(TYPE_NAME, size, buffer.remaining());
             buffer.position(buffer.position() + size);
         }
     }
@@ -250,7 +254,8 @@ public class StringType extends AbstractPrimitiveType<String>
         {
             DecoderImpl decoder = getDecoder();
             int size = ((int)decoder.readRawByte()) & 0xff;
-            return size == 0 ? "" : decoder.readRaw(_stringCreator, size);
+
+            return size == 0 ? "" : decoder.readRaw(_stringCreator, size, TYPE_NAME);
         }
 
         @Override
@@ -266,6 +271,7 @@ public class StringType extends AbstractPrimitiveType<String>
             DecoderImpl decoder = getDecoder();
             ReadableBuffer buffer = decoder.getBuffer();
             int size = ((int)decoder.readRawByte()) & 0xff;
+            ValidationSupport.validateLength(TYPE_NAME, size, buffer.remaining());
             buffer.position(buffer.position() + size);
         }
     }

@@ -81,12 +81,21 @@ public class FastPathFooterType implements AMQPType<Footer>, FastPathDescribedTy
 
     @Override
     public Footer readValue() {
+        // Depth handled by map type readValue
         return new Footer(getDecoder().readMap());
     }
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

@@ -23,6 +23,8 @@ package org.apache.qpid.proton.message.impl;
 
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.Objects;
+
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedByte;
@@ -33,6 +35,8 @@ import org.apache.qpid.proton.message.*;
 
 public class MessageImpl implements ProtonJMessage
 {
+    private static final MessageDecodeOptions DEFAULT_OPTIONS = new MessageDecodeOptions();
+
     private Header _header;
     private DeliveryAnnotations _deliveryAnnotations;
     private MessageAnnotations _messageAnnotations;
@@ -568,21 +572,47 @@ public class MessageImpl implements ProtonJMessage
     @Override
     public int decode(byte[] data, int offset, int length)
     {
+        return decode(data, offset, length, DEFAULT_OPTIONS);
+    }
+
+    @Override
+    public int decode(byte[] data, int offset, int length, MessageDecodeOptions options)
+    {
+        Objects.requireNonNull(options, "Options must not be null");
+
         final ByteBuffer buffer = ByteBuffer.wrap(data, offset, length);
-        decode(buffer);
+        decode(buffer, options);
 
         return length-buffer.remaining();
     }
 
     public void decode(ByteBuffer buffer)
     {
-        decode(ReadableBuffer.ByteBufferReader.wrap(buffer));
+        decode(ReadableBuffer.ByteBufferReader.wrap(buffer), DEFAULT_OPTIONS);
     }
 
+    public void decode(ByteBuffer buffer, MessageDecodeOptions options)
+    {
+        Objects.requireNonNull(options, "Options must not be null");
+
+        decode(ReadableBuffer.ByteBufferReader.wrap(buffer), options);
+    }
+
+    @Override
     public void decode(ReadableBuffer buffer)
     {
+        decode(buffer, DEFAULT_OPTIONS);
+    }
+
+    @Override
+    public void decode(ReadableBuffer buffer, MessageDecodeOptions options)
+    {
+        Objects.requireNonNull(options, "Options must not be null");
+
         DecoderImpl decoder = tlsCodec.get().decoder;
         decoder.setBuffer(buffer);
+        decoder.setZeroWidthArrayElementLimit(options.getZeroWidthArrayElementLimit());
+        decoder.setMaxDecodeDepth(options.getMaxDecodeDepth());
 
         _header = null;
         _deliveryAnnotations = null;

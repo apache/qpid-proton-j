@@ -30,11 +30,15 @@ import org.apache.qpid.proton.codec.Data;
 
 public class DataImpl implements Data
 {
+    private static final int DEFAULT_MAX_DECODE_DEPTH = 50;
 
     private Element _first;
     private Element _current;
     private Element _parent;
 
+    private int zeroWidthElementLimit = 0;
+    private int maxDecodeDepth = DEFAULT_MAX_DECODE_DEPTH;
+    private int decodeDepth = 0;
 
     public DataImpl()
     {
@@ -866,5 +870,50 @@ public class DataImpl implements Data
                              System.identityHashCode(_current),
                              System.identityHashCode(_parent),
                              sb);
+    }
+
+    @Override
+    public int getZeroWidthElementLimit() {
+        return zeroWidthElementLimit;
+    }
+
+    @Override
+    public void setZeroWidthElementLimit(int zeroWidthElementLimit) {
+        this.zeroWidthElementLimit = zeroWidthElementLimit;
+    }
+
+    /**
+     * Returns the maximum decode depth allowed before error when decoding Maps, Lists,
+     * Arrays, and certain related DescribedTypes from an encoded payload.
+     *
+     * @return the maximum depth limit before error for Maps, Lists, Arrays and related DescribedTypes.
+     */
+    public int getMaxDecodeDepth() {
+        return maxDecodeDepth;
+    }
+
+    /**
+     * Configures the maximum decode depth allowed before error when decoding Maps, Lists,
+     * Arrays, and certain related DescribedTypes from an encoded payload. Default is 50.
+     *
+     * It would be unusual to set this to less than 3 due to nesting of types that make up
+     * the base protocol itself.
+     */
+    public void setMaxDecodeDepth(int maxDecodeDepth) {
+        this.maxDecodeDepth = maxDecodeDepth;
+    }
+
+    void increaseDecodeDepth() {
+        if (++decodeDepth > maxDecodeDepth) {
+            --decodeDepth; // Reset so the unwind goes back to zero
+            throw new IllegalArgumentException("The nesting of types in the object being decoded exceeded the configured limit: " + maxDecodeDepth);
+        }
+    }
+
+    void decreaseDecodeDepth() {
+        if(--decodeDepth < 0) {
+            ++decodeDepth; // Reset so the unwind goes back to zero
+            throw new IllegalStateException("Decode depth cannot go negative");
+        }
     }
 }

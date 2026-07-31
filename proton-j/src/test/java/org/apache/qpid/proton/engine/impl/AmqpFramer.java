@@ -105,4 +105,50 @@ public class AmqpFramer
         buffer.get(target, 0, frameSize);
         return target;
     }
+
+    /**
+     * @param frameBody is expected to be a byte[] encoding the payload of the frame
+     */
+    public byte[] generateFrameRawBody(int channel, byte[] frameBody)
+    {
+        return generateFrameRawBody(channel, (byte) 0, frameBody);
+    }
+
+    /**
+     * @param frameBody is expected to be a byte[] encoding the payload of the frame
+     */
+    public byte[] generateSaslFrameRawBody(int channel, byte[] frameBody)
+    {
+        return generateFrameRawBody(channel, (byte) 1, frameBody);
+    }
+
+    private byte[] generateFrameRawBody(int channel, byte amqpFrameType,  byte[] frameBody) {
+        int numberOfExtendedHeaderFourByteWords = 0;
+        byte[] emptyExtendedHeader = new byte[] {};
+
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+        buffer.position(8); // leave hole for frame header
+        _encoder.setByteBuffer(new WritableBuffer.ByteBufferWrapper(buffer));
+
+        // write extended header - empty
+        buffer.put(emptyExtendedHeader);
+        // write frame body bytes
+        buffer.put(frameBody);
+
+        int frameSize = buffer.position();
+        int framePreambleSizeInFourByteWords = 2;
+        byte dataOffsetFourByteWords = (byte)(framePreambleSizeInFourByteWords + numberOfExtendedHeaderFourByteWords);
+        buffer.rewind();
+        buffer.putInt(frameSize);
+        buffer.put(dataOffsetFourByteWords);
+        buffer.put(amqpFrameType);
+        buffer.putShort((short)channel);
+
+        byte[] target = new byte[frameSize];
+
+        buffer.rewind();
+        buffer.get(target, 0, frameSize);
+        return target;
+    }
 }

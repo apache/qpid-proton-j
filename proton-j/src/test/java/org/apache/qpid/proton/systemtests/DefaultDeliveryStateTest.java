@@ -24,17 +24,13 @@ import static org.apache.qpid.proton.engine.EndpointState.CLOSED;
 import static org.apache.qpid.proton.engine.EndpointState.UNINITIALIZED;
 import static org.apache.qpid.proton.systemtests.TestLoggingHelper.bold;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.logging.Logger;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
-import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.amqp.messaging.Modified;
 import org.apache.qpid.proton.amqp.messaging.Released;
 import org.apache.qpid.proton.amqp.messaging.Source;
@@ -43,14 +39,11 @@ import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
 import org.apache.qpid.proton.engine.Delivery;
 import org.apache.qpid.proton.engine.Sender;
-import org.apache.qpid.proton.message.Message;
 import org.junit.Test;
 
 public class DefaultDeliveryStateTest extends EngineTestBase
 {
     private static final Logger LOGGER = Logger.getLogger(DefaultDeliveryStateTest.class.getName());
-
-    private static final int BUFFER_SIZE = 4096;
 
     private final String _sourceAddress = getServer().containerId + "-link1-source";
 
@@ -223,59 +216,5 @@ public class DefaultDeliveryStateTest extends EngineTestBase
         assertEquals(Accepted.getInstance(), serverDelivery1.getRemoteState());
         assertTrue(serverDelivery2.getRemoteState() instanceof Modified);
         assertEquals(Released.getInstance(), serverDelivery3.getRemoteState());
-    }
-
-    private Delivery receiveMessageFromServer(String deliveryTag, String messageContent)
-    {
-        Delivery delivery = getClient().connection.getWorkHead();
-
-        assertTrue(Arrays.equals(deliveryTag.getBytes(StandardCharsets.UTF_8), delivery.getTag()));
-        assertEquals("The received delivery should be on our receiver",
-                            getClient().receiver, delivery.getLink());
-
-        assertNull(delivery.getLocalState());
-        assertNull(delivery.getRemoteState());
-
-        assertFalse(delivery.isPartial());
-        assertTrue(delivery.isReadable());
-
-        byte[] received = new byte[BUFFER_SIZE];
-        int len = getClient().receiver.recv(received, 0, BUFFER_SIZE);
-
-        assertTrue("given array was too small", len < BUFFER_SIZE);
-
-        Message m = Proton.message();
-        m.decode(received, 0, len);
-
-        Object messageBody = ((AmqpValue)m.getBody()).getValue();
-        assertEquals("Unexpected message content", messageContent, messageBody);
-
-        boolean receiverAdvanced = getClient().receiver.advance();
-        assertTrue("receiver has not advanced", receiverAdvanced);
-
-        return delivery;
-    }
-
-    private Delivery sendMessageToClient(String deliveryTag, String messageBody)
-    {
-        byte[] tag = deliveryTag.getBytes(StandardCharsets.UTF_8);
-
-        Message m = Proton.message();
-        m.setBody(new AmqpValue(messageBody));
-
-        byte[] encoded = new byte[BUFFER_SIZE];
-        int len = m.encode(encoded, 0, BUFFER_SIZE);
-
-        assertTrue("given array was too small", len < BUFFER_SIZE);
-
-        Delivery serverDelivery = getServer().sender.delivery(tag);
-        int sent = getServer().sender.send(encoded, 0, len);
-
-        assertEquals("sender unable to send all data at once as assumed for simplicity", len, sent);
-
-        boolean senderAdvanced = getServer().sender.advance();
-        assertTrue("sender has not advanced", senderAdvanced);
-
-        return serverDelivery;
     }
 }

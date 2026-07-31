@@ -73,6 +73,10 @@ class FrameWriter {
         return frameBuffer.transferTo(dst);
     }
 
+    int getFrameBufferPosition() {
+        return frameBuffer.position();
+    }
+
     long getFramesOutput() {
         return framesOutput;
     }

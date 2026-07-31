@@ -20,26 +20,33 @@ package org.apache.qpid.proton.systemtests;
 
 import static java.util.EnumSet.of;
 import static org.apache.qpid.proton.engine.EndpointState.ACTIVE;
+import static org.apache.qpid.proton.engine.EndpointState.CLOSED;
 import static org.apache.qpid.proton.engine.EndpointState.UNINITIALIZED;
 import static org.apache.qpid.proton.systemtests.TestLoggingHelper.bold;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.UnsignedLong;
-import org.apache.qpid.proton.amqp.messaging.AmqpValue;
+import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.amqp.messaging.Source;
 import org.apache.qpid.proton.amqp.messaging.Target;
+import org.apache.qpid.proton.amqp.transport.AmqpError;
+import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.amqp.transport.ReceiverSettleMode;
 import org.apache.qpid.proton.amqp.transport.SenderSettleMode;
 import org.apache.qpid.proton.engine.Connection;
@@ -49,14 +56,16 @@ import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.engine.Sender;
 import org.apache.qpid.proton.engine.Session;
 import org.apache.qpid.proton.engine.Transport;
-import org.apache.qpid.proton.message.Message;
+import org.apache.qpid.proton.engine.TransportException;
+import org.apache.qpid.proton.engine.impl.AmqpFramer;
+import org.apache.qpid.proton.engine.impl.DeliveryImpl;
+import org.apache.qpid.proton.engine.impl.TransportDelivery;
+import org.apache.qpid.proton.engine.impl.TransportDeliveryTestAccessor;
 import org.junit.Test;
 
 public class LinkTest extends EngineTestBase
 {
     private static final Logger LOGGER = Logger.getLogger(LinkTest.class.getName());
-
-    private static final int BUFFER_SIZE = 4096;
 
     private static final Symbol RCV_PROP = Symbol.valueOf("ReceiverPropName");
     private static final Integer RCV_PROP_VAL = 1234;
@@ -534,65 +543,619 @@ public class LinkTest extends EngineTestBase
         assertEquals("Expected value to be set", SERVER_MAX_MSG_SIZE, clientReceiver.getRemoteMaxMessageSize());
     }
 
-    void assertLinkCreditState(Link link, int credit, int queued, int remoteCredit)
+    @Test(timeout=20000)
+    public void testDispositionIllegalRangeFromZero() throws Exception
     {
-        assertEquals("Unexpected credit", credit, link.getCredit());
-        assertEquals("Unexpected queued", queued, link.getQueued());
-        assertEquals("Unexpected remote credit", remoteCredit, link.getRemoteCredit());
+        doDispositionIllegalRangeTestImpl(UnsignedInteger.ZERO, UnsignedInteger.valueOf(Integer.MAX_VALUE).add(UnsignedInteger.ONE));
     }
 
-    private Delivery receiveMessageFromServer(String deliveryTag, String messageContent)
+    @Test(timeout=20000)
+    public void testDispositionIllegalRangeFromIntMaxValue() throws Exception
     {
-        Delivery delivery = getClient().connection.getWorkHead();
-
-        assertTrue(Arrays.equals(deliveryTag.getBytes(StandardCharsets.UTF_8), delivery.getTag()));
-        assertEquals("The received delivery should be on our receiver",
-                            getClient().receiver, delivery.getLink());
-
-        assertNull(delivery.getLocalState());
-        assertNull(delivery.getRemoteState());
-
-        assertFalse(delivery.isPartial());
-        assertTrue(delivery.isReadable());
-
-        byte[] received = new byte[BUFFER_SIZE];
-        int len = getClient().receiver.recv(received, 0, BUFFER_SIZE);
-
-        assertTrue("given array was too small", len < BUFFER_SIZE);
-
-        Message m = Proton.message();
-        m.decode(received, 0, len);
-
-        Object messageBody = ((AmqpValue)m.getBody()).getValue();
-        assertEquals("Unexpected message content", messageContent, messageBody);
-
-        boolean receiverAdvanced = getClient().receiver.advance();
-        assertTrue("receiver has not advanced", receiverAdvanced);
-
-        return delivery;
+        doDispositionIllegalRangeTestImpl(UnsignedInteger.valueOf(Integer.MAX_VALUE), UnsignedInteger.MAX_VALUE);
     }
 
-    private Delivery sendMessageToClient(String deliveryTag, String messageContent)
+    @Test(timeout=20000)
+    public void testDispositionIllegalRangeSpanningIntMaxValue() throws Exception
     {
-        byte[] tag = deliveryTag.getBytes(StandardCharsets.UTF_8);
+        doDispositionIllegalRangeTestImpl(UnsignedInteger.valueOf(100_000), UnsignedInteger.valueOf(Integer.MAX_VALUE + 100_000 + 1));
+    }
 
-        Message m = Proton.message();
-        m.setBody(new AmqpValue(messageContent));
+    @Test(timeout=20000)
+    public void testDispositionIllegalRangeSpanningMaxValue() throws Exception
+    {
+        doDispositionIllegalRangeTestImpl(UnsignedInteger.MAX_VALUE, UnsignedInteger.valueOf(Integer.MAX_VALUE));
+    }
 
-        byte[] encoded = new byte[BUFFER_SIZE];
-        int len = m.encode(encoded, 0, BUFFER_SIZE);
+    private void doDispositionIllegalRangeTestImpl(final UnsignedInteger firstId, final UnsignedInteger lastId) throws Exception
+    {
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertFalse(delivery1.remotelySettled());
+                assertNull(delivery1.getRemoteState());
 
-        assertTrue("given array was too small", len < BUFFER_SIZE);
+                assertFalse(delivery2.remotelySettled());
+                assertNull(delivery2.getRemoteState());
 
-        Delivery serverDelivery = getServer().sender.delivery(tag);
+                assertFalse(delivery3.remotelySettled());
+                assertNull(delivery3.getRemoteState());
+            }
+        };
 
-        int sent = getServer().sender.send(encoded, 0, len);
+        doDispositionTestImpl(firstId.intValue(), lastId.intValue(), new AssertDeliveryNoState(), assertAfter, false);
 
-        assertEquals("sender unable to send all data at once as assumed for simplicity", len, sent);
+        ErrorCondition serverCondition = getServer().transport.getCondition();
+        assertNotNull("Expected server transport error condition object", serverCondition);
+        assertNotNull("Expected server transport error condition", serverCondition.getCondition());
+        assertEquals(AmqpError.NOT_ALLOWED, serverCondition.getCondition());
+        assertEquals("Invalid disposition sequence range: " + firstId.longValue() + " to " + lastId.longValue(), serverCondition.getDescription());
 
-        boolean senderAdvanced = getServer().sender.advance();
-        assertTrue("sender has not advanced", senderAdvanced);
+        pumpServerToClient();
 
-        return serverDelivery;
+        ErrorCondition clientCondition = getClient().connection.getRemoteCondition();
+        assertNotNull(clientCondition);
+        assertNotNull(clientCondition.getCondition());
+        assertEquals(AmqpError.NOT_ALLOWED, clientCondition.getCondition());
+
+        assertEquals(CLOSED, getClient().connection.getRemoteState());
+
+        assertEquals(Transport.END_OF_STREAM, getServer().transport.pending());
+        assertEquals(Transport.END_OF_STREAM, getServer().transport.capacity());
+        assertFalse(getServer().transport.head().hasRemaining());
+        assertTrue(getServer().transport.isClosed());
+
+        try
+        {
+            getServer().transport.tail();
+            fail("Expected exception");
+        }
+        catch (TransportException te)
+        {
+            // Expected
+        }
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionLargeRangeAfter() throws Exception
+    {
+        final int firstId = 0;
+        final int lastId = 1_000_000_000;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionLargeRangePartialAfter() throws Exception
+    {
+        final int firstId = 1;
+        final int lastId = 1_000_000_000;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertFalse(delivery1.remotelySettled());
+                assertNull(delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionLargeRangeBefore() throws Exception
+    {
+        final int firstId = UnsignedInteger.ZERO.subtract(UnsignedInteger.valueOf(1_000_000_000)).intValue();
+        final int lastId = 2;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionLargeRangePartialBefore() throws Exception
+    {
+        final int firstId = 0 - 1_000_000_000;
+        final int lastId = 1;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertFalse(delivery3.remotelySettled());
+                assertNull(delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionLargeRangeSpanning() throws Exception
+    {
+        final int firstId = UnsignedInteger.MAX_VALUE.subtract(UnsignedInteger.valueOf(100)).intValue();
+        final int lastId = 1_000_000_000;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionPartRangeStart() throws Exception
+    {
+        final int firstId = 0;
+        final int lastId = 1;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertFalse(delivery3.remotelySettled());
+                assertNull(delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionPartRangeStartWithWrap() throws Exception
+    {
+        final int firstId = UnsignedInteger.MAX_VALUE.intValue();
+        final int lastId = 1;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertFalse(delivery3.remotelySettled());
+                assertNull(delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionPartRangeEnd() throws Exception
+    {
+        final int firstId = 1;
+        final int lastId = 2;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertFalse(delivery1.remotelySettled());
+                assertNull(delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionPartRangePastEnd() throws Exception
+    {
+        final int firstId = 1;
+        final int lastId = 10;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertFalse(delivery1.remotelySettled());
+                assertNull(delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, false);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionSingleAtStart() throws Exception
+    {
+        doDispositionSingleAtStartTestImpl(true);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionSingleAtStartOmitLast() throws Exception
+    {
+        doDispositionSingleAtStartTestImpl(false);
+    }
+
+    private void doDispositionSingleAtStartTestImpl(boolean setLastIfSame) throws Exception
+    {
+        final int firstId = 0;
+        final int lastId = 0;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertTrue(delivery1.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery1.getRemoteState());
+
+                assertFalse(delivery2.remotelySettled());
+                assertNull(delivery2.getRemoteState());
+
+                assertFalse(delivery3.remotelySettled());
+                assertNull(delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, setLastIfSame);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionSingleInMiddle() throws Exception
+    {
+        doDispositionSingleInMiddleTestImpl(true);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionSingleInMiddleOmitLast() throws Exception
+    {
+        doDispositionSingleInMiddleTestImpl(false);
+    }
+
+    private void doDispositionSingleInMiddleTestImpl(boolean setLastIfSame) throws Exception
+    {
+        final int firstId = 1;
+        final int lastId = 1;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertFalse(delivery1.remotelySettled());
+                assertNull(delivery1.getRemoteState());
+
+                assertTrue(delivery2.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery2.getRemoteState());
+
+                assertFalse(delivery3.remotelySettled());
+                assertNull(delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, setLastIfSame);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionSingleAtEnd() throws Exception
+    {
+        doDispositionSingleAtEndTestImpl(true);
+    }
+
+    @Test(timeout=20000)
+    public void testDispositionSingleAtEndOmitLast() throws Exception
+    {
+        doDispositionSingleAtEndTestImpl(false);
+    }
+
+    private void doDispositionSingleAtEndTestImpl(boolean setLastIfSame) throws Exception
+    {
+        final int firstId = 2;
+        final int lastId = 2;
+
+        AssertDeliveryState assertAfter = new AssertDeliveryState()
+        {
+            @Override
+            public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+            {
+                assertFalse(delivery1.remotelySettled());
+                assertNull(delivery1.getRemoteState());
+
+                assertFalse(delivery2.remotelySettled());
+                assertNull(delivery2.getRemoteState());
+
+                assertTrue(delivery3.remotelySettled());
+                assertSame(Accepted.getInstance(), delivery3.getRemoteState());
+            }
+        };
+
+        doDispositionTestImpl(firstId, lastId, new AssertDeliveryNoState(), assertAfter, setLastIfSame);
+    }
+
+    private void doDispositionTestImpl(final int firstId, final int lastId, final AssertDeliveryState assertBefore, final AssertDeliveryState assertAfter, boolean setLastIfSame) throws Exception
+    {
+        boolean setLast = true;
+        if (firstId == lastId) {
+            setLast = setLastIfSame;
+        }
+
+        LOGGER.fine(bold("======== About to create transports"));
+
+        getClient().transport = Proton.transport();
+        ProtocolTracerEnabler.setProtocolTracer(getClient().transport, TestLoggingHelper.CLIENT_PREFIX);
+
+        getServer().transport = Proton.transport();
+        ProtocolTracerEnabler.setProtocolTracer(getServer().transport, "            " + TestLoggingHelper.SERVER_PREFIX);
+
+        doOutputInputCycle();
+
+        getClient().connection = Proton.connection();
+        getClient().transport.bind(getClient().connection);
+
+        getServer().connection = Proton.connection();
+        getServer().transport.bind(getServer().connection);
+
+        LOGGER.fine(bold("======== About to open connections"));
+        getClient().connection.open();
+        getServer().connection.open();
+
+        doOutputInputCycle();
+
+        LOGGER.fine(bold("======== About to open sessions"));
+        getClient().session = getClient().connection.session();
+        getClient().session.open();
+
+        pumpClientToServer();
+
+        getServer().session = getServer().connection.sessionHead(of(UNINITIALIZED), of(ACTIVE));
+        assertEndpointState(getServer().session, UNINITIALIZED, ACTIVE);
+
+        getServer().session.open();
+        assertEndpointState(getServer().session, ACTIVE, ACTIVE);
+
+        pumpServerToClient();
+        assertEndpointState(getClient().session, ACTIVE, ACTIVE);
+
+        LOGGER.fine(bold("======== About to create receiver"));
+
+        getClient().source = new Source();
+        getClient().source.setAddress(_sourceAddress);
+
+        getClient().target = new Target();
+        getClient().target.setAddress(null);
+
+        getClient().receiver = getClient().session.receiver("link1");
+        getClient().receiver.setTarget(getClient().target);
+        getClient().receiver.setSource(getClient().source);
+
+        getClient().receiver.setReceiverSettleMode(ReceiverSettleMode.FIRST);
+        getClient().receiver.setSenderSettleMode(SenderSettleMode.UNSETTLED);
+
+        assertEndpointState(getClient().receiver, UNINITIALIZED, UNINITIALIZED);
+
+        getClient().receiver.open();
+        assertEndpointState(getClient().receiver, ACTIVE, UNINITIALIZED);
+
+        pumpClientToServer();
+
+        LOGGER.fine(bold("======== About to set up implicitly created sender"));
+
+        getServer().sender = (Sender) getServer().connection.linkHead(of(UNINITIALIZED), of(ACTIVE));
+
+        getServer().sender.setReceiverSettleMode(getServer().sender.getRemoteReceiverSettleMode());
+        getServer().sender.setSenderSettleMode(getServer().sender.getRemoteSenderSettleMode());
+
+        org.apache.qpid.proton.amqp.transport.Source serverRemoteSource = getServer().sender.getRemoteSource();
+        getServer().sender.setSource(serverRemoteSource);
+
+        assertEndpointState(getServer().sender, UNINITIALIZED, ACTIVE);
+        getServer().sender.open();
+
+        assertEndpointState(getServer().sender, ACTIVE, ACTIVE);
+
+        pumpServerToClient();
+
+        assertEndpointState(getClient().receiver, ACTIVE, ACTIVE);
+
+        LOGGER.fine(bold("======== About to flow credit"));
+
+        int flowCount = 4;
+        getClient().receiver.flow(flowCount);
+
+        pumpClientToServer();
+
+        LOGGER.fine(bold("======== About to create messages and send to the client"));
+
+        // 'Send' and verify credit state
+        Delivery serverDelivery1 = sendMessageToClient("delivery1", "Msg1");
+        assertLinkCreditState(getServer().sender, 3, 1, 3);
+        assertLinkCreditState(getClient().receiver, 4, 0, 4);
+
+        // 'Send' and verify credit state
+        Delivery serverDelivery2 = sendMessageToClient("delivery2", "Msg2");
+        assertLinkCreditState(getServer().sender, 2, 2, 2);
+        assertLinkCreditState(getClient().receiver, 4, 0, 4);
+
+        // 'Send' and verify credit state
+        Delivery serverDelivery3 = sendMessageToClient("delivery3", "Msg3");
+        assertLinkCreditState(getServer().sender, 1, 3, 1);
+        assertLinkCreditState(getClient().receiver, 4, 0, 4);
+
+        // Pump to the client to send messages 'on the wire', verify new state, process messages
+        pumpServerToClient();
+
+        LOGGER.fine(bold("======== About to process the messages on the client"));
+
+        Delivery clientDelivery1 =  receiveMessageFromServer("delivery1", "Msg1");
+
+        TransportDelivery clientTransportDelivery1 = TransportDeliveryTestAccessor.getTransportDelivery((DeliveryImpl) clientDelivery1);
+        assertEquals(UnsignedInteger.valueOf(0), clientTransportDelivery1.getDeliveryId());
+
+        assertLinkCreditState(getServer().sender, 1, 0, 1);
+        assertLinkCreditState(getClient().receiver, 3, 2, 1);
+
+        Delivery clientDelivery2 =  receiveMessageFromServer("delivery2", "Msg2");
+
+        TransportDelivery clientTransportDelivery2 = TransportDeliveryTestAccessor.getTransportDelivery((DeliveryImpl) clientDelivery2);
+        assertEquals(UnsignedInteger.valueOf(1), clientTransportDelivery2.getDeliveryId());
+
+        assertLinkCreditState(getServer().sender, 1, 0, 1);
+        assertLinkCreditState(getClient().receiver, 2, 1, 1);
+
+        Delivery clientDelivery3 =  receiveMessageFromServer("delivery3", "Msg3");
+
+        TransportDelivery clientTransportDelivery3 = TransportDeliveryTestAccessor.getTransportDelivery((DeliveryImpl) clientDelivery3);
+        assertEquals(UnsignedInteger.valueOf(2), clientTransportDelivery3.getDeliveryId());
+
+        assertLinkCreditState(getServer().sender, 1, 0, 1);
+        assertLinkCreditState(getClient().receiver, 1, 0, 1);
+
+        LOGGER.fine(bold("======== About to prepare and send crafted disposition to the server transport"));
+
+        // Send a Disposition to the server 'on behalf of the client' for the deliveries
+        AmqpFramer amqpFramer = new AmqpFramer();
+
+        ByteBuffer tmpBuf = ByteBuffer.allocate(1024);
+        tmpBuf.put((byte) 0x00); // DescribedType
+        tmpBuf.put((byte) 0x53); // small-ulong
+        tmpBuf.put((byte) 0x15); // Disposition ulong descriptor
+        tmpBuf.put((byte) (byte) 0xC0); // list8 primitive type constructor
+        tmpBuf.put((byte) (setLast ? 17 : 13)); // size
+        tmpBuf.put((byte) 5); // count
+        tmpBuf.put((byte) 0x41); // role (=true=receiver)
+        tmpBuf.put((byte) 0x70); // uint
+        tmpBuf.putInt(firstId); // first
+        if (setLast)
+        {
+            tmpBuf.put((byte) 0x70); // uint
+            tmpBuf.putInt(lastId); // last
+        }
+        else
+        {
+            tmpBuf.put((byte) 0x40); // null to omit last
+        }
+        tmpBuf.put((byte) 0x41); // settled = true
+        tmpBuf.put((byte) 0x00); // DescribedType
+        tmpBuf.put((byte) 0x53); // small-ulong
+        tmpBuf.put((byte) 0x24); // Accepted
+        tmpBuf.put((byte) 0x45); // list0 primitive type constructor
+
+        tmpBuf.flip();
+
+        final byte[] frameBodyBytes = ByteBuffer.allocate(tmpBuf.remaining()).put(tmpBuf).array();
+        final byte[] frameBytes = amqpFramer.generateFrameRawBody(0, frameBodyBytes);
+
+        final ByteBuffer clientToServerBuffer = ByteBuffer.wrap(frameBytes);
+
+        assertBefore.assertDeliveryState(serverDelivery1, serverDelivery2, serverDelivery3);
+        long start = System.nanoTime();
+
+        // Send the bytes for the frame with disposition performative
+        pumpBufferFromClientToServer(clientToServerBuffer, false);
+
+        long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertTrue("Unexpected duration: " + duration, duration < 100);
+
+        assertAfter.assertDeliveryState(serverDelivery1, serverDelivery2, serverDelivery3);
+    }
+
+    private final class AssertDeliveryNoState implements AssertDeliveryState
+    {
+        @Override
+        public void assertDeliveryState(final Delivery delivery1, final Delivery delivery2, final Delivery delivery3)
+        {
+            assertFalse(delivery1.remotelySettled());
+            assertNull(delivery1.getRemoteState());
+
+            assertFalse(delivery2.remotelySettled());
+            assertNull(delivery2.getRemoteState());
+
+            assertFalse(delivery3.remotelySettled());
+            assertNull(delivery3.getRemoteState());
+        }
+    }
+
+    private interface AssertDeliveryState
+    {
+        void assertDeliveryState(Delivery delivery1, Delivery delivery2, Delivery delivery3);
     }
 }

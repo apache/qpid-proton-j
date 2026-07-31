@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +44,15 @@ import org.apache.qpid.proton.amqp.UnsignedShort;
 
 public class DecoderImpl implements ByteBufferDecoder
 {
+    private static final int UNKNOWN_DT_CONSTRUCTOR_CACHE_SIZE = 16;
+    private static final int DT_DESCRIPTOR_MAX_CACHED_SYMBOL_LENGTH = 64;
+
+    /**
+     * The default maximum depth the decoder will allow before triggering a {@link DecodeException}
+     * when the depth is increased during decode of complex types that can nest objects.
+     */
+    private static final int DEFAULT_MAX_DECODE_DEPTH = 32;
+
     private ReadableBuffer _buffer;
 
     private final CharsetDecoder _charsetDecoder = StandardCharsets.UTF_8.newDecoder();
@@ -56,13 +64,66 @@ public class DecoderImpl implements ByteBufferDecoder
     private final Map<Object, FastPathDescribedTypeConstructor<?>> _fastPathTypeConstructors =
         new HashMap<Object, FastPathDescribedTypeConstructor<?>>();
 
+    private Map<Object, UnknownDescribedTypeConstructor> _unknownDescribedTypeConstructors = new HashMap<>();
+
+    private int _zeroWidthElementLimit = 0;
+    private boolean _sasl;
+
+    private int _maxDecodeDepth = DEFAULT_MAX_DECODE_DEPTH;
+    private int _decodeDepth;
+
     public DecoderImpl()
     {
+        this(false);
+    }
+
+    public DecoderImpl(boolean sasl)
+    {
+        _sasl = sasl;
     }
 
     DecoderImpl(final ByteBuffer buffer)
     {
+        this(buffer, false);
+    }
+
+    DecoderImpl(final ByteBuffer buffer, boolean sasl)
+    {
         _buffer = new ReadableBuffer.ByteBufferReader(buffer);
+    }
+
+    /**
+     * Returns the maximum decode depth allowed before error when decoding Maps, Lists,
+     * Arrays, and certain related DescribedTypes from an encoded payload.
+     *
+     * @return the maximum depth limit before error for Maps, Lists, Arrays and related DescribedTypes.
+     */
+    @Override
+    public int getMaxDecodeDepth() {
+        return _maxDecodeDepth;
+    }
+
+    /**
+     * Configures the maximum decode depth allowed before error when decoding Maps, Lists,
+     * Arrays, and certain related DescribedTypes from an encoded payload. Default is 32.
+     */
+    @Override
+    public void setMaxDecodeDepth(int maxDecodeDepth) {
+        this._maxDecodeDepth = maxDecodeDepth;
+    }
+
+    public void increaseDecodeDepth() {
+        if (++_decodeDepth > _maxDecodeDepth) {
+            --_decodeDepth; // Reset so the unwind goes back to zero
+            throw new DecodeException("The nesting of types in the object being decoded exceeded the configured limit: " + _maxDecodeDepth);
+        }
+    }
+
+    public void decreaseDecodeDepth() {
+        if(--_decodeDepth < 0) {
+            ++_decodeDepth; // Reset so the unwind goes back to zero
+            throw new IllegalStateException("Decode depth cannot go negative");
+        }
     }
 
     public TypeConstructor<?> peekConstructor()
@@ -81,17 +142,28 @@ public class DecoderImpl implements ByteBufferDecoder
     @SuppressWarnings("rawtypes")
     public TypeConstructor readConstructor()
     {
-        return readConstructor(false);
+        return readConstructor(false, false);
     }
 
     @SuppressWarnings("rawtypes")
     public TypeConstructor readConstructor(boolean excludeFastPathConstructors)
     {
+        return readConstructor(excludeFastPathConstructors, false);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private TypeConstructor readConstructor(boolean excludeFastPathConstructors, boolean decodingDescribedTypePrimitiveNestedEncoding)
+    {
         int code = ((int)readRawByte()) & 0xff;
         if(code == EncodingCodes.DESCRIBED_TYPE_INDICATOR)
         {
+            if(decodingDescribedTypePrimitiveNestedEncoding) {
+                throw new DecodeException("DescribedType value encoding cannot be another DescribedType, must be a primitive type");
+            }
+
             final byte encoding = _buffer.get(_buffer.position());
             final Object descriptor;
+            boolean cachable = true;
 
             if (EncodingCodes.SMALLULONG == encoding || EncodingCodes.ULONG == encoding)
             {
@@ -99,11 +171,22 @@ public class DecoderImpl implements ByteBufferDecoder
             }
             else if (EncodingCodes.SYM8 == encoding || EncodingCodes.SYM32 == encoding)
             {
-                descriptor = readSymbol(null);
+                final Symbol sym = readSymbol(null);
+                if (sym.length() > DT_DESCRIPTOR_MAX_CACHED_SYMBOL_LENGTH)
+                {
+                    cachable = false;
+                }
+                descriptor = sym;
             }
             else
             {
-                descriptor = readObject();
+                if (_sasl)
+                {
+                    throw new DecodeException("Unexpected described type descriptor encoding during SASL: " + EncodingCodes.toString(encoding));
+                }
+
+                descriptor = readReservedDescriptor();
+                cachable = false;
             }
 
             if (!excludeFastPathConstructors)
@@ -115,32 +198,38 @@ public class DecoderImpl implements ByteBufferDecoder
                 }
             }
 
-            TypeConstructor<?> nestedEncoding = readConstructor(false);
+            TypeConstructor<?> nestedEncoding = readConstructor(false, true);
             DescribedTypeConstructor<?> dtc = _dynamicTypeConstructors.get(descriptor);
             if(dtc == null)
             {
-                dtc = new DescribedTypeConstructor()
-                {
-                    @Override
-                    public DescribedType newInstance(final Object described)
-                    {
-                        return new UnknownDescribedType(descriptor, described);
-                    }
-
-                    @Override
-                    public Class<?> getTypeClass()
-                    {
-                        return UnknownDescribedType.class;
-                    }
-                };
-                register(descriptor, dtc);
+                dtc = handleUnknownDescribedType(descriptor, cachable);
             }
+
             return new DynamicTypeConstructor(dtc, nestedEncoding);
         }
         else
         {
             return _constructors[code];
         }
+    }
+
+    private UnknownDescribedTypeConstructor handleUnknownDescribedType(final Object descriptor, final boolean cacheAllowed) {
+        if (_sasl)
+        {
+            throw new DecodeException("Cannot decode unknown described types during SASL");
+        }
+
+        UnknownDescribedTypeConstructor udtc = cacheAllowed ? _unknownDescribedTypeConstructors.get(descriptor): null;
+
+        if (udtc == null)
+        {
+            udtc = new UnknownDescribedTypeConstructor(descriptor);
+            if (cacheAllowed && _unknownDescribedTypeConstructors.size() < UNKNOWN_DT_CONSTRUCTOR_CACHE_SIZE)
+            {
+                _unknownDescribedTypeConstructors.put(descriptor, udtc);
+            }
+        }
+        return udtc;
     }
 
     @Override
@@ -236,22 +325,15 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public byte readByte(final byte defaultVal)
     {
-        TypeConstructor<?> constructor = readConstructor();
-        if(constructor instanceof ByteType.ByteEncoding)
-        {
-            return ((ByteType.ByteEncoding)constructor).readPrimitiveValue();
-        }
-        else
-        {
-            Object val = constructor.readValue();
-            if(val == null)
-            {
+        byte encodingCode = _buffer.get();
+
+        switch (encodingCode) {
+            case EncodingCodes.BYTE:
+                return readRawByte();
+            case EncodingCodes.NULL:
                 return defaultVal;
-            }
-            else
-            {
-                throw unexpectedType(val, Byte.class);
-            }
+            default:
+                throw new DecodeException("Expected Byte type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -280,22 +362,16 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public short readShort(final short defaultVal)
     {
-        TypeConstructor<?> constructor = readConstructor();
-        if(constructor instanceof ShortType.ShortEncoding)
+        byte encodingCode = _buffer.get();
+
+        switch (encodingCode)
         {
-            return ((ShortType.ShortEncoding)constructor).readPrimitiveValue();
-        }
-        else
-        {
-            Object val = constructor.readValue();
-            if(val == null)
-            {
+            case EncodingCodes.SHORT:
+                return readRawShort();
+            case EncodingCodes.NULL:
                 return defaultVal;
-            }
-            else
-            {
-                throw unexpectedType(val, Short.class);
-            }
+            default:
+                throw new DecodeException("Expected Short type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -326,22 +402,18 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public int readInteger(final int defaultVal)
     {
-        TypeConstructor<?> constructor = readConstructor();
-        if(constructor instanceof IntegerType.IntegerEncoding)
+        byte encodingCode = _buffer.get();
+
+        switch (encodingCode)
         {
-            return ((IntegerType.IntegerEncoding)constructor).readPrimitiveValue();
-        }
-        else
-        {
-            Object val = constructor.readValue();
-            if(val == null)
-            {
+            case EncodingCodes.SMALLINT:
+                return readRawByte();
+            case EncodingCodes.INT:
+                return readRawInt();
+            case EncodingCodes.NULL:
                 return defaultVal;
-            }
-            else
-            {
-                throw unexpectedType(val, Integer.class);
-            }
+            default:
+                throw new DecodeException("Expected Integer type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -372,22 +444,18 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public long readLong(final long defaultVal)
     {
-        TypeConstructor<?> constructor = readConstructor();
-        if(constructor instanceof LongType.LongEncoding)
+        byte encodingCode = _buffer.get();
+
+        switch (encodingCode)
         {
-            return ((LongType.LongEncoding)constructor).readPrimitiveValue();
-        }
-        else
-        {
-            Object val = constructor.readValue();
-            if(val == null)
-            {
+            case EncodingCodes.SMALLLONG:
+                return readRawByte();
+            case EncodingCodes.LONG:
+                return readRawLong();
+            case EncodingCodes.NULL:
                 return defaultVal;
-            }
-            else
-            {
-                throw unexpectedType(val, Long.class);
-            }
+            default:
+                throw new DecodeException("Expected Long type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -550,22 +618,16 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public float readFloat(final float defaultVal)
     {
-        TypeConstructor<?> constructor = readConstructor();
-        if(constructor instanceof FloatType.FloatEncoding)
+        byte encodingCode = _buffer.get();
+
+        switch (encodingCode)
         {
-            return ((FloatType.FloatEncoding)constructor).readPrimitiveValue();
-        }
-        else
-        {
-            Object val = constructor.readValue();
-            if(val == null)
-            {
+            case EncodingCodes.FLOAT:
+                return readRawFloat();
+            case EncodingCodes.NULL:
                 return defaultVal;
-            }
-            else
-            {
-                throw unexpectedType(val, Float.class);
-            }
+            default:
+                throw new DecodeException("Expected Float type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -594,22 +656,16 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public double readDouble(final double defaultVal)
     {
-        TypeConstructor<?> constructor = readConstructor();
-        if(constructor instanceof DoubleType.DoubleEncoding)
+        byte encodingCode = _buffer.get();
+
+        switch (encodingCode)
         {
-            return ((DoubleType.DoubleEncoding)constructor).readPrimitiveValue();
-        }
-        else
-        {
-            Object val = constructor.readValue();
-            if(val == null)
-            {
+            case EncodingCodes.DOUBLE:
+                return readRawDouble();
+            case EncodingCodes.NULL:
                 return defaultVal;
-            }
-            else
-            {
-                throw unexpectedType(val, Double.class);
-            }
+            default:
+                throw new DecodeException("Expected Double type but found encoding: " + EncodingCodes.toString(encodingCode));
         }
     }
 
@@ -804,7 +860,7 @@ public class DecoderImpl implements ByteBufferDecoder
         switch (encodingCode)
         {
             case EncodingCodes.LIST0:
-                return Collections.EMPTY_LIST;
+                return (List) _constructors[EncodingCodes.LIST0 & 0xff].readValue();
             case EncodingCodes.LIST8:
                 return (List) _constructors[EncodingCodes.LIST8 & 0xff].readValue();
             case EncodingCodes.LIST32:
@@ -1027,6 +1083,11 @@ public class DecoderImpl implements ByteBufferDecoder
         return val == null ? defaultValue : val;
     }
 
+    protected Object readReservedDescriptor()
+    {
+        throw new DecodeException("Reserved non-ulong/non-symbol described-type descriptors not supported by this decoder");
+    }
+
     <V> void register(PrimitiveType<V> type)
     {
         Collection<? extends PrimitiveTypeEncoding<V>> encodings = type.getAllEncodings();
@@ -1073,17 +1134,26 @@ public class DecoderImpl implements ByteBufferDecoder
         _buffer.get(data, offset, length);
     }
 
-    <V> V readRaw(TypeDecoder<V> decoder, int size)
+    @Deprecated
+    <V> V readRaw(final TypeDecoder<V> decoder, final  int size)
     {
+        return readRaw(decoder, size, "unspecified-type");
+    }
+
+    <V> V readRaw(final TypeDecoder<V> decoder, final int size, final String typeName)
+    {
+        ValidationSupport.validateLength(typeName, size, _buffer.remaining());
+
         final int oldLimit = _buffer.limit();
-        final int oldPosition = _buffer.position();
+        final int newLimit = _buffer.position() + size;
 
         final V decode;
-
         try {
-            decode = decoder.decode(this, _buffer.limit(_buffer.position() + size));
+            decode = decoder.decode(this, _buffer.limit(newLimit));
+            if (_buffer.position() != newLimit) {
+                throw new DecodeException(typeName + " decode unexpectedly left " + (newLimit - _buffer.position()) + " bytes from size indicated " + size);
+            }
         } finally {
-            _buffer.position(oldPosition + size);
             _buffer.limit(oldLimit);
         }
 
@@ -1119,6 +1189,26 @@ public class DecoderImpl implements ByteBufferDecoder
     interface TypeDecoder<V>
     {
         V decode(DecoderImpl decoder, ReadableBuffer buf);
+    }
+
+    private static final class UnknownDescribedTypeConstructor implements DescribedTypeConstructor<Object> {
+        private final Object descriptor;
+
+        private UnknownDescribedTypeConstructor(Object descriptor) {
+            this.descriptor = descriptor;
+        }
+
+        @Override
+        public DescribedType newInstance(final Object described)
+        {
+            return new UnknownDescribedType(descriptor, described);
+        }
+
+        @Override
+        public Class<?> getTypeClass()
+        {
+            return UnknownDescribedType.class;
+        }
     }
 
     private static class UnknownDescribedType implements DescribedType
@@ -1162,5 +1252,15 @@ public class DecoderImpl implements ByteBufferDecoder
     @Override
     public int getByteBufferRemaining() {
         return _buffer.remaining();
+    }
+
+    @Override
+    public int getZeroWidthArrayElementLimit() {
+        return _zeroWidthElementLimit;
+    }
+
+    @Override
+    public void setZeroWidthArrayElementLimit(int zeroWidthElementLimit) {
+        this._zeroWidthElementLimit = zeroWidthElementLimit;
     }
 }

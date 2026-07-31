@@ -16,6 +16,9 @@
  */
 package org.apache.qpid.proton.codec.messaging;
 
+import static org.apache.qpid.proton.codec.ValidationSupport.validateMapCount;
+import static org.apache.qpid.proton.codec.ValidationSupport.validateMapSize;
+
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -94,68 +97,96 @@ public class FastPathApplicationPropertiesType implements AMQPType<ApplicationPr
         DecoderImpl decoder = getDecoder();
         ReadableBuffer buffer = decoder.getBuffer();
 
-        final int size;
-        final int count;
+        decoder.increaseDecodeDepth();
+        try {
+            final int size;
+            final int count;
 
-        byte encodingCode = buffer.get();
+            byte encodingCode = buffer.get();
 
-        switch (encodingCode) {
-            case EncodingCodes.MAP8:
-                size = buffer.get() & 0xFF;
-                count = buffer.get() & 0xFF;
-                break;
-            case EncodingCodes.MAP32:
-                size = buffer.getInt();
-                count = buffer.getInt();
-                break;
-            case EncodingCodes.NULL:
-                return new ApplicationProperties(null);
-            default:
-                throw new ProtonException("Expected Map type but found encoding: " + encodingCode);
-        }
+            final int oldLimit = buffer.limit();
+            final int newLimit;
 
-        if (count > buffer.remaining()) {
-            throw new IllegalArgumentException("Map element count " + count + " is specified to be greater than the " +
-                                               "amount of data available ("+ buffer.remaining() + ")");
-        }
-
-        TypeConstructor<?> valueConstructor = null;
-
-        Map<String, Object> map = new LinkedHashMap<>(count);
-        for (int i = 0; i < count / 2; i++) {
-            String key = decoder.readString(null);
-            if (key == null) {
-                throw new DecodeException("String key in ApplicationProperties cannot be null");
+            switch (encodingCode) {
+                case EncodingCodes.MAP8:
+                    size = buffer.get() & 0xFF;
+                    validateMapSize(size, buffer.remaining());
+                    newLimit = buffer.position() + size;
+                    count = buffer.get() & 0xFF;
+                    validateMapCount(size, count, buffer.remaining());
+                    break;
+                case EncodingCodes.MAP32:
+                    size = buffer.getInt();
+                    validateMapSize(size, buffer.remaining());
+                    newLimit = buffer.position() + size;
+                    count = buffer.getInt();
+                    validateMapCount(size, count, buffer.remaining());
+                    break;
+                case EncodingCodes.NULL:
+                    return new ApplicationProperties(null);
+                default:
+                    throw new ProtonException("Expected Map type but found encoding: " + encodingCode);
             }
 
-            boolean arrayType = false;
-            byte code = buffer.get(buffer.position());
-            switch (code)
-            {
-                case EncodingCodes.ARRAY8:
-                case EncodingCodes.ARRAY32:
-                    arrayType = true;
+            final Map<String, Object> map;
+            try {
+                buffer.limit(newLimit);
+
+                TypeConstructor<?> valueConstructor = null;
+
+                map = new LinkedHashMap<>(count);
+                for (int i = 0; i < count / 2; i++) {
+                    String key = decoder.readString(null);
+                    if (key == null) {
+                        throw new DecodeException("String key in ApplicationProperties cannot be null");
+                    }
+
+                    boolean arrayType = false;
+                    byte code = buffer.get(buffer.position());
+                    switch (code)
+                    {
+                        case EncodingCodes.ARRAY8:
+                        case EncodingCodes.ARRAY32:
+                            arrayType = true;
+                    }
+
+                    valueConstructor = findNextDecoder(decoder, buffer, valueConstructor);
+
+                    final Object value;
+
+                    if (arrayType) {
+                        value = ((ArrayType.ArrayEncoding) valueConstructor).readValueArray();
+                    } else {
+                        value = valueConstructor.readValue();
+                    }
+
+                    map.put(key, value);
+                }
+
+                if (buffer.position() != newLimit) {
+                    throw new DecodeException("ApplicationProperties incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                }
+            } finally {
+                buffer.limit(oldLimit);
             }
 
-            valueConstructor = findNextDecoder(decoder, buffer, valueConstructor);
-
-            final Object value;
-
-            if (arrayType) {
-                value = ((ArrayType.ArrayEncoding) valueConstructor).readValueArray();
-            } else {
-                value = valueConstructor.readValue();
-            }
-
-            map.put(key, value);
+            return new ApplicationProperties(map);
+        } finally {
+            decoder.decreaseDecodeDepth();
         }
-
-        return new ApplicationProperties(map);
     }
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

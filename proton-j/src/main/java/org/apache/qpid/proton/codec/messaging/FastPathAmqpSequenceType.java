@@ -80,12 +80,21 @@ public class FastPathAmqpSequenceType implements AMQPType<AmqpSequence>, FastPat
 
     @Override
     public AmqpSequence readValue() {
+        // Depth handled by list type readValue
         return new AmqpSequence(getDecoder().readList());
     }
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

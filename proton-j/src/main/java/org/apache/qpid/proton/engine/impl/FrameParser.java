@@ -73,6 +73,7 @@ class FrameParser implements TransportInput
 
     private ByteBuffer _inputBuffer = null;
     private boolean _tail_closed = false;
+    private boolean _tail_closed_seen = false;
 
     private State _state = State.HEADER0;
 
@@ -114,7 +115,7 @@ class FrameParser implements TransportInput
         State state = _state;
         ByteBuffer oldIn = null;
 
-        boolean transportAccepting = true;
+        boolean transportAccepting = !_tail_closed_seen;
 
         while(in.hasRemaining() && state != State.ERROR && transportAccepting)
         {
@@ -392,8 +393,21 @@ class FrameParser implements TransportInput
                         if (frameBodySize > 0)
                         {
                             _decoder.setByteBuffer(in);
-                            val = _decoder.readObject();
-                            _decoder.setByteBuffer(null);
+                            try
+                            {
+                                val = _decoder.readObject();
+                            }
+                            catch(DecodeException de)
+                            {
+                                throw de;
+                            }
+                            catch (RuntimeException re)
+                            {
+                                throw new DecodeException("Exception decoding frame performative: " + re.getMessage(), re);
+                            }
+                            finally {
+                                _decoder.setByteBuffer(null);
+                            }
 
                             if(in.hasRemaining())
                             {
@@ -423,6 +437,9 @@ class FrameParser implements TransportInput
                             if(_frameHandler.isHandlingFrames())
                             {
                                 _tail_closed = _frameHandler.handleFrame(frame);
+                                if (_tail_closed) {
+                                    transportAccepting = false;
+                                }
                             }
                             else
                             {
@@ -457,8 +474,9 @@ class FrameParser implements TransportInput
 
         }
 
-        if (_tail_closed)
+        if (_tail_closed && !_tail_closed_seen)
         {
+            _tail_closed_seen = true;
             if (in.hasRemaining()) {
                 state = State.ERROR;
                 frameParsingError = new TransportException("framing error");
@@ -476,6 +494,7 @@ class FrameParser implements TransportInput
         if(_state == State.ERROR)
         {
             _tail_closed = true;
+            _tail_closed_seen = true;
             if(frameParsingError != null)
             {
                 _parsingError = frameParsingError;
@@ -544,6 +563,10 @@ class FrameParser implements TransportInput
                 } else {
                     _inputBuffer.clear();
                 }
+
+                if(_tail_closed && _tail_closed_seen) {
+                    _inputBuffer = null;
+                }
             }
         }
         else
@@ -555,8 +578,10 @@ class FrameParser implements TransportInput
     @Override
     public void close_tail()
     {
-        _tail_closed = true;
-        process();
+        if (!_tail_closed) {
+            _tail_closed = true;
+            process();
+        }
     }
 
     /**

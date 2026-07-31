@@ -19,6 +19,8 @@
  */
 package org.apache.qpid.proton.engine.impl;
 
+import static org.apache.qpid.proton.amqp.transport.ConnectionError.FRAMING_ERROR;
+import static org.apache.qpid.proton.amqp.transport.SessionError.WINDOW_VIOLATION;
 import static org.apache.qpid.proton.engine.impl.AmqpHeader.HEADER;
 import static org.apache.qpid.proton.engine.impl.TransportTestHelper.stringOfLength;
 import static org.junit.Assert.assertArrayEquals;
@@ -1065,6 +1067,10 @@ public class TransportImplTest
     }
 
     private void doSessionIncomingWindowTestImpl(boolean setFrameSize, boolean setSessionCapacity) {
+        doSessionIncomingWindowTestImpl(setFrameSize, setSessionCapacity, false);
+    }
+
+    private void doSessionIncomingWindowTestImpl(boolean setFrameSize, boolean setSessionCapacity, boolean blowWindow) {
         MockTransportImpl transport;
         if(setFrameSize) {
             transport = new MockTransportImpl(5*1024);
@@ -1074,6 +1080,9 @@ public class TransportImplTest
 
         Connection connection = Proton.connection();
         transport.bind(connection);
+
+        Collector collector = Collector.Factory.create();
+        connection.collect(collector);
 
         connection.open();
 
@@ -1186,6 +1195,48 @@ public class TransportImplTest
             expectedWindowSize = expectedWindowSize +1;
         }
         assertEquals("Unexpected session window", UnsignedInteger.valueOf(expectedWindowSize), sentFlow.getIncomingWindow());
+
+        if (blowWindow) {
+            // Fill the window
+            for (int i = 0; i < expectedWindowSize; i++) {
+                handleTransfer(transport, 2 + i, "tagB" + i, "contentB" + i);
+            }
+
+            assertNull(transport.getCondition());
+
+            while(collector.peek() != null) {
+                collector.pop();
+            }
+
+            // Blow the window
+            handleTransfer(transport, 2 + expectedWindowSize, "tagC1", "contentC1" );
+
+            final ErrorCondition condition = transport.getCondition();
+            assertNotNull(condition);
+            assertNotNull(condition.getCondition());
+            assertEquals(WINDOW_VIOLATION, condition.getCondition());
+
+            Event peek = collector.peek();
+            assertNotNull(peek);
+            assertEquals(Event.Type.TRANSPORT_ERROR, peek.getType());
+
+            pumpMockTransport(transport);
+
+            assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 7, transport.writes.size());
+            final FrameBody frameBody = transport.writes.get(6);
+            assertTrue("Unexpected frame type: " + frameBody, frameBody instanceof Close);
+            assertEquals(WINDOW_VIOLATION, ((Close) frameBody).getError().getCondition());
+
+            assertEquals(Transport.END_OF_STREAM, transport.pending());
+            // Not asserting capacity, since we didnt actually parse frames its state isnt reflective.
+            // See SessionTest#testBlownSessionIncomingWindow for one that does
+        }
+    }
+
+    @Test
+    public void testBlownSessionIncomingWindow()
+    {
+        doSessionIncomingWindowTestImpl(true, true, true);
     }
 
     /**
@@ -2544,21 +2595,141 @@ public class TransportImplTest
     }
 
     @Test
+    public void testSetMaxFrameSizeBelowMinMaxThrowsIAE()
+    {
+        TransportImpl transport = new TransportImpl();
+        try {
+            transport.setMaxFrameSize(1);
+            fail("Expected exception");
+        } catch (IllegalArgumentException iae) {
+            //expected
+        }
+
+        try {
+            transport.setMaxFrameSize(511);
+            fail("Expected exception");
+        } catch (IllegalArgumentException iae) {
+            //expected
+        }
+    }
+
+    @Test
+    public void testSetOutboundFrameSizeLimitBelowMinMaxThrowsIAE()
+    {
+        TransportImpl transport = new TransportImpl();
+        try {
+            transport.setOutboundFrameSizeLimit(1);
+            fail("Expected exception");
+        } catch (IllegalArgumentException iae) {
+            // Expected
+        }
+
+        try {
+            transport.setOutboundFrameSizeLimit(511);
+            fail("Expected exception");
+        } catch (IllegalArgumentException iae) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testMaxFrameSizeOfPeerBelowMinimum()
+    {
+        doRejectPeerMaxFrameSizeTestImpl(UnsignedInteger.valueOf(511));
+        doRejectPeerMaxFrameSizeTestImpl(UnsignedInteger.valueOf(1));
+        doRejectPeerMaxFrameSizeTestImpl(UnsignedInteger.valueOf(0));
+    }
+
+    void doRejectPeerMaxFrameSizeTestImpl(UnsignedInteger remoteMaxFrameSize)
+    {
+        assertNotNull(remoteMaxFrameSize);
+        MockTransportImpl transport = new MockTransportImpl();
+        transport.setEmitFlowEventOnSend(false);
+
+        Connection connection = Proton.connection();
+
+        Collector collector = Collector.Factory.create();
+        connection.collect(collector);
+
+        transport.bind(connection);
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 0, transport.writes.size());
+
+        // Now open the connection, expect the Open frame.
+        connection.open();
+
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+
+        while(collector.peek() != null) {
+            collector.pop();
+        }
+
+        // Send the necessary response to open, with frame size below minimum
+        Open open = new Open();
+        if(remoteMaxFrameSize != null) {
+            open.setMaxFrameSize(remoteMaxFrameSize);
+        }
+        transport.handleFrame(new TransportFrame(0, open, null));
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 1, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+
+        // Now pump the transport again and expect it to close
+        pumpMockTransport(transport);
+
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 2, transport.writes.size());
+        assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
+
+        final FrameBody frameBody = transport.writes.get(1);
+        assertTrue("Unexpected frame type: " + frameBody, frameBody instanceof Close);
+        assertEquals(FRAMING_ERROR, ((Close) frameBody).getError().getCondition());
+
+        final ErrorCondition condition = transport.getCondition();
+        assertNotNull(condition);
+        assertNotNull(condition.getCondition());
+        assertEquals(FRAMING_ERROR, condition.getCondition());
+
+        Event peek = collector.peek();
+        assertNotNull(peek);
+        assertEquals(Event.Type.TRANSPORT_ERROR, peek.getType());
+
+        assertEquals(Transport.END_OF_STREAM, transport.pending());
+        // Not asserting capacity, since we didnt actually parse frames its state isnt reflective.
+    }
+
+    @Test
     public void testMaxFrameSizeOfPeerHasEffect()
     {
-        doMaxFrameSizeTestImpl(0, 0, 5700, 1);
-        doMaxFrameSizeTestImpl(1024, 0, 5700, 6);
+        doMaxFrameSizeTestImpl(null, 0, 5700, 1);
+        doMaxFrameSizeTestImpl(UnsignedInteger.MAX_VALUE, 0, 5700, 1);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(Integer.MAX_VALUE).add(UnsignedInteger.ONE), 0, 5700, 1);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(2048), 0, 5700, 3);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(1024), 0, 5700, 6);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(730), 0, 5700, 9);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(512), 0, 5700, 12);
     }
+
 
     @Test
     public void testMaxFrameSizeOutgoingFrameSizeLimitHasEffect()
     {
-        doMaxFrameSizeTestImpl(0, 512, 5700, 12);
-        doMaxFrameSizeTestImpl(1024, 512, 5700, 12);
-        doMaxFrameSizeTestImpl(1024, 2048, 5700, 6);
+        doMaxFrameSizeTestImpl(null, 1024, 5700, 6);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(512), 1024, 5700, 12);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(730), 1024, 5700, 9);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(1024), 1024, 5700, 6);
+
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(2048), 1024, 5700, 6);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(2048), 1024, 5700, 6);
+        doMaxFrameSizeTestImpl(UnsignedInteger.MAX_VALUE, 1024, 5700, 6);
+        doMaxFrameSizeTestImpl(UnsignedInteger.valueOf(Integer.MAX_VALUE).add(UnsignedInteger.ONE), 1024, 5700, 6);
     }
 
-    void doMaxFrameSizeTestImpl(int remoteMaxFrameSize, int outboundFrameSizeLimit, int contentLength, int expectedNumFrames)
+    void doMaxFrameSizeTestImpl(UnsignedInteger remoteMaxFrameSize, int outboundFrameSizeLimit, int contentLength, int expectedNumTransferFrames)
     {
         MockTransportImpl transport = new MockTransportImpl();
         transport.setEmitFlowEventOnSend(false);
@@ -2591,7 +2762,8 @@ public class TransportImplTest
 
         pumpMockTransport(transport);
 
-        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), 3, transport.writes.size());
+        final int start = 3;
+        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), start, transport.writes.size());
 
         assertTrue("Unexpected frame type", transport.writes.get(0) instanceof Open);
         assertTrue("Unexpected frame type", transport.writes.get(1) instanceof Begin);
@@ -2599,8 +2771,8 @@ public class TransportImplTest
 
         // Send the necessary responses to open/begin/attach then give sender credit
         Open open = new Open();
-        if(remoteMaxFrameSize != 0) {
-            open.setMaxFrameSize(UnsignedInteger.valueOf(remoteMaxFrameSize));
+        if(remoteMaxFrameSize != null) {
+            open.setMaxFrameSize(remoteMaxFrameSize);
         }
         transport.handleFrame(new TransportFrame(0, open, null));
 
@@ -2631,31 +2803,12 @@ public class TransportImplTest
         // Now pump the transport again and expect transfers for the message
         pumpMockTransport(transport);
 
-        // This calc isn't entirely precise, there is some added performative/frame overhead not
-        // accounted for...but values are chosen to work, and verified here.
-        final int frameCount;
-        if(remoteMaxFrameSize == 0 && outboundFrameSizeLimit == 0) {
-            frameCount = 1;
-        } else if(remoteMaxFrameSize == 0 && outboundFrameSizeLimit != 0) {
-            frameCount = (int) Math.ceil((double)contentLength / (double) outboundFrameSizeLimit);
-        } else {
-            int effectiveMaxFrameSize;
-            if(outboundFrameSizeLimit != 0) {
-                effectiveMaxFrameSize = Math.min(outboundFrameSizeLimit, remoteMaxFrameSize);
-            } else {
-                effectiveMaxFrameSize = remoteMaxFrameSize;
-            }
+        final int totalExpected = start + expectedNumTransferFrames;
+        assertEquals("Unexpected total frames written: " + getFrameTypesWritten(transport), totalExpected, transport.writes.size());
 
-            frameCount = (int) Math.ceil((double)contentLength / (double) effectiveMaxFrameSize);
-        }
-
-        assertEquals("Unexpected number of frames calculated", expectedNumFrames, frameCount);
-
-        final int start = 3;
-        final int totalExpected = start + frameCount;
-        assertEquals("Unexpected frames written: " + getFrameTypesWritten(transport), totalExpected, transport.writes.size());
         for(int i = start; i < totalExpected; i++) {
-            assertTrue("Unexpected frame type", transport.writes.get(i) instanceof Transfer);
+            final FrameBody frame = transport.writes.get(i);
+            assertTrue("Unexpected frame type at index " + i + ": " + frame, frame instanceof Transfer);
         }
     }
 
@@ -3827,7 +3980,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x0F, // Frame size = 15 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x11, (byte) 0xC0, // Described-type, ulong type, Begin descriptor, list8.
-                0x03, 0x01, 0x40 }; // size (3), count (1), remote-channel (null).
+                0x02, 0x01, 0x40 }; // size (2), count (1), remote-channel (null).
 
         doInvalidBeginProvokesDecodeErrorTestImpl(bytes, "The outgoing-window field cannot be omitted");
     }
@@ -3838,7 +3991,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x11, // Frame size = 17 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x11, (byte) 0xC0, // Described-type, ulong type, Begin descriptor, list8.
-                0x05, 0x03, 0x40, 0x43, 0x43 }; // size (5), count (3), remote-channel (null), next-outgoing-id (uint0), incoming-window (uint0).
+                0x04, 0x03, 0x40, 0x43, 0x43 }; // size (4), count (3), remote-channel (null), next-outgoing-id (uint0), incoming-window (uint0).
 
         doInvalidBeginProvokesDecodeErrorTestImpl(bytes, "The outgoing-window field cannot be omitted");
     }
@@ -3849,7 +4002,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x12, // Frame size = 18 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x11, (byte) 0xC0, // Described-type, ulong type, Begin descriptor, list8.
-                0x06, 0x04, 0x40, 0x43, 0x43, 0x40 }; // size (5), count (4), remote-channel (null), next-outgoing-id (uint0), incoming-window (uint0), outgoing-window (null).
+                0x05, 0x04, 0x40, 0x43, 0x43, 0x40 }; // size (5), count (4), remote-channel (null), next-outgoing-id (uint0), incoming-window (uint0), outgoing-window (null).
 
         doInvalidBeginProvokesDecodeErrorTestImpl(bytes, "Unexpected null value - mandatory field not set? (the outgoing-window field is mandatory)");
     }
@@ -3912,7 +4065,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x0F, // Frame size = 15 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x13, (byte) 0xC0, // Described-type, ulong type, Flow descriptor, list8.
-                0x03, 0x01, 0x43 }; // size (3), count (1), next-incoming-id (uint0).
+                0x02, 0x01, 0x43 }; // size (2), count (1), next-incoming-id (uint0).
 
         doInvalidFlowProvokesDecodeErrorTestImpl(bytes, "The outgoing-window field cannot be omitted");
     }
@@ -3923,7 +4076,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x11, // Frame size = 17 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x13, (byte) 0xC0, // Described-type, ulong type, Flow descriptor, list8.
-                0x05, 0x03, 0x43, 0x43, 0x43 }; // size (5), count (3), next-incoming-id (0), incoming-window (uint0), next-outgoing-id (uint0).
+                0x04, 0x03, 0x43, 0x43, 0x43 }; // size (4), count (3), next-incoming-id (0), incoming-window (uint0), next-outgoing-id (uint0).
 
         doInvalidFlowProvokesDecodeErrorTestImpl(bytes, "The outgoing-window field cannot be omitted");
     }
@@ -3934,7 +4087,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x12, // Frame size = 18 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x13, (byte) 0xC0, // Described-type, ulong type, Flow descriptor, list8.
-                0x06, 0x04, 0x43, 0x43, 0x43, 0x40 }; // size (5), count (4), next-incoming-id (0), incoming-window (uint0), next-outgoing-id (uint0), outgoing-window (null).
+                0x05, 0x04, 0x43, 0x43, 0x43, 0x40 }; // size (5), count (4), next-incoming-id (0), incoming-window (uint0), next-outgoing-id (uint0), outgoing-window (null).
 
         doInvalidFlowProvokesDecodeErrorTestImpl(bytes, "Unexpected null value - mandatory field not set? (the outgoing-window field is mandatory)");
     }
@@ -4009,7 +4162,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x0F, // Frame size = 15 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x14, (byte) 0xC0, // Described-type, ulong type, Transfer descriptor, list8.
-                0x03, 0x01, 0x40 }; // size (3), count (1), handle (null / not-present).
+                0x02, 0x01, 0x40 }; // size (2), count (1), handle (null / not-present).
 
         doInvalidTransferProvokesDecodeErrorTestImpl(bytes, "Unexpected null value - mandatory field not set? (the handle field is mandatory)");
     }
@@ -4020,7 +4173,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x0F, // Frame size = 15 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x14, (byte) 0xC0, // Described-type, ulong type, Transfer descriptor, list8.
-                0x03, 0x01, (byte) 0xA3 }; // size (3), count (1), handle (invalid sym8 type constructor given, not really present).
+                0x02, 0x01, (byte) 0xA3 }; // size (2), count (1), handle (invalid sym8 type constructor given, not really present).
 
         doInvalidTransferProvokesDecodeErrorTestImpl(bytes, "Expected UnsignedInteger type but found encoding: SYM8:0xa3");
     }
@@ -4108,7 +4261,7 @@ public class TransportImplTest
         byte[] bytes = new byte[] {  0x00, 0x00, 0x00, 0x10, // Frame size = 16 bytes.
                 0x02, 0x00, 0x00, 0x00, // DOFF, TYPE, 2x CHANNEL
                 0x00, 0x53, 0x15, (byte) 0xC0, // Described-type, ulong type, Disposition descriptor, list8.
-                0x04, 0x02, 0x41, 0x40 }; // size (4), count (2), role (receiver - the peers perspective), first ( null / not-present)
+                0x03, 0x02, 0x41, 0x40 }; // size (3), count (2), role (receiver - the peers perspective), first ( null / not-present)
 
         doInvalidDispositionProvokesDecodeErrorTestImpl(bytes, "Unexpected null value - mandatory field not set? (the first field is mandatory)");
     }
@@ -5195,4 +5348,25 @@ public class TransportImplTest
         // Check the delivery isnt in the work list as it clearly cant be sent now the sender is closed.
         assertNull("Expected the transport work list to be empty", connection.getTransportWorkHead());
     }
+
+    @Test
+    public void testSetGetMaxTransfersPerDelivery()
+    {
+        TransportImpl transport = new TransportImpl();
+        assertEquals(65535, transport.getMaxTransfersPerDelivery());
+
+        transport.setMaxTransfersPerDelivery(2);
+        assertEquals(2, transport.getMaxTransfersPerDelivery());
+
+        transport.setMaxTransfersPerDelivery(0);
+        assertEquals(0, transport.getMaxTransfersPerDelivery());
+
+        try {
+            transport.setMaxTransfersPerDelivery(-1);
+            fail("Expected exception");
+        } catch (IllegalArgumentException iae) {
+            //expected
+        }
+    }
+
 }

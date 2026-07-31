@@ -21,6 +21,7 @@ package org.apache.qpid.proton;
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.DescribedType;
 import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.UnsignedLong;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.apache.qpid.proton.codec.AMQPDefinedTypes;
 import org.apache.qpid.proton.codec.Decoder;
@@ -135,7 +136,7 @@ public class InteropTest
         assertEquals("foo-value", dt.getDescribed());
 
         dt = (DescribedType) (d.readObject());
-        assertEquals(12, dt.getDescriptor());
+        assertEquals(UnsignedLong.valueOf(12), dt.getDescriptor());
         assertEquals(13, dt.getDescribed());
     }
 

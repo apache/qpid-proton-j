@@ -21,16 +21,23 @@
 
 package org.apache.qpid.proton.engine.impl;
 
+import static org.apache.qpid.proton.amqp.transport.SessionError.WINDOW_VIOLATION;
+
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.qpid.proton.amqp.Binary;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
+import org.apache.qpid.proton.amqp.transport.AmqpError;
 import org.apache.qpid.proton.amqp.transport.Disposition;
 import org.apache.qpid.proton.amqp.transport.Flow;
+import org.apache.qpid.proton.amqp.transport.LinkError;
 import org.apache.qpid.proton.amqp.transport.Role;
 import org.apache.qpid.proton.amqp.transport.Transfer;
 import org.apache.qpid.proton.engine.Event;
+import org.apache.qpid.proton.engine.TransportConditionException;
 
 class TransportSession
 {
@@ -71,6 +78,7 @@ class TransportSession
     private boolean _endReceived;
     private boolean _beginSent;
     private boolean _endSent;
+    private boolean _transferLimitBlown;
 
     TransportSession(TransportImpl transport, SessionImpl session)
     {
@@ -279,6 +287,10 @@ class TransportSession
 
     public void handleTransfer(Transfer transfer, Binary payload)
     {
+        if(checkIncomingWindow()) {
+            return;
+        }
+
         DeliveryImpl delivery;
         incrementNextIncomingId(); // The conceptual/non-wire transfer-id, for the session window.
 
@@ -290,6 +302,10 @@ class TransportSession
         {
             delivery = _unsettledIncomingDeliveriesById.get(linkIncomingDeliveryId);
             delivery.getTransportDelivery().incrementSessionSize();
+
+            if(checkTransfersPerDeliveryLimit(delivery)) {
+                return;
+            }
         }
         else
         {
@@ -298,6 +314,7 @@ class TransportSession
             _incomingDeliveryId = deliveryId;
 
             ReceiverImpl receiver = transportReceiver.getReceiver();
+
             Binary deliveryTag = transfer.getDeliveryTag();
             delivery = receiver.delivery(deliveryTag.getArray(), deliveryTag.getArrayOffset(),
                                                       deliveryTag.getLength());
@@ -353,6 +370,41 @@ class TransportSession
         }
 
         getSession().getConnection().put(Event.Type.DELIVERY, delivery);
+    }
+
+    private boolean checkTransfersPerDeliveryLimit(DeliveryImpl delivery) {
+        if (_transferLimitBlown)
+        {
+            return true;
+        }
+
+        if (_transport.getMaxTransfersPerDelivery() > 0)
+        {
+            if (delivery.getTransportDelivery().getSessionSize() > _transport.getMaxTransfersPerDelivery())
+            {
+                _transport.closed(new TransportConditionException("Max transfers per delivery limit exceeded", LinkError.TRANSFER_LIMIT_EXCEEDED));
+                _transferLimitBlown = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean checkIncomingWindow() {
+        if (_transferLimitBlown)
+        {
+            return true;
+        }
+
+        if (UnsignedInteger.ZERO.equals(_incomingWindowSize))
+        {
+            _transferLimitBlown = true;
+            _transport.closed(new TransportConditionException("Session incoming window exceeded", WINDOW_VIOLATION));
+            return true;
+        }
+
+        return false;
     }
 
     private void verifyNewDeliveryIdSequence(UnsignedInteger previousId, UnsignedInteger linkIncomingId, UnsignedInteger newDeliveryId) {
@@ -434,13 +486,96 @@ class TransportSession
 
     void handleDisposition(Disposition disposition)
     {
-        UnsignedInteger id = disposition.getFirst();
-        UnsignedInteger last = disposition.getLast() == null ? id : disposition.getLast();
+        final UnsignedInteger first = disposition.getFirst();
         final Map<UnsignedInteger, DeliveryImpl> unsettledDeliveries =
                 disposition.getRole() == Role.RECEIVER ? _unsettledOutgoingDeliveriesById
                         : _unsettledIncomingDeliveriesById;
 
-        while(id.compareTo(last)<=0)
+        if (disposition.getLast() == null || first.equals(disposition.getLast())) {
+            applyDispositionSingle(first, disposition, unsettledDeliveries);
+            return;
+        }
+
+        final UnsignedInteger last = disposition.getLast();
+
+        final long range = getSequenceRange(first, last);
+        if (range > Integer.MAX_VALUE) {
+            _transport.closed(new TransportConditionException("Invalid disposition sequence range: " + first.longValue() + " to " + last.longValue(), AmqpError.NOT_ALLOWED));
+            return;
+        }
+
+        final long count = range + 1;
+        if (count > unsettledDeliveries.size())
+        {
+            applyDispositionByEntries(first, range, disposition, unsettledDeliveries);
+        }
+        else
+        {
+            applyDispositionByRange(first, range, disposition, unsettledDeliveries);
+        }
+    }
+
+    private void applyDispositionSingle(final UnsignedInteger id, final Disposition disposition,
+                                        final Map<UnsignedInteger, DeliveryImpl> unsettledDeliveries)
+    {
+        DeliveryImpl delivery = unsettledDeliveries.get(id);
+        if(delivery != null)
+        {
+            if(disposition.getState() != null)
+            {
+                delivery.setRemoteDeliveryState(disposition.getState());
+            }
+            if(disposition.getSettled())
+            {
+                delivery.setRemoteSettled(true);
+                unsettledDeliveries.remove(id);
+            }
+            delivery.updateWork();
+
+            getSession().getConnection().put(Event.Type.DELIVERY, delivery);
+        }
+    }
+
+    private long getSequenceRange(final UnsignedInteger first, final UnsignedInteger last) {
+        return (last.intValue() - first.intValue()) & 0xFFFFFFFFL;
+    }
+
+    private void applyDispositionByEntries(final UnsignedInteger first, final long range, final Disposition disposition,
+                                           final Map<UnsignedInteger, DeliveryImpl> unsettledDeliveries)
+    {
+        Set<UnsignedInteger> deliveryIDs = unsettledDeliveries.keySet();
+        Iterator<UnsignedInteger> idIterator = deliveryIDs.iterator();
+
+        while (idIterator.hasNext())
+        {
+            final UnsignedInteger id = idIterator.next();
+
+            if (getSequenceRange(first, id) <= range)
+            {
+                final DeliveryImpl delivery = unsettledDeliveries.get(id);
+                if (disposition.getState() != null)
+                {
+                    delivery.setRemoteDeliveryState(disposition.getState());
+                }
+                if (disposition.getSettled())
+                {
+                    delivery.setRemoteSettled(true);
+
+                    // Remove it from the map, via the key iterator
+                    idIterator.remove();
+                }
+                delivery.updateWork();
+
+                getSession().getConnection().put(Event.Type.DELIVERY, delivery);
+            }
+        }
+    }
+
+    private void applyDispositionByRange(final UnsignedInteger first, final long range, final Disposition disposition,
+                                         final Map<UnsignedInteger, DeliveryImpl> unsettledDeliveries)
+    {
+        UnsignedInteger id = first;
+        for (long i = 0L; i <= range; i++)
         {
             DeliveryImpl delivery = unsettledDeliveries.get(id);
             if(delivery != null)
@@ -449,7 +584,7 @@ class TransportSession
                 {
                     delivery.setRemoteDeliveryState(disposition.getState());
                 }
-                if(Boolean.TRUE.equals(disposition.getSettled()))
+                if(disposition.getSettled())
                 {
                     delivery.setRemoteSettled(true);
                     unsettledDeliveries.remove(id);
@@ -458,9 +593,9 @@ class TransportSession
 
                 getSession().getConnection().put(Event.Type.DELIVERY, delivery);
             }
+
             id = id.add(UnsignedInteger.ONE);
         }
-        //TODO - Implement.
     }
 
     void addUnsettledOutgoing(UnsignedInteger deliveryId, DeliveryImpl delivery)

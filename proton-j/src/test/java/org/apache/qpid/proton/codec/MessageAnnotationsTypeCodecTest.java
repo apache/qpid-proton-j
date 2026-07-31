@@ -19,11 +19,17 @@ package org.apache.qpid.proton.codec;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Map.Entry;
 
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.UnsignedByte;
@@ -126,4 +132,193 @@ public class MessageAnnotationsTypeCodecTest extends CodecTestSupport {
         assertEquals(resultMap.get(SYMBOL_1), stringKeyedMap);
         assertEquals(resultMap.get(SYMBOL_2), symbolKeyedMap);
     }
+
+      @Test
+      public void testDecodeMessageAnnotations() throws Exception {
+          Object o = doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(false, 25, 6);
+          assertDecodedMessageAnnotations(o);
+
+          o = doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 28, 6);
+          assertDecodedMessageAnnotations(o);
+      }
+
+      @Test
+      public void testDecodeThrowsWithSizeBeyondAvailable() throws Exception {
+          try {
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(false, 25 + 1, 6);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map size 26 cannot be more than remaining bytes 25", de.getMessage());
+          }
+
+          try {
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 28 + 1, 6);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map size 29 cannot be more than remaining bytes 28", de.getMessage());
+          }
+      }
+
+      @Test
+      public void testDecodeThrowsWithNegativeSize() throws Exception {
+          try {
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, UnsignedInteger.MAX_VALUE.intValue(), 6);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map size -1 cannot be negative", de.getMessage());
+          }
+      }
+
+      @Test
+      public void testDecodeThrowsWithNegativeCount() throws Exception {
+          try {
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 28, UnsignedInteger.MAX_VALUE.intValue());
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map element count -1 cannot be negative", de.getMessage());
+          }
+      }
+
+      @Test
+      public void testDecodeThrowsWithCountLargerThanSize() throws Exception {
+          try {
+              // Deliberately tries not to decode the full map, so the 'remaining' checks dont foul
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 20, 22);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map element count 22 must be less than size (20)", de.getMessage());
+          }
+      }
+
+      @Test
+      public void testDecodeThrowsWithOddCount() throws Exception {
+          try {
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(false, 25, 5);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map element count 5 cannot be odd", de.getMessage());
+          }
+
+          try {
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 28, 5);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("Map element count 5 cannot be odd", de.getMessage());
+          }
+      }
+
+      private Object doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(final boolean map32, int size, int count) {
+          ByteBuffer tmpBuf = ByteBuffer.allocate(1024);
+          tmpBuf.put((byte) 0x00); // DescribedType
+          tmpBuf.put((byte) 0x53); // small-ulong
+          tmpBuf.put((byte) 0x72); // message-annotations ulong descriptor
+          if (map32) {
+              tmpBuf.put((byte) (byte) 0xD1); // map32 primitive type constructor
+              tmpBuf.putInt(size); // size
+              tmpBuf.putInt(count); // count
+          } else {
+              tmpBuf.put((byte) (byte) 0xC1); // map8 primitive type constructor
+              tmpBuf.put((byte) size); // size
+              tmpBuf.put((byte) count); // count
+          }
+
+          tmpBuf.put((byte) 0xA3); // sym8
+          tmpBuf.put((byte) 1); // length
+          tmpBuf.put((byte) 0x33); // "3"
+          tmpBuf.put((byte) 0x71); // int
+          tmpBuf.putInt(3);
+
+          tmpBuf.put((byte) 0xA3); // sym8
+          tmpBuf.put((byte) 1); // length
+          tmpBuf.put((byte) 0x32); // "2"
+          tmpBuf.put((byte) 0x71); // int
+          tmpBuf.putInt(2);
+
+          tmpBuf.put((byte) 0xA3); // sym8
+          tmpBuf.put((byte) 1); // length
+          tmpBuf.put((byte) 0x31); // "1"
+          tmpBuf.put((byte) 0x71); // int
+          tmpBuf.putInt(1);
+
+          tmpBuf.flip();
+          int oldLimit = tmpBuf.limit();
+
+          decoder.setByteBuffer(tmpBuf);
+
+          final Object decoded;
+          try {
+              decoded = decoder.readObject();
+          } finally {
+              assertEquals(oldLimit, tmpBuf.limit());
+          }
+          assertEquals(oldLimit, tmpBuf.position());
+
+          return decoded;
+      }
+
+      private void assertDecodedMessageAnnotations(Object o) {
+          assertTrue(o instanceof MessageAnnotations);
+          Map<Symbol,Object> map = ((MessageAnnotations)o).getValue();
+          assertTrue(map instanceof LinkedHashMap);
+
+          assertEquals(3, map.size());
+          assertEquals(Integer.valueOf(3), map.get(Symbol.valueOf("3")));
+          assertEquals(Integer.valueOf(2), map.get(Symbol.valueOf("2")));
+          assertEquals(Integer.valueOf(1), map.get(Symbol.valueOf("1")));
+
+          Iterator<Map.Entry<Symbol,Object>> iterator = map.entrySet().iterator();
+          assertTrue(iterator.hasNext());
+
+          Entry<Symbol, Object> entry = iterator.next();
+          assertEquals(Symbol.valueOf("3"), entry.getKey());
+          assertEquals(Integer.valueOf(3), entry.getValue());
+
+          assertTrue(iterator.hasNext());
+          entry = iterator.next();
+          assertEquals(Symbol.valueOf("2"), entry.getKey());
+          assertEquals(Integer.valueOf(2), entry.getValue());
+
+          assertTrue(iterator.hasNext());
+          entry = iterator.next();
+          assertEquals(Symbol.valueOf("1"), entry.getKey());
+          assertEquals(Integer.valueOf(1), entry.getValue());
+      }
+
+      @Test
+      public void testDecodeOverflowThrows() throws Exception {
+          try {
+              // Deliberately pass size for part map, but count for full map...will try to decode count, overflow size
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(false, 25 -8, 6);
+              fail("Expected exception to be thrown");
+          } catch (BufferUnderflowException bue) {
+              // Expected
+          }
+
+          try {
+              // Deliberately pass size for part map, but count for full map...will try to decode count, overflow size
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 28 - 8, 6);
+              fail("Expected exception to be thrown");
+          } catch (BufferUnderflowException bue) {
+              // Expected
+          }
+      }
+
+      @Test
+      public void testDecodeUnderflowThrows() throws Exception {
+          try {
+              // Deliberately pass size for full map, but count for part map...will try to decode count, underflow size
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(false, 25, 6 - 2);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("MessageAnnotations incorrectly encoded, left 8 bytes from size indicated 25", de.getMessage());
+          }
+
+          try {
+              // Deliberately pass size for full map, but count for part map...will try to decode count, underflow size
+              doDecodeMessageAnnotationsWithSpecificSizeCountTestImpl(true, 28, 6 - 2);
+              fail("Expected exception to be thrown");
+          } catch (DecodeException de) {
+              assertEquals("MessageAnnotations incorrectly encoded, left 8 bytes from size indicated 28", de.getMessage());
+          }
+      }
 }

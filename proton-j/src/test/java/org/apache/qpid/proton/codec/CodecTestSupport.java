@@ -27,13 +27,15 @@ public class CodecTestSupport {
 
     public static final int DEFAULT_MAX_BUFFER = 256 * 1024;
 
-    final DecoderImpl decoder = new DecoderImpl();
-    final EncoderImpl encoder = new EncoderImpl(decoder);
+    protected DecoderImpl decoder;
+    protected EncoderImpl encoder;
 
-    ByteBuffer buffer;
+    protected ByteBuffer buffer;
 
     @Before
     public void setUp() {
+        decoder = new DecoderImpl();
+        encoder = new EncoderImpl(decoder);
         AMQPDefinedTypes.registerAllTypes(decoder, encoder);
 
         buffer = ByteBuffer.allocate(getMaxBufferSize());

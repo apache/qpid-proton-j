@@ -62,4 +62,15 @@ public class DynamicTypeConstructor implements TypeConstructor
     {
         return _describedTypeConstructor.getTypeClass();
     }
+
+    public TypeConstructor getUnderlyingEncoding()
+    {
+        return _underlyingEncoding;
+    }
+
+    public DescribedTypeConstructor getDescribedTypeConstructor()
+    {
+        return _describedTypeConstructor;
+    }
+
 }

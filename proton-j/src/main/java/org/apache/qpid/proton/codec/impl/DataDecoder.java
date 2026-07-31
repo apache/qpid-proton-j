@@ -21,19 +21,36 @@
 
 package org.apache.qpid.proton.codec.impl;
 
+import static org.apache.qpid.proton.codec.impl.DataValidationSupport.validateConstructorSize;
+import static org.apache.qpid.proton.codec.impl.DataValidationSupport.validateListCount;
+import static org.apache.qpid.proton.codec.impl.DataValidationSupport.validateListSize;
+import static org.apache.qpid.proton.codec.impl.DataValidationSupport.validateMapCount;
+import static org.apache.qpid.proton.codec.impl.DataValidationSupport.validateMapSize;
+import static org.apache.qpid.proton.codec.impl.DataValidationSupport.validateSizeInitial;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.UUID;
 
 import org.apache.qpid.proton.amqp.*;
 import org.apache.qpid.proton.codec.Data;
+import org.apache.qpid.proton.codec.EncodingCodes;
 
 class DataDecoder
 {
 
     private static final Charset ASCII = Charset.forName("US-ASCII");
     private static final Charset UTF_8 = Charset.forName("UTF-8");
+
+    private static final long AMQP_VALUE_NUMERIC_CODE = 0x0000000000000077L;
+    private static final String AMQP_VALUE_SYMBOLIC_NAME = "amqp:amqp-value:*";
+    private static final int AMQP_VALUE_SYMBOLIC_NAME_LENGTH = AMQP_VALUE_SYMBOLIC_NAME.length();
+    private static final byte[] AMQP_VALUE_SYMBOLIC_NAME_BYTES =AMQP_VALUE_SYMBOLIC_NAME.getBytes(StandardCharsets.US_ASCII);
+    private static final Symbol AMQP_VALUE_SYMBOLIC_DESCRIPTOR = Symbol.valueOf(AMQP_VALUE_SYMBOLIC_NAME);
+    private static final UnsignedLong AMQP_VALUE_NUMERIC_DESCRIPTOR = UnsignedLong.valueOf(AMQP_VALUE_NUMERIC_CODE);
 
     private static final TypeConstructor[] _constructors = new TypeConstructor[256];
 
@@ -99,19 +116,20 @@ class DataDecoder
     {
         Data.DataType getType();
 
-        int size(ByteBuffer b);
+        int size(ByteBuffer b, DataImpl data);
 
-        void parse(ByteBuffer b, Data data);
+        void parse(ByteBuffer b, DataImpl data);
     }
 
 
-    static int decode(ByteBuffer b, Data data)
+    static int decode(ByteBuffer b, DataImpl data)
     {
         if(b.hasRemaining())
         {
             int position = b.position();
             TypeConstructor c = readConstructor(b);
-            final int size = c.size(b);
+            final int size = c.size(b, data);
+
             if(b.remaining() >= size)
             {
                 c.parse(b, data);
@@ -120,10 +138,42 @@ class DataDecoder
             else
             {
                 b.position(position);
-                return -4;
+                return -4; // PN_UNDERFLOW
             }
         }
         return 0;
+    }
+
+    private static TypeConstructor readDescriptorConstructor(ByteBuffer b)
+    {
+        final byte type = b.get();
+        if (EncodingCodes.SMALLULONG == type || EncodingCodes.ULONG == type || EncodingCodes.SYM8 == type || EncodingCodes.SYM32 == type)
+        {
+            final int index = type & 0xff;
+            TypeConstructor tc = _constructors[index];
+            if(tc == null)
+            {
+                throw new IllegalArgumentException("No constructor for type " + index);
+            }
+
+            return tc;
+        }
+        else
+        {
+            throw new IllegalArgumentException("Reserved non-ulong/non-symbol described-type descriptors not supported by this decoder");
+        }
+    }
+
+    private static TypeConstructor readDescribedConstructor(ByteBuffer buf, boolean isAmqpValue)
+    {
+        final TypeConstructor constructor = readConstructor(buf);
+
+        if (!isAmqpValue && Data.DataType.DESCRIBED == constructor.getType())
+        {
+            throw new IllegalArgumentException("DescribedType value encoding cannot be another DescribedType, must be a primitive type");
+        }
+
+        return constructor;
     }
 
     private static TypeConstructor readConstructor(ByteBuffer b)
@@ -137,8 +187,7 @@ class DataDecoder
         return tc;
     }
 
-
-    private static class NullConstructor implements TypeConstructor
+    private static class NullConstructor extends Fixed0SizeConstructor
     {
         @Override
         public Data.DataType getType()
@@ -147,19 +196,13 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
-        {
-            return 0;
-        }
-
-        @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putNull();
         }
     }
 
-    private static class TrueConstructor implements TypeConstructor
+    private static class TrueConstructor extends Fixed0SizeConstructor
     {
         @Override
         public Data.DataType getType()
@@ -168,20 +211,14 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
-        {
-            return 0;
-        }
-
-        @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putBoolean(true);
         }
     }
 
 
-    private static class FalseConstructor implements TypeConstructor
+    private static class FalseConstructor extends Fixed0SizeConstructor
     {
 
         @Override
@@ -191,19 +228,13 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
-        {
-            return 0;
-        }
-
-        @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putBoolean(false);
         }
     }
 
-    private static class UInt0Constructor implements TypeConstructor
+    private static class UInt0Constructor extends Fixed0SizeConstructor
     {
 
         @Override
@@ -213,19 +244,13 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
-        {
-            return 0;
-        }
-
-        @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedInteger(UnsignedInteger.ZERO);
         }
     }
 
-    private static class ULong0Constructor implements TypeConstructor
+    private static class ULong0Constructor extends Fixed0SizeConstructor
     {
 
         @Override
@@ -235,20 +260,14 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
-        {
-            return 0;
-        }
-
-        @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedLong(UnsignedLong.ZERO);
         }
     }
 
 
-    private static class EmptyListConstructor implements TypeConstructor
+    private static class EmptyListConstructor extends Fixed0SizeConstructor
     {
 
         @Override
@@ -258,15 +277,31 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
+        public void parse(ByteBuffer b, DataImpl data)
         {
-            return 0;
+            data.increaseDecodeDepth();
+            try
+            {
+                data.putList();
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public int size(ByteBuffer b, DataImpl data)
         {
-            data.putList();
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
         }
     }
 
@@ -274,7 +309,7 @@ class DataDecoder
     private static abstract class Fixed0SizeConstructor implements TypeConstructor
     {
         @Override
-        public final int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             return 0;
         }
@@ -283,7 +318,7 @@ class DataDecoder
     private static abstract class Fixed1SizeConstructor implements TypeConstructor
     {
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             return 1;
         }
@@ -292,7 +327,7 @@ class DataDecoder
     private static abstract class Fixed2SizeConstructor implements TypeConstructor
     {
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             return 2;
         }
@@ -301,7 +336,7 @@ class DataDecoder
     private static abstract class Fixed4SizeConstructor implements TypeConstructor
     {
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             return 4;
         }
@@ -310,7 +345,7 @@ class DataDecoder
     private static abstract class Fixed8SizeConstructor implements TypeConstructor
     {
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             return 8;
         }
@@ -319,7 +354,7 @@ class DataDecoder
     private static abstract class Fixed16SizeConstructor implements TypeConstructor
     {
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             return 16;
         }
@@ -335,7 +370,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedByte(UnsignedByte.valueOf(b.get()));
         }
@@ -351,7 +386,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putByte(b.get());
         }
@@ -367,7 +402,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedInteger(UnsignedInteger.valueOf(((int) b.get()) & 0xff));
         }
@@ -383,7 +418,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putInt(b.get());
         }
@@ -399,7 +434,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedLong(UnsignedLong.valueOf(((int) b.get()) & 0xff));
         }
@@ -415,7 +450,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putLong(b.get());
         }
@@ -431,7 +466,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int i = b.get();
             if(i != 0 && i != 1)
@@ -452,7 +487,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedShort(UnsignedShort.valueOf(b.getShort()));
         }
@@ -468,7 +503,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putShort(b.getShort());
         }
@@ -484,7 +519,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedInteger(UnsignedInteger.valueOf(b.getInt()));
         }
@@ -500,7 +535,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putInt(b.getInt());
         }
@@ -516,7 +551,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putFloat(b.getFloat());
         }
@@ -532,7 +567,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putChar(b.getInt());
         }
@@ -548,7 +583,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putDecimal32(new Decimal32(b.getInt()));
         }
@@ -564,7 +599,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUnsignedLong(UnsignedLong.valueOf(b.getLong()));
         }
@@ -580,7 +615,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putLong(b.getLong());
         }
@@ -596,7 +631,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putDouble(b.getDouble());
         }
@@ -612,7 +647,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putTimestamp(new Date(b.getLong()));
         }
@@ -628,7 +663,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putDecimal64(new Decimal64(b.getLong()));
         }
@@ -644,7 +679,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putDecimal128(new Decimal128(b.getLong(), b.getLong()));
         }
@@ -660,7 +695,7 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putUUID(new UUID(b.getLong(), b.getLong()));
         }
@@ -670,15 +705,16 @@ class DataDecoder
     {
 
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             int position = b.position();
             if(b.hasRemaining())
             {
                 int size = b.get() & 0xff;
+                validateTypeSize(size);
                 b.position(position);
 
-                return size+1;
+                return validateConstructorSize(size+1);
             }
             else
             {
@@ -686,21 +722,23 @@ class DataDecoder
             }
         }
 
+        public abstract void validateTypeSize(int size);
     }
 
     private static abstract class VariableConstructor implements TypeConstructor
     {
 
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             int position = b.position();
             if(b.remaining()>=4)
             {
                 int size = b.getInt();
+                validateTypeSize(size);
                 b.position(position);
 
-                return size+4;
+                return validateConstructorSize(size+4);
             }
             else
             {
@@ -708,11 +746,12 @@ class DataDecoder
             }
         }
 
+        public abstract void validateTypeSize(int size);
     }
-
 
     private static class SmallBinaryConstructor extends SmallVariableConstructor
     {
+        private static final String TYPE = "Binary";
 
         @Override
         public Data.DataType getType()
@@ -721,17 +760,24 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int size = b.get() & 0xff;
+            DataValidationSupport.validateSize(TYPE, size, b.remaining());
             byte[] bytes = new byte[size];
             b.get(bytes);
             data.putBinary(bytes);
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
         }
     }
 
     private static class SmallSymbolConstructor extends SmallVariableConstructor
     {
+        private static final String TYPE = "Symbol";
 
         @Override
         public Data.DataType getType()
@@ -740,18 +786,25 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int size = b.get() & 0xff;
+            DataValidationSupport.validateSize(TYPE, size, b.remaining());
             byte[] bytes = new byte[size];
             b.get(bytes);
             data.putSymbol(Symbol.valueOf(new String(bytes, ASCII)));
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
         }
     }
 
 
     private static class SmallStringConstructor extends SmallVariableConstructor
     {
+        private static final String TYPE = "String";
 
         @Override
         public Data.DataType getType()
@@ -760,17 +813,24 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int size = b.get() & 0xff;
+            DataValidationSupport.validateSize(TYPE, size, b.remaining());
             byte[] bytes = new byte[size];
             b.get(bytes);
             data.putString(new String(bytes, UTF_8));
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
         }
     }
 
     private static class BinaryConstructor extends VariableConstructor
     {
+        private static final String TYPE = "Binary";
 
         @Override
         public Data.DataType getType()
@@ -779,17 +839,24 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int size = b.getInt();
+            DataValidationSupport.validateSize(TYPE, size, b.remaining());
             byte[] bytes = new byte[size];
             b.get(bytes);
             data.putBinary(bytes);
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            DataValidationSupport.validateSizeInitial(TYPE, size);
         }
     }
 
     private static class SymbolConstructor extends VariableConstructor
     {
+        private static final String TYPE = "Symbol";
 
         @Override
         public Data.DataType getType()
@@ -798,18 +865,25 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int size = b.getInt();
+            DataValidationSupport.validateSize(TYPE, size, b.remaining());
             byte[] bytes = new byte[size];
             b.get(bytes);
             data.putSymbol(Symbol.valueOf(new String(bytes, ASCII)));
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            DataValidationSupport.validateSizeInitial(TYPE, size);
         }
     }
 
 
     private static class StringConstructor extends VariableConstructor
     {
+        private static final String TYPE = "String";
 
         @Override
         public Data.DataType getType()
@@ -818,18 +892,25 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             int size = b.getInt();
+            DataValidationSupport.validateSize(TYPE, size, b.remaining());
             byte[] bytes = new byte[size];
             b.get(bytes);
             data.putString(new String(bytes, UTF_8));
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            DataValidationSupport.validateSizeInitial(TYPE, size);
         }
     }
 
 
     private static class SmallListConstructor extends SmallVariableConstructor
     {
+        private static final String TYPE = "List";
 
         @Override
         public Data.DataType getType()
@@ -838,21 +919,51 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
-            int size = b.get() & 0xff;
-            ByteBuffer buf = b.slice();
-            buf.limit(size);
-            b.position(b.position()+size);
-            int count = buf.get() & 0xff;
-            data.putList();
-            parseChildren(data, buf, count);
+            data.increaseDecodeDepth();
+            try
+            {
+                int size = b.get() & 0xff;
+                validateListSize(size, b.remaining());
+                ByteBuffer buf = b.slice();
+                buf.limit(size);
+                b.position(b.position()+size);
+                int count = buf.get() & 0xff;
+                validateListCount(size, count, buf.remaining());
+                data.putList();
+                parseChildren(data, buf, count, TYPE, size);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public int size(ByteBuffer b, DataImpl data)
+        {
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
         }
     }
 
 
     private static class SmallMapConstructor extends SmallVariableConstructor
     {
+        private static final String TYPE = "Map";
 
         @Override
         public Data.DataType getType()
@@ -861,21 +972,51 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
-            int size = b.get() & 0xff;
-            ByteBuffer buf = b.slice();
-            buf.limit(size);
-            b.position(b.position()+size);
-            int count = buf.get() & 0xff;
-            data.putMap();
-            parseChildren(data, buf, count);
+            data.increaseDecodeDepth();
+            try
+            {
+                int size = b.get() & 0xff;
+                validateMapSize(size, b.remaining());
+                ByteBuffer buf = b.slice();
+                buf.limit(size);
+                b.position(b.position()+size);
+                int count = buf.get() & 0xff;
+                validateMapCount(size, count, buf.remaining());
+                data.putMap();
+                parseChildren(data, buf, count, TYPE, size);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public int size(ByteBuffer b, DataImpl data)
+        {
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
         }
     }
 
 
     private static class ListConstructor extends VariableConstructor
     {
+        private static final String TYPE = "List";
 
         @Override
         public Data.DataType getType()
@@ -884,21 +1025,51 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
-            int size = b.getInt();
-            ByteBuffer buf = b.slice();
-            buf.limit(size);
-            b.position(b.position()+size);
-            int count = buf.getInt();
-            data.putList();
-            parseChildren(data, buf, count);
+            data.increaseDecodeDepth();
+            try
+            {
+                int size = b.getInt();
+                validateListSize(size, b.remaining());
+                ByteBuffer buf = b.slice();
+                buf.limit(size);
+                b.position(b.position()+size);
+                int count = buf.getInt();
+                validateListCount(size, count, buf.remaining());
+                data.putList();
+                parseChildren(data, buf, count, TYPE, size);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public int size(ByteBuffer b, DataImpl data)
+        {
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            DataValidationSupport.validateSizeInitial(TYPE, size);
         }
     }
 
 
     private static class MapConstructor extends VariableConstructor
     {
+        private static final String TYPE = "Map";
 
         @Override
         public Data.DataType getType()
@@ -907,26 +1078,55 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
-            int size = b.getInt();
-            ByteBuffer buf = b.slice();
-            buf.limit(size);
-            b.position(b.position()+size);
-            int count = buf.getInt();
-            data.putMap();
-            parseChildren(data, buf, count);
+            data.increaseDecodeDepth();
+            try
+            {
+                int size = b.getInt();
+                validateMapSize(size, b.remaining());
+                ByteBuffer buf = b.slice();
+                buf.limit(size);
+                b.position(b.position()+size);
+                int count = buf.getInt();
+                validateMapCount(size, count, buf.remaining());
+                data.putMap();
+                parseChildren(data, buf, count, TYPE, size);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public int size(ByteBuffer b, DataImpl data)
+        {
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            DataValidationSupport.validateSizeInitial(TYPE, size);
         }
     }
 
 
-    private static void parseChildren(Data data, ByteBuffer buf, int count)
+    private static void parseChildren(DataImpl data, ByteBuffer buf, int count, String type, int parentSize)
     {
         data.enter();
         for(int i = 0; i < count; i++)
         {
             TypeConstructor c = readConstructor(buf);
-            final int size = c.size(buf);
+            final int size = c.size(buf, data);
             final int remaining = buf.remaining();
             if(size <= remaining)
             {
@@ -936,14 +1136,18 @@ class DataDecoder
             {
                 throw new IllegalArgumentException("Malformed data");
             }
-
         }
+
+        if (buf.position() != parentSize)
+        {
+            throw new IllegalArgumentException(type + " incorrectly encoded, left " + (buf.remaining()) + " bytes from size indicated " + parentSize);
+        }
+
         data.exit();
     }
 
     private static class DescribedTypeConstructor implements TypeConstructor
     {
-
         @Override
         public Data.DataType getType()
         {
@@ -951,46 +1155,97 @@ class DataDecoder
         }
 
         @Override
-        public int size(ByteBuffer b)
+        public int size(ByteBuffer b, DataImpl data)
         {
             ByteBuffer buf = b.slice();
             if(buf.hasRemaining())
             {
-                TypeConstructor c = readConstructor(buf);
-                int size = c.size(buf);
-                if(buf.remaining()>size)
+                TypeConstructor c = readDescriptorConstructor(buf);
+                int descriptorConstructorSize = c.size(buf, data);
+                long dtConstructorSize = 1L + descriptorConstructorSize; // 1 more for the type code in readDescriptorConstructor
+
+                if(buf.remaining() > descriptorConstructorSize)
                 {
-                    buf.position(size + 1);
-                    c = readConstructor(buf);
-                    return size + 2 + c.size(buf);
+                    buf.position(buf.position() + descriptorConstructorSize);
+
+                    final ByteBuffer descriptorCheckBuf = b.slice(); // slice of original buffer b, not buf!
+                    final boolean isAmqpValue = isAmqpValueDescriptor(descriptorCheckBuf);
+
+                    c = readDescribedConstructor(buf, isAmqpValue);
+
+                    final boolean countOwnDepth = isAmqpValue && Data.DataType.DESCRIBED.equals(c.getType());
+                    if (countOwnDepth)
+                    {
+                        data.increaseDecodeDepth();
+                    }
+                    try
+                    {
+                        int describedConstructorSize = c.size(buf, data);
+                        dtConstructorSize += 1L + describedConstructorSize; // 1  more for the type code in readDescribedConstructor
+                    }
+                    finally
+                    {
+                        if (countOwnDepth)
+                        {
+                            data.decreaseDecodeDepth();
+                        }
+                    }
                 }
                 else
                 {
-                    return size + 2;
+                    dtConstructorSize += 1; // another 1 more for the described constructor type code not yet read
                 }
+
+                if (dtConstructorSize > Integer.MAX_VALUE) {
+                    throw new IllegalArgumentException("DescribedTypeConstructor total size cannot exceed " + Integer.MAX_VALUE + " but was: " + dtConstructorSize);
+                }
+
+                return validateConstructorSize((int) dtConstructorSize);
             }
             else
             {
                 return 1;
             }
-
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
             data.putDescribed();
             data.enter();
-            TypeConstructor c = readConstructor(b);
+
+            TypeConstructor c = readDescriptorConstructor(b);
+
             c.parse(b, data);
-            c = readConstructor(b);
-            c.parse(b, data);
-            data.exit();
+
+            Object current = data.getObject();
+            boolean isAmqpValue = AMQP_VALUE_NUMERIC_DESCRIPTOR.equals(current) || AMQP_VALUE_SYMBOLIC_DESCRIPTOR.equals(current);
+
+            c = readDescribedConstructor(b, isAmqpValue);
+
+            boolean countOwnDepth = isAmqpValue && Data.DataType.DESCRIBED.equals(c.getType());
+            if (countOwnDepth)
+            {
+                data.increaseDecodeDepth();
+            }
+            try
+            {
+                c.parse(b, data);
+                data.exit();
+            }
+            finally
+            {
+                if (countOwnDepth)
+                {
+                    data.decreaseDecodeDepth();
+                }
+            }
         }
     }
 
     private static class SmallArrayConstructor extends SmallVariableConstructor
     {
+        private static final String TYPE = "Array";
 
         @Override
         public Data.DataType getType()
@@ -999,21 +1254,50 @@ class DataDecoder
         }
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
+            data.increaseDecodeDepth();
+            try
+            {
+                int size = b.get() & 0xff;
+                validateArraySizeInitial(size, b.remaining());
+                ByteBuffer buf = b.slice();
+                buf.limit(size);
+                b.position(b.position()+size);
+                int count = buf.get() & 0xff;
+                validateArrayCountInitial(count);
 
-            int size = b.get() & 0xff;
-            ByteBuffer buf = b.slice();
-            buf.limit(size);
-            b.position(b.position()+size);
-            int count = buf.get() & 0xff;
-            parseArray(data, buf, count);
+                parseArray(data, buf, count, size);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
         }
 
+        @Override
+        public int size(ByteBuffer b, DataImpl data)
+        {
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
+        }
     }
 
     private static class ArrayConstructor extends VariableConstructor
     {
+        private static final String TYPE = "Array";
 
         @Override
         public Data.DataType getType()
@@ -1023,52 +1307,198 @@ class DataDecoder
 
 
         @Override
-        public void parse(ByteBuffer b, Data data)
+        public void parse(ByteBuffer b, DataImpl data)
         {
+            data.increaseDecodeDepth();
+            try
+            {
+                int size = b.getInt();
+                validateArraySizeInitial(size, b.remaining());
+                ByteBuffer buf = b.slice();
+                buf.limit(size);
+                b.position(b.position()+size);
+                int count = buf.getInt();
+                validateArrayCountInitial(count);
 
-            int size = b.getInt();
-            ByteBuffer buf = b.slice();
-            buf.limit(size);
-            b.position(b.position()+size);
-            int count = buf.getInt();
-            parseArray(data, buf, count);
+                parseArray(data, buf, count, size);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public int size(ByteBuffer b, DataImpl data)
+        {
+            data.increaseDecodeDepth();
+            try
+            {
+                return super.size(b, data);
+            }
+            finally
+            {
+                data.decreaseDecodeDepth();
+            }
+        }
+
+        @Override
+        public void validateTypeSize(int size) {
+            validateSizeInitial(TYPE, size);
         }
     }
 
-    private static void parseArray(Data data, ByteBuffer buf, int count)
+    private static void parseArray(DataImpl data, ByteBuffer buf, int count, int size)
     {
+        // element constructor
         byte type = buf.get();
-        boolean isDescribed = type == (byte)0x00;
+        boolean isDescribed = isTypeCodeDescribedTypeIndicator(type);
         int descriptorPosition = buf.position();
         if(isDescribed)
         {
-            TypeConstructor descriptorTc = readConstructor(buf);
-            buf.position(buf.position()+descriptorTc.size(buf));
+            TypeConstructor descriptorTc = readDescriptorConstructor(buf);
+            buf.position(buf.position() + descriptorTc.size(buf, data));
             type = buf.get();
-            if(type == (byte)0x00)
+            if(isTypeCodeDescribedTypeIndicator(type))
             {
-                throw new IllegalArgumentException("Malformed array data");
+                throw new IllegalArgumentException("DescribedType value encoding cannot be another DescribedType, must be a primitive type");
             }
-
         }
-        TypeConstructor tc = _constructors[type&0xff];
 
+        // read array / elements
+        TypeConstructor tc = _constructors[type&0xff];
+        checkArraySizeCountConstructor(data, buf.remaining(), tc, count, size);
         data.putArray(isDescribed, tc.getType());
         data.enter();
         if(isDescribed)
         {
             int position = buf.position();
             buf.position(descriptorPosition);
-            TypeConstructor descriptorTc = readConstructor(buf);
-            descriptorTc.parse(buf,data);
+            TypeConstructor descriptorTc = readDescriptorConstructor(buf);
+            descriptorTc.parse(buf, data);
             buf.position(position);
         }
         for(int i = 0; i<count; i++)
         {
-            tc.parse(buf,data);
+            tc.parse(buf, data);
+        }
+
+        if (buf.position() != size)
+        {
+            throw new IllegalArgumentException("Array incorrectly encoded, left " + (buf.remaining()) + " bytes from size indicated " + size);
         }
 
         data.exit();
     }
 
+    private static void validateArraySizeInitial(int size, int remaining)
+    {
+        if (size < 0)
+        {
+            throw new IllegalArgumentException("Array size " + size + " cannot be negative");
+        }
+
+        if (size > remaining)
+        {
+            throw new IllegalArgumentException("Array size " + size + " cannot be more than remaining bytes " + remaining);
+        }
+    }
+
+    private static void validateArrayCountInitial(int count)
+    {
+        if (count < 0)
+        {
+            throw new IllegalArgumentException("Array element count " + count + " cannot be negative");
+        }
+    }
+
+    private static void checkArraySizeCountConstructor(Data data, int remaining, final TypeConstructor constructor, final int count, final int size)
+    {
+        if(constructor instanceof Fixed0SizeConstructor)
+        {
+            if (count > data.getZeroWidthElementLimit())
+            {
+                throw new IllegalArgumentException("Array element count " + count + " is specified to be greater than the allowed 0-width-element limit for arrays ("
+                        + data.getZeroWidthElementLimit() + ")");
+            }
+            else
+            {
+                // Remaining checks are not valid for these cases, return
+                return;
+            }
+        }
+
+        if (count > size)
+        {
+            throw new IllegalArgumentException("Array element count " + count + " is specified to be greater than the size of array (" + size + ")");
+        }
+
+        if (count > remaining)
+        {
+            throw new IllegalArgumentException("Array element count " + count + " is specified to be greater than the amount of data available (" + remaining + ")");
+        }
+    }
+
+    private static boolean isTypeCodeDescribedTypeIndicator(byte type)
+    {
+        return type == (byte)0x00;
+    }
+
+    private static boolean isAmqpValueDescriptor(ByteBuffer buf)
+    {
+        if(buf.hasRemaining())
+        {
+            byte type = buf.get();
+            switch (type) {
+                case EncodingCodes.SMALLULONG:
+                    if(buf.hasRemaining())
+                    {
+                        byte value = buf.get();
+
+                        return value == AMQP_VALUE_NUMERIC_CODE;
+                    }
+                    break;
+                case EncodingCodes.ULONG:
+                    if (buf.remaining() >= 8)
+                    {
+                        long value = buf.getLong();
+
+                        return value == AMQP_VALUE_NUMERIC_CODE;
+                    }
+                    break;
+                case EncodingCodes.SYM8:
+                    if(buf.hasRemaining())
+                    {
+                        int length = buf.get() & 0xFF;
+
+                        return checkSymbolContentIsAmqpValue(buf, length);
+                    }
+                    break;
+                case EncodingCodes.SYM32:
+                    if (buf.remaining() >= 4)
+                    {
+                        int length = buf.getInt();
+                        validateSizeInitial("Symbol", length);
+
+                        return checkSymbolContentIsAmqpValue(buf, length);
+                    }
+                    break;
+                default:
+                    throw new IllegalArgumentException("Reserved non-ulong/non-symbol described-type descriptors not supported by this decoder");
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean checkSymbolContentIsAmqpValue(ByteBuffer buf, int length) {
+        if (length == AMQP_VALUE_SYMBOLIC_NAME_LENGTH && length <= buf.remaining()) {
+            byte[] bytes = new byte[AMQP_VALUE_SYMBOLIC_NAME_LENGTH];
+            buf.get(bytes);
+
+            return Arrays.equals(AMQP_VALUE_SYMBOLIC_NAME_BYTES, bytes);
+        }
+
+        return false;
+    }
 }

@@ -143,6 +143,35 @@ public interface Decoder
     Object readObject();
     Object readObject(Object defaultValue);
 
+    /**
+     * Returns the maximum number of array elements allowed while decoding arrays of zero-width
+     * elements (ulong0, uint0, list0, boolean-true, boolean-false, null) before a decode exception.
+     *
+     * @return the maximum number of zero-width elements allowed in an array.
+     */
+    int getZeroWidthArrayElementLimit();
+
+    /**
+     * Configures the maximum number of array elements allowed while decoding arrays of zero-width
+     * elements (ulong0, uint0, list0, boolean-true, boolean-false, null) before a decode exception.
+     * Default is 0, meaning only the empty array is permitted.
+     */
+    void setZeroWidthArrayElementLimit(int zeroWidthElementLimit);
+
+    /**
+     * Returns the maximum decode depth allowed before error when decoding Maps, Lists,
+     * Arrays, and certain related DescribedTypes from an encoded payload.
+     *
+     * @return the maximum depth limit before error for Maps, Lists, Arrays and related DescribedTypes.
+     */
+    int getMaxDecodeDepth();
+
+    /**
+     * Configures the maximum decode depth allowed before error when decoding Maps, Lists,
+     * Arrays, and certain related DescribedTypes from an encoded payload. Default is 50.
+     */
+    void setMaxDecodeDepth(int maxDecodeDepth);
+
     void register(final Object descriptor, final DescribedTypeConstructor dtc);
 
     void register(final Object descriptor, final FastPathDescribedTypeConstructor<?> dtc);

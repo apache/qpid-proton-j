@@ -27,6 +27,8 @@ import org.apache.qpid.proton.amqp.Binary;
 
 public class BinaryType extends AbstractPrimitiveType<Binary>
 {
+    private static final String TYPE_NAME = "binary";
+
     private final BinaryEncoding _binaryEncoding;
     private final BinaryEncoding _shortBinaryEncoding;
 
@@ -132,12 +134,11 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         public Binary readValue()
         {
             final DecoderImpl decoder = getDecoder();
-            int size = decoder.readRawInt();
-            if (size > decoder.getByteBufferRemaining()) {
-                throw new IllegalArgumentException("Binary data size "+size+" is specified to be greater than the amount of data available ("+
-                                                   decoder.getByteBufferRemaining()+")");
-            }
-            byte[] data = new byte[size];
+            final int size = decoder.readRawInt();
+
+            ValidationSupport.validateLength(TYPE_NAME, size, decoder.getByteBufferRemaining());
+
+            final byte[] data = new byte[size];
             decoder.readRaw(data, 0, size);
             return new Binary(data);
         }
@@ -145,9 +146,12 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         @Override
         public void skipValue()
         {
-            DecoderImpl decoder = getDecoder();
-            ReadableBuffer buffer = decoder.getBuffer();
-            int size = decoder.readRawInt();
+            final DecoderImpl decoder = getDecoder();
+            final ReadableBuffer buffer = decoder.getBuffer();
+            final int size = decoder.readRawInt();
+
+            ValidationSupport.validateLength(TYPE_NAME, size, buffer.remaining());
+
             buffer.position(buffer.position() + size);
         }
     }
@@ -196,18 +200,25 @@ public class BinaryType extends AbstractPrimitiveType<Binary>
         @Override
         public Binary readValue()
         {
-            int size = ((int)getDecoder().readRawByte()) & 0xff;
-            byte[] data = new byte[size];
-            getDecoder().readRaw(data, 0, size);
+            final DecoderImpl decoder = getDecoder();
+            final int size = ((int) decoder.readRawByte()) & 0xff;
+
+            ValidationSupport.validateLength(TYPE_NAME, size, decoder.getByteBufferRemaining());
+
+            final byte[] data = new byte[size];
+            decoder.readRaw(data, 0, size);
             return new Binary(data);
         }
 
         @Override
         public void skipValue()
         {
-            DecoderImpl decoder = getDecoder();
-            ReadableBuffer buffer = decoder.getBuffer();
-            int size = ((int)getDecoder().readRawByte()) & 0xff;
+            final DecoderImpl decoder = getDecoder();
+            final ReadableBuffer buffer = decoder.getBuffer();
+            final int size = ((int) decoder.readRawByte()) & 0xff;
+
+            ValidationSupport.validateLength(TYPE_NAME, size, buffer.remaining());
+
             buffer.position(buffer.position() + size);
         }
     }

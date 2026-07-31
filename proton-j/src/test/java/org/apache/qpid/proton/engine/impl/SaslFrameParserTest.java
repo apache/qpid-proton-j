@@ -64,9 +64,9 @@ public class SaslFrameParserTest
 
     public SaslFrameParserTest()
     {
-        DecoderImpl decoder = new DecoderImpl();
-        EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder,encoder);
+        DecoderImpl decoder = new DecoderImpl(true);
+        EncoderImpl encoder = new EncoderImpl(decoder, true);
+        AMQPDefinedTypes.registerSecurityTypes(decoder,encoder);
 
         _frameParser = new SaslFrameParser(_mockSaslFrameHandler, decoder, Transport.MIN_MAX_FRAME_SIZE, mockTransport);
         _saslFrameBody = new SaslInit();

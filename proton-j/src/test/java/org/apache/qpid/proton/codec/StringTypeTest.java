@@ -22,6 +22,7 @@ package org.apache.qpid.proton.codec;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.lang.Character.UnicodeBlock;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import org.apache.qpid.proton.amqp.UnsignedInteger;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -42,7 +44,7 @@ import org.mockito.Mockito;
 /**
  * Test the encoding and decoding of {@link StringType} values.
  */
-public class StringTypeTest
+public class StringTypeTest extends CodecTestSupport
 {
     private static final List<String> TEST_DATA = generateTestData();
 
@@ -105,9 +107,6 @@ public class StringTypeTest
     @Test
     public void encodeDecodeStrings()
     {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
         final ByteBuffer bb = ByteBuffer.allocate(16);
 
         for (final String input : TEST_DATA)
@@ -126,9 +125,6 @@ public class StringTypeTest
     @Test
     public void testSkipString()
     {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
         final ByteBuffer buffer = ByteBuffer.allocate(64);
 
         decoder.setByteBuffer(buffer);
@@ -149,10 +145,6 @@ public class StringTypeTest
 
     @Test
     public void testEncodeAndDecodeEmptyString() {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-
         final ByteBuffer buffer = ByteBuffer.allocate(64);
 
         encoder.setByteBuffer(buffer);
@@ -185,10 +177,6 @@ public class StringTypeTest
     }
 
     public void doTestEmptyStringEncodeAsGivenType(byte encodingCode) {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-
         final ByteBuffer buffer = ByteBuffer.allocate(64);
 
         buffer.put(encodingCode);
@@ -212,11 +200,6 @@ public class StringTypeTest
 
     @Test
     public void testDecodeNonStringWhenStringExpectedReportsUsefulError() {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-
         final ByteBuffer buffer = ByteBuffer.allocate(64);
         final UUID encoded = UUID.randomUUID();
 
@@ -252,11 +235,6 @@ public class StringTypeTest
 
     @Test
     public void testDecodeUnknownTypeWhenStringExpectedReportsUsefulError() {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-
         final ByteBuffer buffer = ByteBuffer.allocate(64);
 
         buffer.put((byte) 0x01);
@@ -323,10 +301,6 @@ public class StringTypeTest
     }
 
     private void doTestEncodeStringTypeReservation(int size) throws IOException {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-
         StringBuilder builder = new StringBuilder(size);
         for (int i = 0; i < size; ++i) {
             builder.append(i);
@@ -344,10 +318,6 @@ public class StringTypeTest
 
     @Test
     public void testEncodeAndDecodeUsingWritableBufferDefaultPutString() throws Exception {
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
-
         // Verify that the default put(String) impl is being used by the buffers
         Method m = WritableBufferWithoutPutStringOverride.class.getMethod("put", String.class);
         assertTrue("Expected method to be default", m.isDefault());
@@ -464,9 +434,6 @@ public class StringTypeTest
         unicodeStringBuilder.append((char) 1002);
         unicodeStringBuilder.append((char) 1003);
 
-        final DecoderImpl decoder = new DecoderImpl();
-        final EncoderImpl encoder = new EncoderImpl(decoder);
-        AMQPDefinedTypes.registerAllTypes(decoder, encoder);
         final ByteBuffer bb = ByteBuffer.allocate(1024);
 
         final AmqpValue inputValue = new AmqpValue(unicodeStringBuilder.toString());
@@ -492,5 +459,74 @@ public class StringTypeTest
         final AmqpValue outputValue = (AmqpValue) decoder.readObject();
 
         assertEquals("Failed to round trip String correctly: ", unicodeStringBuilder.toString(), outputValue.getValue());
+    }
+
+    @Test
+    public void testDecodeString() throws Exception {
+        Object o = doDecodeStringWithSpecificSizeTestImpl(false, 5);
+        assertEquals("54321", o);
+
+        o = doDecodeStringWithSpecificSizeTestImpl(true, 5);
+        assertEquals("54321", o);
+    }
+
+    @Test
+    public void testDecodeThrowsWithSizeBeyondAvailable() throws Exception {
+        try {
+            doDecodeStringWithSpecificSizeTestImpl(false, 5 + 1);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("string length 6 cannot be more than remaining bytes 5", de.getMessage());
+        }
+
+        try {
+            doDecodeStringWithSpecificSizeTestImpl(true, 5 + 1);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("string length 6 cannot be more than remaining bytes 5", de.getMessage());
+        }
+    }
+
+    @Test
+    public void testDecodeThrowsWithNegativeSize() throws Exception {
+        try {
+            doDecodeStringWithSpecificSizeTestImpl(true, UnsignedInteger.MAX_VALUE.intValue());
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("string length -1 cannot be negative", de.getMessage());
+        }
+    }
+
+    private Object doDecodeStringWithSpecificSizeTestImpl(final boolean sym32, int size) {
+        ByteBuffer tmpBuf = ByteBuffer.allocate(1024);
+        if (sym32) {
+            tmpBuf.put((byte) (byte) 0xB1); // str32 primitive type constructor
+            tmpBuf.putInt(size); // size
+        } else {
+            assertTrue(size < 256);
+            tmpBuf.put((byte) (byte) 0xA1); // str8 primitive type constructor
+            tmpBuf.put((byte) size); // size
+        }
+        tmpBuf.put((byte) 0x35); // "5"
+        tmpBuf.put((byte) 0x34); // "4"
+        tmpBuf.put((byte) 0x33); // "3"
+        tmpBuf.put((byte) 0x32); // "2"
+        tmpBuf.put((byte) 0x31); // "1"
+
+
+        tmpBuf.flip();
+        int oldLimit = tmpBuf.limit();
+
+        decoder.setByteBuffer(tmpBuf);
+
+        final Object decoded;
+        try {
+            decoded = decoder.readObject();
+        } finally {
+            assertEquals(oldLimit, tmpBuf.limit());
+        }
+        assertEquals(oldLimit, tmpBuf.position());
+
+        return decoded;
     }
 }

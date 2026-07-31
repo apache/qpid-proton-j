@@ -27,6 +27,7 @@ import org.apache.qpid.proton.codec.DecoderImpl;
 import org.apache.qpid.proton.codec.EncoderImpl;
 import org.apache.qpid.proton.codec.EncodingCodes;
 import org.apache.qpid.proton.codec.FastPathDescribedTypeConstructor;
+import org.apache.qpid.proton.codec.ReadableBuffer;
 import org.apache.qpid.proton.codec.TypeEncoding;
 import org.apache.qpid.proton.codec.WritableBuffer;
 
@@ -80,12 +81,36 @@ public class FastPathAmqpValueType implements AMQPType<AmqpValue>, FastPathDescr
 
     @Override
     public AmqpValue readValue() {
-        return new AmqpValue(getDecoder().readObject());
+        final DecoderImpl decoder = getDecoder();
+        final ReadableBuffer buffer = decoder.getBuffer();
+
+        // Peeks ahead, doesnt read the byte
+        final byte nestedEncodingCode = buffer.get(buffer.position());
+        final boolean countOwnDepth = nestedEncodingCode == EncodingCodes.DESCRIBED_TYPE_INDICATOR;
+
+        if(countOwnDepth) {
+            decoder.increaseDecodeDepth();
+        }
+        try {
+            return new AmqpValue(decoder.readObject());
+        } finally {
+            if(countOwnDepth) {
+                decoder.decreaseDecodeDepth();
+            }
+        }
     }
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

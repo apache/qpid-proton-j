@@ -115,7 +115,7 @@ class InteropTest(common.Test):
 
         assert self.data.next() == Data.DESCRIBED
         self.data.enter()
-        self.assert_next(Data.INT, 12)
+        self.assert_next(Data.ULONG, 12)
         self.assert_next(Data.INT, 13)
         self.data.exit()
 

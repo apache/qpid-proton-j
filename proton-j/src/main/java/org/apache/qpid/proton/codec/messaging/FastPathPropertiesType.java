@@ -16,6 +16,9 @@
  */
 package org.apache.qpid.proton.codec.messaging;
 
+import static org.apache.qpid.proton.codec.ValidationSupport.validateListCount;
+import static org.apache.qpid.proton.codec.ValidationSupport.validateListSize;
+
 import java.util.Collection;
 
 import org.apache.qpid.proton.amqp.Symbol;
@@ -61,79 +64,106 @@ public class FastPathPropertiesType implements AMQPType<Properties>, FastPathDes
         ReadableBuffer buffer = decoder.getBuffer();
         byte typeCode = decoder.getBuffer().get();
 
-        @SuppressWarnings("unused")
         int size = 0;
         int count = 0;
 
+        final int oldLimit = buffer.limit();
+        final int newLimit;
+
         switch (typeCode) {
             case EncodingCodes.LIST0:
+                newLimit = buffer.position();
                 break;
             case EncodingCodes.LIST8:
                 size = buffer.get() & 0xff;
+                validateListSize(size, buffer.remaining());
+                newLimit = buffer.position() + size;
                 count = buffer.get() & 0xff;
+                validateListCount(size, count, buffer.remaining());
                 break;
             case EncodingCodes.LIST32:
                 size = buffer.getInt();
+                validateListSize(size, buffer.remaining());
+                newLimit = buffer.position() + size;
                 count = buffer.getInt();
+                validateListCount(size, count, buffer.remaining());
                 break;
             default:
                 throw new DecodeException("Incorrect type found in Properties encoding: " + typeCode);
         }
 
-        Properties properties = new Properties();
+        try {
+            buffer.limit(newLimit);
 
-        for (int index = 0; index < count; ++index) {
-            switch (index) {
-                case 0:
-                    properties.setMessageId(decoder.readObject());
-                    break;
-                case 1:
-                    properties.setUserId(decoder.readBinary(null));
-                    break;
-                case 2:
-                    properties.setTo(decoder.readString(null));
-                    break;
-                case 3:
-                    properties.setSubject(decoder.readString(null));
-                    break;
-                case 4:
-                    properties.setReplyTo(decoder.readString(null));
-                    break;
-                case 5:
-                    properties.setCorrelationId(decoder.readObject());
-                    break;
-                case 6:
-                    properties.setContentType(decoder.readSymbol(null));
-                    break;
-                case 7:
-                    properties.setContentEncoding(decoder.readSymbol(null));
-                    break;
-                case 8:
-                    properties.setAbsoluteExpiryTime(decoder.readTimestamp(null));
-                    break;
-                case 9:
-                    properties.setCreationTime(decoder.readTimestamp(null));
-                    break;
-                case 10:
-                    properties.setGroupId(decoder.readString(null));
-                    break;
-                case 11:
-                    properties.setGroupSequence(decoder.readUnsignedInteger(null));
-                    break;
-                case 12:
-                    properties.setReplyToGroupId(decoder.readString(null));
-                    break;
-                default:
-                    throw new IllegalStateException("To many entries in Properties encoding");
+            Properties properties = new Properties();
+
+            for (int index = 0; index < count; ++index) {
+                switch (index) {
+                    case 0:
+                        properties.setMessageId(decoder.readObject());
+                        break;
+                    case 1:
+                        properties.setUserId(decoder.readBinary(null));
+                        break;
+                    case 2:
+                        properties.setTo(decoder.readString(null));
+                        break;
+                    case 3:
+                        properties.setSubject(decoder.readString(null));
+                        break;
+                    case 4:
+                        properties.setReplyTo(decoder.readString(null));
+                        break;
+                    case 5:
+                        properties.setCorrelationId(decoder.readObject());
+                        break;
+                    case 6:
+                        properties.setContentType(decoder.readSymbol(null));
+                        break;
+                    case 7:
+                        properties.setContentEncoding(decoder.readSymbol(null));
+                        break;
+                    case 8:
+                        properties.setAbsoluteExpiryTime(decoder.readTimestamp(null));
+                        break;
+                    case 9:
+                        properties.setCreationTime(decoder.readTimestamp(null));
+                        break;
+                    case 10:
+                        properties.setGroupId(decoder.readString(null));
+                        break;
+                    case 11:
+                        properties.setGroupSequence(decoder.readUnsignedInteger(null));
+                        break;
+                    case 12:
+                        properties.setReplyToGroupId(decoder.readString(null));
+                        break;
+                    default:
+                        throw new IllegalStateException("To many entries in Properties encoding");
+                }
             }
-        }
 
-        return properties;
+            if (buffer.position() != newLimit) {
+                throw new DecodeException("Properties incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+            }
+
+            return properties;
+        } finally {
+            buffer.limit(oldLimit);
+        }
     }
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

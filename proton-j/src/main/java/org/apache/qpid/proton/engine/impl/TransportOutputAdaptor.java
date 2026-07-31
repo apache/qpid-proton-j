@@ -56,7 +56,10 @@ class TransportOutputAdaptor implements TransportOutput
             init_buffers();
         }
 
-        _output_done = _transportOutputWriter.writeInto(_outputBuffer);
+        if (!_output_done)
+        {
+            _output_done = _transportOutputWriter.writeInto(_outputBuffer);
+        }
         _head.limit(_outputBuffer.position());
 
         if (_outputBuffer.position() == 0 && _outputBuffer.capacity() > TransportImpl.BUFFER_RELEASE_THRESHOLD)

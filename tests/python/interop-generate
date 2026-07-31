@@ -77,7 +77,7 @@ def main(argv):
 
     d.put_described()
     d.enter()
-    d.put_int(12)
+    d.put_ulong(12)
     d.put_int(13)
     d.exit()
 

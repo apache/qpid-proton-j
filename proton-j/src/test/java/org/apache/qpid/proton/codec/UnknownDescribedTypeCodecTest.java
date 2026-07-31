@@ -18,9 +18,12 @@ package org.apache.qpid.proton.codec;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -109,6 +112,181 @@ public class UnknownDescribedTypeCodecTest extends CodecTestSupport {
 
         DescribedType resultTye = (DescribedType) mapEntry;
         assertEquals(NoLocalType.NO_LOCAL.getDescriptor(), resultTye.getDescriptor());
+    }
+
+    @Test
+    public void testReadConstructorUnknownDescribedType() throws Exception {
+        encoder.writeObject(NoLocalType.NO_LOCAL);
+
+        buffer.flip();
+
+        TypeConstructor<?> result = decoder.readConstructor();
+
+        assertTrue(result instanceof DynamicTypeConstructor);
+        DynamicTypeConstructor c1 = (DynamicTypeConstructor) result;
+
+        assertTrue(buffer.remaining() > 0);
+
+        buffer.flip();
+
+        result = decoder.readConstructor();
+
+        assertTrue(result instanceof DynamicTypeConstructor);
+        DynamicTypeConstructor c2 = (DynamicTypeConstructor) result;
+
+        assertSame(c1.getDescribedTypeConstructor(), c2.getDescribedTypeConstructor());
+        assertSame(c1.getUnderlyingEncoding(), c2.getUnderlyingEncoding());
+    }
+
+    @Test
+    public void testSymbolDescriptorConstructorReuse() throws Exception {
+
+        final int limit = 16;
+        int attempts = doSymbolDescriptorReuseTestImpl(limit, "UNKNOWN");
+        assertTrue("Attempts not as expected: " + attempts, attempts > 5);
+        assertTrue("Attempts not as expected: " + attempts, attempts <= limit);
+    }
+
+    @Test
+    public void testSymbolDescriptorConstructorReuseLong() throws Exception {
+
+        final int limit = 16;
+        final StringBuilder descriptorPrefix = new StringBuilder("UNKNOWN");
+        final String descriptorPrefixPad = "123456789_";
+        for (int i = 1; i <= 6; i++)
+        {
+            descriptorPrefix.append(descriptorPrefixPad);
+        }
+        assertTrue(descriptorPrefix.length() > 64);
+
+        int attempts = doSymbolDescriptorReuseTestImpl(limit, descriptorPrefix.toString());
+
+        assertEquals("Expected no reuse", 0, attempts);
+    }
+
+    private int doSymbolDescriptorReuseTestImpl(final int limit, String descriptorPrefix) {
+        boolean notSame = false;
+        int attempts = 0;
+        for (; attempts < limit + 5; attempts++)
+        {
+            final String descriptorValue = descriptorPrefix + attempts;
+            final byte[] bytes = descriptorValue.getBytes(StandardCharsets.US_ASCII);
+            assertTrue(bytes.length < 128);
+            buffer.clear();
+
+            buffer.put((byte) 0x00); // DescribedType
+            buffer.put(EncodingCodes.SYM8); // Symbol
+            buffer.put((byte) bytes.length); // descriptor length
+            buffer.put(bytes); // descriptor value
+            buffer.put((byte) 0x45); // list0 primitive type constructor
+
+            buffer.flip();
+
+            TypeConstructor<?> result = decoder.readConstructor();
+
+            assertTrue(result instanceof DynamicTypeConstructor);
+            DynamicTypeConstructor c1 = (DynamicTypeConstructor) result;
+
+            buffer.flip();
+
+            result = decoder.readConstructor();
+
+            assertTrue(result instanceof DynamicTypeConstructor);
+            DynamicTypeConstructor c2 = (DynamicTypeConstructor) result;
+
+            if (c1.getDescribedTypeConstructor() != c2.getDescribedTypeConstructor())
+            {
+                notSame = true;
+                break;
+            }
+        }
+
+        assertTrue(notSame);
+
+        return attempts;
+    }
+
+    @Test
+    public void testUnknownDescribedTypeDuringSasl() throws IOException {
+        final String descriptorValue = "UNKNOWN";
+        final byte[] bytes = descriptorValue.getBytes(StandardCharsets.US_ASCII);
+        assertTrue(bytes.length <= 255);
+
+        DecoderImpl myDecoder = new DecoderImpl(true);
+        new EncoderImpl(myDecoder, true); // Needed for type registration
+
+        myDecoder.setByteBuffer(buffer);
+
+        buffer.put((byte) 0x00); // DescribedType
+        buffer.put(EncodingCodes.SYM8); // Symbol
+        buffer.put((byte) bytes.length); // descriptor length
+        buffer.put(bytes); // descriptor value
+        buffer.put((byte) 0x45); // list0 primitive type constructor
+
+        buffer.flip();
+
+        try {
+            myDecoder.readObject();
+            fail("Expected exception");
+         } catch (DecodeException de) {
+             assertNotNull(de.getMessage());
+             assertEquals("Cannot decode unknown described types during SASL", de.getMessage());
+         }
+    }
+
+    @Test
+    public void testDescribedTypeValueBeingDescribedTypeThrows() throws Exception {
+        // DescribedTypes constructors describe a primitive AMQP type, not another DescribedType
+        final byte[] descriptor1bytes = "UNKNOWN1".getBytes(StandardCharsets.US_ASCII);
+        assertTrue(descriptor1bytes.length <= 255);
+
+        final byte[] descriptor2bytes = "UNKNOWN2".getBytes(StandardCharsets.US_ASCII);
+        assertTrue(descriptor2bytes.length <= 255);
+
+        buffer.put((byte) 0x00); // DescribedType
+        buffer.put(EncodingCodes.SYM8); // Symbol
+        buffer.put((byte) descriptor1bytes.length); // descriptor1 length
+        buffer.put(descriptor1bytes); // descriptor value
+        buffer.put((byte) 0x00); // Described value type code. Another DescribedType (instead of the expected primitive type code)
+        buffer.put(EncodingCodes.SYM8); // Symbol
+        buffer.put((byte) descriptor2bytes.length); // descriptor2 length
+        buffer.put(descriptor1bytes); // descriptor2 value
+        buffer.put((byte) 0x45); // list0 primitive type constructor
+
+        buffer.flip();
+
+        try {
+            decoder.readObject();
+            fail("Expected exception");
+         } catch (DecodeException de) {
+             assertNotNull(de.getMessage());
+             assertEquals("DescribedType value encoding cannot be another DescribedType, must be a primitive type", de.getMessage());
+         }
+    }
+
+    @Test
+    public void testDescribedTypeDescriptorBeingDescribedTypeThrows() throws Exception {
+        // Descriptors except ulong and symbol are reserved, none are used
+        final byte[] descriptor1bytes = "UNKNOWN1".getBytes(StandardCharsets.US_ASCII);
+        assertTrue(descriptor1bytes.length <= 255);
+
+        buffer.put((byte) 0x00); // DescribedType
+        buffer.put((byte) 0x00); // Nested DescribedType as the descriptor. Reserved.
+        buffer.put(EncodingCodes.SYM8); // Symbol
+        buffer.put((byte) descriptor1bytes.length); // descriptor length
+        buffer.put(descriptor1bytes); // descriptor value
+        buffer.put((byte) 0x45); // list0 primitive type constructor
+        buffer.put((byte) 0x45); // list0 primitive type constructor (for outer DescribedType value)
+
+        buffer.flip();
+
+        try {
+            decoder.readObject();
+            fail("Expected exception");
+         } catch (DecodeException de) {
+             assertNotNull(de.getMessage());
+             assertEquals("Reserved non-ulong/non-symbol described-type descriptors not supported by this decoder", de.getMessage());
+         }
     }
 
     private void doTestDecodeUnknownDescribedTypeSeries(int size) throws IOException {

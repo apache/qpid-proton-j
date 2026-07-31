@@ -18,9 +18,13 @@ package org.apache.qpid.proton.codec;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 
 import org.apache.qpid.proton.amqp.UnsignedByte;
 import org.apache.qpid.proton.amqp.UnsignedInteger;
@@ -140,6 +144,146 @@ public class HeaderTypeCodecTest extends CodecTestSupport {
             assertEquals(3, decoded.getPriority().intValue());
             assertTrue(decoded.getDurable().booleanValue());
             assertEquals(header.getDeliveryCount(), decoded.getDeliveryCount());
+        }
+    }
+
+    @Test
+    public void testDecodeHeader2() throws Exception {
+        Object o = doDecodeHeaderWithSpecificSizeCountTestImpl(false, 5, 2);
+        assertDecodedHeader(o);
+
+        o = doDecodeHeaderWithSpecificSizeCountTestImpl(true, 8, 2);
+        assertDecodedHeader(o);
+    }
+
+    private void assertDecodedHeader(Object o) {
+        assertTrue(o instanceof Header);
+        Header h = (Header) o;
+
+        assertTrue(h.getDurable());
+        assertEquals(UnsignedByte.valueOf((byte) 5), h.getPriority());
+        assertNull(h.getTtl());
+        assertNull(h.getDeliveryCount());
+        assertNull(h.getFirstAcquirer());
+    }
+
+    @Test
+    public void testDecodeThrowsWithSizeBeyondAvailable() throws Exception {
+        try {
+            doDecodeHeaderWithSpecificSizeCountTestImpl(false, 5 + 1, 2);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("List size 6 cannot be more than remaining bytes 5", de.getMessage());
+        }
+
+        try {
+            doDecodeHeaderWithSpecificSizeCountTestImpl(true, 8 + 1, 2);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("List size 9 cannot be more than remaining bytes 8", de.getMessage());
+        }
+    }
+
+    @Test
+    public void testDecodeThrowsWithNegativeSize() throws Exception {
+        try {
+            doDecodeHeaderWithSpecificSizeCountTestImpl(true, UnsignedInteger.MAX_VALUE.intValue(), 2);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("List size -1 cannot be negative", de.getMessage());
+        }
+    }
+
+    @Test
+    public void testDecodeThrowsWithNegativeCount() throws Exception {
+        try {
+            doDecodeHeaderWithSpecificSizeCountTestImpl(true, 2, UnsignedInteger.MAX_VALUE.intValue());
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("List element count -1 cannot be negative", de.getMessage());
+        }
+    }
+
+    @Test
+    public void testDecodeThrowsWithCountLargerThanSize() throws Exception {
+        try {
+            // Deliberately tries not to decode the full list, so the 'remaining' checks dont foul
+            doDecodeHeaderWithSpecificSizeCountTestImpl(false, 2, 3);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("List element count 3 must be less than size (2)", de.getMessage());
+        }
+
+        try {
+            // Deliberately tries not to decode the full list, so the 'remaining' checks dont foul
+            doDecodeHeaderWithSpecificSizeCountTestImpl(true, 6, 7);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("List element count 7 must be less than size (6)", de.getMessage());
+        }
+    }
+
+    private Object doDecodeHeaderWithSpecificSizeCountTestImpl(final boolean list32, int size, int count) {
+        ByteBuffer tmpBuf = ByteBuffer.allocate(1024);
+        tmpBuf.put((byte) 0x00); // DescribedType
+        tmpBuf.put((byte) 0x53); // small-ulong
+        tmpBuf.put((byte) 0x70); // header ulong descriptor
+        if (list32) {
+            tmpBuf.put((byte) (byte) 0xD0); // list32 primitive type constructor
+            tmpBuf.putInt(size); // size
+            tmpBuf.putInt(count); // count
+        } else {
+            tmpBuf.put((byte) (byte) 0xC0); // list8 primitive type constructor
+            tmpBuf.put((byte) size); // size
+            tmpBuf.put((byte) count); // count
+        }
+        tmpBuf.put((byte) 0x56); // boolean
+        tmpBuf.put((byte) 0x41); // durable = true
+        tmpBuf.put((byte) 0x50); // ubyte
+        tmpBuf.put((byte) 5); // priority = 5
+
+        tmpBuf.flip();
+
+        decoder.setByteBuffer(tmpBuf);
+
+        return decoder.readObject();
+    }
+
+    @Test
+    public void testDecodeOverflowThrows() throws Exception {
+        try {
+            // Deliberately pass size for part list, but count for full list...will try to decode count, overflow size
+            doDecodeHeaderWithSpecificSizeCountTestImpl(false, 5 - 2, 2);
+            fail("Expected exception to be thrown");
+        } catch (BufferUnderflowException bue) {
+            // Expected
+        }
+
+        try {
+            // Deliberately pass size for part list, but count for full list...will try to decode count, overflow size
+            doDecodeHeaderWithSpecificSizeCountTestImpl(true, 8 - 2, 2);
+            fail("Expected exception to be thrown");
+        } catch (BufferUnderflowException bue) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testDecodeUnderflowThrows() throws Exception {
+        try {
+            // Deliberately pass size for full list, but count for part list...will try to decode count, underflow size
+            doDecodeHeaderWithSpecificSizeCountTestImpl(false, 5, 2 - 1);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("Header incorrectly encoded, left 2 bytes from size indicated 5", de.getMessage());
+        }
+
+        try {
+            // Deliberately pass size for full list, but count for part list...will try to decode count, underflow size
+            doDecodeHeaderWithSpecificSizeCountTestImpl(true, 8, 2 - 1);
+            fail("Expected exception to be thrown");
+        } catch (DecodeException de) {
+            assertEquals("Header incorrectly encoded, left 2 bytes from size indicated 8", de.getMessage());
         }
     }
 }

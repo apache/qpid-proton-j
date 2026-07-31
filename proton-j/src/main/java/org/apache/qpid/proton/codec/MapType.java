@@ -20,6 +20,9 @@
  */
 package org.apache.qpid.proton.codec;
 
+import static org.apache.qpid.proton.codec.ValidationSupport.validateMapCount;
+import static org.apache.qpid.proton.codec.ValidationSupport.validateMapSize;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -246,58 +249,82 @@ public class MapType extends AbstractPrimitiveType<Map>
             final DecoderImpl decoder = getDecoder();
             final ReadableBuffer buffer = decoder.getBuffer();
 
-            final int size = decoder.readRawInt();
-            // todo - limit the decoder with size
-            final int count = decoder.readRawInt();
-            if (count > decoder.getByteBufferRemaining()) {
-                throw new IllegalArgumentException("Map element count "+count+" is specified to be greater than the amount of data available ("+
-                                                   decoder.getByteBufferRemaining()+")");
-            }
-
-            TypeConstructor<?> keyConstructor = null;
-            TypeConstructor<?> valueConstructor = null;
-
-            Map<Object, Object> map = new LinkedHashMap<>(count);
-            for(int i = 0; i < count / 2; i++)
+            decoder.increaseDecodeDepth();
+            try
             {
-                keyConstructor = findNextDecoder(decoder, buffer, keyConstructor);
-                if(keyConstructor == null)
+                final int size = decoder.readRawInt();
+                validateMapSize(size, decoder.getByteBufferRemaining());
+
+                final int oldLimit = buffer.limit();
+                final int newLimit = buffer.position() + size;
+
+                Map<Object, Object> map = null;
+                try
                 {
-                    throw new DecodeException("Unknown constructor");
+                    buffer.limit(newLimit);
+
+                    final int count = decoder.readRawInt();
+                    validateMapCount(size, count, decoder.getByteBufferRemaining());
+
+                    TypeConstructor<?> keyConstructor = null;
+                    TypeConstructor<?> valueConstructor = null;
+
+                    map = new LinkedHashMap<>(count);
+                    for(int i = 0; i < count / 2; i++)
+                    {
+                        keyConstructor = findNextDecoder(decoder, buffer, keyConstructor);
+                        if(keyConstructor == null)
+                        {
+                            throw new DecodeException("Unknown constructor");
+                        }
+
+                        final Object key = keyConstructor.readValue();
+
+                        boolean arrayType = false;
+                        final byte code = buffer.get(buffer.position());
+                        switch (code)
+                        {
+                        case EncodingCodes.ARRAY8:
+                        case EncodingCodes.ARRAY32:
+                            arrayType = true;
+                        }
+
+                        valueConstructor = findNextDecoder(decoder, buffer, valueConstructor);
+                        if (valueConstructor == null)
+                        {
+                            throw new DecodeException("Unknown constructor");
+                        }
+
+                        final Object value;
+
+                        if (arrayType)
+                        {
+                            value = ((ArrayType.ArrayEncoding) valueConstructor).readValueArray();
+                        }
+                        else
+                        {
+                            value = valueConstructor.readValue();
+                        }
+
+                        map.put(key, value);
+                    }
+
+                    if (buffer.position() != newLimit)
+                    {
+                        throw new DecodeException("Map incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                    }
+                }
+                finally
+                {
+                    buffer.limit(oldLimit);
                 }
 
-                final Object key = keyConstructor.readValue();
-
-                boolean arrayType = false;
-                final byte code = buffer.get(buffer.position());
-                switch (code)
-                {
-                    case EncodingCodes.ARRAY8:
-                    case EncodingCodes.ARRAY32:
-                        arrayType = true;
-                }
-
-                valueConstructor = findNextDecoder(decoder, buffer, valueConstructor);
-                if (valueConstructor == null)
-                {
-                    throw new DecodeException("Unknown constructor");
-                }
-
-                final Object value;
-
-                if (arrayType)
-                {
-                    value = ((ArrayType.ArrayEncoding) valueConstructor).readValueArray();
-                }
-                else
-                {
-                    value = valueConstructor.readValue();
-                }
-
-                map.put(key, value);
+                return map;
             }
-
-            return map;
+            finally
+            {
+                decoder.decreaseDecodeDepth();
+            }
         }
 
         @Override
@@ -306,6 +333,7 @@ public class MapType extends AbstractPrimitiveType<Map>
             final DecoderImpl decoder = getDecoder();
             final ReadableBuffer buffer = decoder.getBuffer();
             final int size = decoder.readRawInt();
+            validateMapSize(size, decoder.getByteBufferRemaining());
             buffer.position(buffer.position() + size);
         }
 
@@ -398,54 +426,82 @@ public class MapType extends AbstractPrimitiveType<Map>
             final DecoderImpl decoder = getDecoder();
             final ReadableBuffer buffer = decoder.getBuffer();
 
-            final int size = (decoder.readRawByte()) & 0xff;
-            // todo - limit the decoder with size
-            final int count = (decoder.readRawByte()) & 0xff;
-
-            TypeConstructor<?> keyConstructor = null;
-            TypeConstructor<?> valueConstructor = null;
-
-            final Map<Object, Object> map = new LinkedHashMap<>(count);
-            for(int i = 0; i < count / 2; i++)
+            decoder.increaseDecodeDepth();
+            try
             {
-                keyConstructor = findNextDecoder(decoder, buffer, keyConstructor);
-                if(keyConstructor == null)
+                final int size = (decoder.readRawByte()) & 0xff;
+                validateMapSize(size, decoder.getByteBufferRemaining());
+
+                final int oldLimit = buffer.limit();
+                final int newLimit = buffer.position() + size;
+
+                Map<Object, Object> map = null;
+                try
                 {
-                    throw new DecodeException("Unknown constructor");
+                    buffer.limit(newLimit);
+
+                    final int count = (decoder.readRawByte()) & 0xff;
+                    validateMapCount(size, count, decoder.getByteBufferRemaining());
+
+                    TypeConstructor<?> keyConstructor = null;
+                    TypeConstructor<?> valueConstructor = null;
+
+                    map = new LinkedHashMap<>(count);
+                    for(int i = 0; i < count / 2; i++)
+                    {
+                        keyConstructor = findNextDecoder(decoder, buffer, keyConstructor);
+                        if(keyConstructor == null)
+                        {
+                            throw new DecodeException("Unknown constructor");
+                        }
+
+                        final Object key = keyConstructor.readValue();
+
+                        boolean arrayType = false;
+                        final byte code = buffer.get(buffer.position());
+                        switch (code)
+                        {
+                        case EncodingCodes.ARRAY8:
+                        case EncodingCodes.ARRAY32:
+                            arrayType = true;
+                        }
+
+                        valueConstructor = findNextDecoder(decoder, buffer, valueConstructor);
+                        if(valueConstructor== null)
+                        {
+                            throw new DecodeException("Unknown constructor");
+                        }
+
+                        final Object value;
+
+                        if (arrayType)
+                        {
+                            value = ((ArrayType.ArrayEncoding) valueConstructor).readValueArray();
+                        }
+                        else
+                        {
+                            value = valueConstructor.readValue();
+                        }
+
+                        map.put(key, value);
+                    }
+
+                    if (buffer.position() != newLimit)
+                    {
+                        throw new DecodeException("Map incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                    }
+                }
+                finally
+                {
+                    buffer.limit(oldLimit);
                 }
 
-                final Object key = keyConstructor.readValue();
-
-                boolean arrayType = false;
-                final byte code = buffer.get(buffer.position());
-                switch (code)
-                {
-                    case EncodingCodes.ARRAY8:
-                    case EncodingCodes.ARRAY32:
-                        arrayType = true;
-                }
-
-                valueConstructor = findNextDecoder(decoder, buffer, valueConstructor);
-                if(valueConstructor== null)
-                {
-                    throw new DecodeException("Unknown constructor");
-                }
-
-                final Object value;
-
-                if (arrayType)
-                {
-                    value = ((ArrayType.ArrayEncoding) valueConstructor).readValueArray();
-                }
-                else
-                {
-                    value = valueConstructor.readValue();
-                }
-
-                map.put(key, value);
+                return map;
             }
-
-            return map;
+            finally
+            {
+                decoder.decreaseDecodeDepth();
+            }
         }
 
         @Override
@@ -454,6 +510,7 @@ public class MapType extends AbstractPrimitiveType<Map>
             final DecoderImpl decoder = getDecoder();
             final ReadableBuffer buffer = decoder.getBuffer();
             final int size = ((int)decoder.readRawByte()) & 0xff;
+            validateMapSize(size, decoder.getByteBufferRemaining());
             buffer.position(buffer.position() + size);
         }
 

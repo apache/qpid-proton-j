@@ -169,6 +169,8 @@ public interface Message
      */
     int decode(byte[] data, int offset, int length);
 
+    int decode(byte[] data, int offset, int length, MessageDecodeOptions options);
+
     /**
      * Decodes the Message from the given {@link ReadableBuffer}.
      * <p>
@@ -180,6 +182,20 @@ public interface Message
      *      A {@link ReadableBuffer} that contains the complete message bytes.
      */
     void decode(ReadableBuffer buffer);
+
+    /**
+     * Decodes the Message from the given {@link ReadableBuffer}.
+     * <p>
+     * If the buffer given does not contain the fully encoded Message bytes for decode
+     * this method will throw an exception to indicate the buffer underflow condition and
+     * the message object will be left in an undefined state.
+     *
+     * @param buffer
+     *      A {@link ReadableBuffer} that contains the complete message bytes.
+     * @param options
+     *      A {@link MessageDecodeOptions} that configures certain decode settings.
+     */
+    void decode(ReadableBuffer buffer, MessageDecodeOptions options);
 
     /**
      * Encodes up to {@code length} bytes of the message into the provided byte array,

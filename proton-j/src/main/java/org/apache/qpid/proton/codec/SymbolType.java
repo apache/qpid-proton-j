@@ -20,44 +20,48 @@
  */
 package org.apache.qpid.proton.codec;
 
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.apache.qpid.proton.amqp.Symbol;
 
+
 public class SymbolType extends AbstractPrimitiveType<Symbol>
 {
-    private static final Charset ASCII_CHARSET = Charset.forName("US-ASCII");
+    private static final int MAX_SYMBOL_CACHE_SIZE = 4096;
+    private static final int MAX_CACHED_SYMBOL_LENGTH = 64;
+
+    private static final int MAX_SASL_SYMBOL_CACHE_SIZE = 64;
+    private static final int MAX_CACHED_SASL_SYMBOL_LENGTH = 32;
+
+    private static final ConcurrentMap<ReadableBuffer, Symbol> _symbolCache = new ConcurrentHashMap<ReadableBuffer, Symbol>(2048);
+    private static final ConcurrentMap<ReadableBuffer, Symbol> _saslSymbolCache = new ConcurrentHashMap<ReadableBuffer, Symbol>(32);
+
+    private static final String TYPE_NAME = "symbol";
+
+    private static final DecoderImpl.TypeDecoder<Symbol> _symbolDecoder = new AbstractSymbolDecoder(MAX_SYMBOL_CACHE_SIZE, MAX_CACHED_SYMBOL_LENGTH, _symbolCache)
+    {
+        @Override
+        public Symbol createSymbol(final String symbolVal)
+        {
+            return Symbol.getSymbol(symbolVal);
+        }
+    };
+
+    private static final DecoderImpl.TypeDecoder<Symbol> _saslSymbolDecoder = new AbstractSymbolDecoder(MAX_SASL_SYMBOL_CACHE_SIZE, MAX_CACHED_SASL_SYMBOL_LENGTH, _saslSymbolCache)
+    {
+        @Override
+        public Symbol createSymbol(final String symbolVal)
+        {
+            return Symbol.getSaslSymbol(symbolVal);
+        }
+    };
+
     private final SymbolEncoding _symbolEncoding;
     private final SymbolEncoding _shortSymbolEncoding;
-
-    private final Map<ReadableBuffer, Symbol> _symbolCache = new HashMap<ReadableBuffer, Symbol>();
-    private DecoderImpl.TypeDecoder<Symbol> _symbolCreator =
-        new DecoderImpl.TypeDecoder<Symbol>()
-        {
-            @Override
-            public Symbol decode(DecoderImpl decoder, ReadableBuffer buffer)
-            {
-                Symbol symbol = _symbolCache.get(buffer);
-                if (symbol == null)
-                {
-                    final byte[] bytes = new byte[buffer.remaining()];
-                    buffer.get(bytes);
-
-                    symbol = Symbol.getSymbol(new String(bytes, ASCII_CHARSET));
-
-                    _symbolCache.put(ReadableBuffer.ByteBufferReader.wrap(bytes), symbol);
-                }
-                else
-                {
-                    buffer.position(buffer.limit());
-                }
-                return symbol;
-            }
-        };
+    private DecoderImpl.TypeDecoder<Symbol> _symbolCreator;
 
     public static interface SymbolEncoding extends PrimitiveTypeEncoding<Symbol>
     {
@@ -66,11 +70,18 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
 
     SymbolType(final EncoderImpl encoder, final DecoderImpl decoder)
     {
+        this(encoder, decoder, false);
+    }
+
+    SymbolType(final EncoderImpl encoder, final DecoderImpl decoder, final boolean sasl)
+    {
         _symbolEncoding =  new LongSymbolEncoding(encoder, decoder);
         _shortSymbolEncoding = new ShortSymbolEncoding(encoder, decoder);
+        _symbolCreator = sasl ? _saslSymbolDecoder : _symbolDecoder;
         encoder.register(Symbol.class, this);
         decoder.register(this);
     }
+
 
     @Override
     public Class<Symbol> getTypeClass()
@@ -162,7 +173,8 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         {
             DecoderImpl decoder = getDecoder();
             int size = decoder.readRawInt();
-            return decoder.readRaw(_symbolCreator, size);
+
+            return decoder.readRaw(_symbolCreator, size, TYPE_NAME);
         }
 
         @Override
@@ -171,6 +183,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
             DecoderImpl decoder = getDecoder();
             ReadableBuffer buffer = decoder.getBuffer();
             int size = decoder.readRawInt();
+            ValidationSupport.validateLength(TYPE_NAME, size, buffer.remaining());
             buffer.position(buffer.position() + size);
         }
     }
@@ -221,7 +234,8 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
         {
             DecoderImpl decoder = getDecoder();
             int size = ((int)decoder.readRawByte()) & 0xff;
-            return decoder.readRaw(_symbolCreator, size);
+
+            return decoder.readRaw(_symbolCreator, size, TYPE_NAME);
         }
 
         @Override
@@ -230,6 +244,7 @@ public class SymbolType extends AbstractPrimitiveType<Symbol>
             DecoderImpl decoder = getDecoder();
             ReadableBuffer buffer = decoder.getBuffer();
             int size = ((int)decoder.readRawByte()) & 0xff;
+            ValidationSupport.validateLength(TYPE_NAME, size, buffer.remaining());
             buffer.position(buffer.position() + size);
         }
     }

@@ -16,6 +16,9 @@
  */
 package org.apache.qpid.proton.codec.messaging;
 
+import static org.apache.qpid.proton.codec.ValidationSupport.validateListCount;
+import static org.apache.qpid.proton.codec.ValidationSupport.validateListSize;
+
 import java.util.Collection;
 
 import org.apache.qpid.proton.amqp.Symbol;
@@ -59,57 +62,89 @@ public class FastPathHeaderType implements AMQPType<Header>, FastPathDescribedTy
     public Header readValue() {
         DecoderImpl decoder = getDecoder();
         ReadableBuffer buffer = decoder.getBuffer();
-        byte typeCode = decoder.getBuffer().get();
 
-        @SuppressWarnings("unused")
-        int size = 0;
-        int count = 0;
+        decoder.increaseDecodeDepth();
+        try {
+            byte typeCode = decoder.getBuffer().get();
 
-        switch (typeCode) {
-            case EncodingCodes.LIST0:
-                break;
-            case EncodingCodes.LIST8:
-                size = buffer.get() & 0xff;
-                count = buffer.get() & 0xff;
-                break;
-            case EncodingCodes.LIST32:
-                size = buffer.getInt();
-                count = buffer.getInt();
-                break;
-            default:
-                throw new DecodeException("Incorrect type found in Header encoding: " + typeCode);
-        }
+            int size = 0;
+            int count = 0;
 
-        Header header = new Header();
+            final int oldLimit = buffer.limit();
+            final int newLimit;
 
-        for (int index = 0; index < count; ++index) {
-            switch (index) {
-                case 0:
-                    header.setDurable(decoder.readBoolean(null));
+            switch (typeCode) {
+                case EncodingCodes.LIST0:
+                    newLimit = buffer.position();
                     break;
-                case 1:
-                    header.setPriority(decoder.readUnsignedByte(null));
+                case EncodingCodes.LIST8:
+                    size = buffer.get() & 0xff;
+                    validateListSize(size, buffer.remaining());
+                    newLimit = buffer.position() + size;
+                    count = buffer.get() & 0xff;
+                    validateListCount(size, count, buffer.remaining());
                     break;
-                case 2:
-                    header.setTtl(decoder.readUnsignedInteger(null));
-                    break;
-                case 3:
-                    header.setFirstAcquirer(decoder.readBoolean(null));
-                    break;
-                case 4:
-                    header.setDeliveryCount(decoder.readUnsignedInteger(null));
+                case EncodingCodes.LIST32:
+                    size = buffer.getInt();
+                    validateListSize(size, buffer.remaining());
+                    newLimit = buffer.position() + size;
+                    count = buffer.getInt();
+                    validateListCount(size, count, buffer.remaining());
                     break;
                 default:
-                    throw new IllegalStateException("To many entries in Header encoding");
+                    throw new DecodeException("Incorrect type found in Header encoding: " + typeCode);
             }
-        }
 
-        return header;
+            Header header = new Header();
+            try {
+                buffer.limit(newLimit);
+
+                for (int index = 0; index < count; ++index) {
+                    switch (index) {
+                        case 0:
+                            header.setDurable(decoder.readBoolean(null));
+                            break;
+                        case 1:
+                            header.setPriority(decoder.readUnsignedByte(null));
+                            break;
+                        case 2:
+                            header.setTtl(decoder.readUnsignedInteger(null));
+                            break;
+                        case 3:
+                            header.setFirstAcquirer(decoder.readBoolean(null));
+                            break;
+                        case 4:
+                            header.setDeliveryCount(decoder.readUnsignedInteger(null));
+                            break;
+                        default:
+                            throw new IllegalStateException("To many entries in Header encoding");
+                    }
+                }
+
+                if (buffer.position() != newLimit) {
+                    throw new DecodeException("Header incorrectly encoded, left " + (newLimit - buffer.position()) + " bytes from size indicated " + size);
+                }
+            } finally {
+                buffer.limit(oldLimit);
+            }
+
+            return header;
+        } finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override
     public void skipValue() {
-        getDecoder().readConstructor().skipValue();
+        final DecoderImpl decoder = getDecoder();
+
+        decoder.increaseDecodeDepth();
+        try {
+            decoder.readConstructor().skipValue();
+        }
+        finally {
+            decoder.decreaseDecodeDepth();
+        }
     }
 
     @Override

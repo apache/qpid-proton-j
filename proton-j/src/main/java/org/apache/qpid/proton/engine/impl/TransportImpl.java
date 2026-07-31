@@ -17,6 +17,7 @@
 
 package org.apache.qpid.proton.engine.impl;
 
+import static org.apache.qpid.proton.amqp.transport.ConnectionError.FRAMING_ERROR;
 import static org.apache.qpid.proton.engine.impl.ByteBufferUtils.pourArrayToBuffer;
 import static org.apache.qpid.proton.engine.impl.ByteBufferUtils.pourBufferToArray;
 
@@ -58,6 +59,7 @@ import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.Ssl;
 import org.apache.qpid.proton.engine.SslDomain;
 import org.apache.qpid.proton.engine.SslPeerDetails;
+import org.apache.qpid.proton.engine.TransportConditionException;
 import org.apache.qpid.proton.engine.TransportDecodeException;
 import org.apache.qpid.proton.engine.TransportException;
 import org.apache.qpid.proton.engine.TransportResult;
@@ -73,6 +75,7 @@ public class TransportImpl extends EndpointImpl
 {
     static final int BUFFER_RELEASE_THRESHOLD = Integer.getInteger("proton.transport_buffer_release_threshold", 2 * 1024 * 1024);
     private static final int CHANNEL_MAX_LIMIT = 65535;
+    private static final int TRANSFERS_PER_DELIVERY_MAX_LIMIT = 65535;
 
     private static final boolean getBooleanEnv(String name)
     {
@@ -111,6 +114,7 @@ public class TransportImpl extends EndpointImpl
     private int _outboundFrameSizeLimit = 0;
     private int _channelMax       = CHANNEL_MAX_LIMIT;
     private int _remoteChannelMax = CHANNEL_MAX_LIMIT;
+    private int _maxTransfersPerDelivery = TRANSFERS_PER_DELIVERY_MAX_LIMIT;
 
     private final FrameWriter _frameWriter;
 
@@ -171,6 +175,10 @@ public class TransportImpl extends EndpointImpl
     {
         AMQPDefinedTypes.registerAllTypes(_decoder, _encoder);
 
+        if (maxFrameSize > 0 && maxFrameSize < MIN_MAX_FRAME_SIZE)
+        {
+            throw new IllegalArgumentException("Cannot set max frame size under 512 (MIN_MAX_FRAME_SIZE)");
+        }
         _maxFrameSize = maxFrameSize;
         _frameWriter = new FrameWriter(_encoder, _remoteMaxFrameSize,
                                        FrameWriter.AMQP_FRAME_TYPE,
@@ -213,12 +221,22 @@ public class TransportImpl extends EndpointImpl
             throw new IllegalStateException("Cannot set initial remote max frame size after transport has been initialised");
         }
 
+        if (remoteMaxFrameSize < MIN_MAX_FRAME_SIZE)
+        {
+            throw new IllegalArgumentException("Cannot set initial remote max frame size under 512 (MIN_MAX_FRAME_SIZE)");
+        }
+
         _remoteMaxFrameSize = remoteMaxFrameSize;
     }
 
     @Override
     public void setMaxFrameSize(int maxFrameSize)
     {
+        if (maxFrameSize > 0 && maxFrameSize < MIN_MAX_FRAME_SIZE)
+        {
+            throw new IllegalArgumentException("Cannot set max frame size under 512 (MIN_MAX_FRAME_SIZE)");
+        }
+
         if(_init)
         {
             throw new IllegalStateException("Cannot set max frame size after transport has been initialised");
@@ -360,22 +378,31 @@ public class TransportImpl extends EndpointImpl
     {
         processHeader();
         processOpen();
-        processBegin();
-        processAttach();
-        processReceiverFlow();
-        // we process transport work twice intentionally, the first
-        // pass may end up settling deliveries that the second pass
-        // can clean up
-        processTransportWork();
-        processTransportWork();
-        processSenderFlow();
-        processDetach();
-        processEnd();
+        if (!_conditionSet) {
+            processBegin();
+            processAttach();
+            processReceiverFlow();
+            // we process transport work twice intentionally, the first
+            // pass may end up settling deliveries that the second pass
+            // can clean up
+            processTransportWork();
+            processTransportWork();
+            processSenderFlow();
+            processDetach();
+            processEnd();
+        }
         processClose();
 
         _frameWriter.readBytes(outputBuffer);
 
-        return _isCloseSent || _head_closed;
+        if(_frameWriter.getFrameBufferPosition() > 0)
+        {
+            return false;
+        }
+        else
+        {
+            return _isCloseSent || _head_closed;
+        }
     }
 
     @Override
@@ -783,7 +810,7 @@ public class TransportImpl extends EndpointImpl
 
                     if(session.getLocalState() == EndpointState.ACTIVE && transportSession.isLocalChannelSet())
                     {
-                        if(transportSession.getIncomingWindowSize().equals(UnsignedInteger.ZERO))
+                        if(transportSession.getIncomingWindowSize().equals(UnsignedInteger.ZERO) && !_conditionSet)
                         {
                             writeFlow(transportSession, null);
                         }
@@ -1115,7 +1142,7 @@ public class TransportImpl extends EndpointImpl
              (_connectionEndpoint != null &&
               _connectionEndpoint.getLocalState() == EndpointState.CLOSED)) &&
             !_isCloseSent) {
-            if(!hasSendableMessages(null))
+            if(!hasSendableMessages(null) || _conditionSet)
             {
                 Close close = new Close();
 
@@ -1171,25 +1198,21 @@ public class TransportImpl extends EndpointImpl
     @Override
     public void handleOpen(Open open, Binary payload, Integer channel)
     {
-        setRemoteState(EndpointState.ACTIVE);
-        if(_connectionEndpoint != null)
-        {
-            _connectionEndpoint.handleOpen(open);
-        }
-        else
-        {
-            _open = open;
-        }
+        int effectiveMaxFrameSize = MIN_MAX_FRAME_SIZE;
+        final UnsignedInteger openMaxFrameSize = open.getMaxFrameSize();
 
-        int effectiveMaxFrameSize = _remoteMaxFrameSize;
-        if(open.getMaxFrameSize().longValue() > 0)
+        if (openMaxFrameSize.longValue() >= MIN_MAX_FRAME_SIZE)
         {
-            _remoteMaxFrameSize = (int) open.getMaxFrameSize().longValue();
-            effectiveMaxFrameSize = (int) Math.min(open.getMaxFrameSize().longValue(), Integer.MAX_VALUE);
+            _remoteMaxFrameSize = openMaxFrameSize.intValue();
+            effectiveMaxFrameSize = (int) Math.min(openMaxFrameSize.longValue(), Integer.MAX_VALUE);
+        } else
+        {
+            closed(new TransportConditionException("Requested max-frame-size " + openMaxFrameSize.longValue() + " is below the minimum of 512 (MIN-MAX-FRAME-SIZE)", FRAMING_ERROR));
+            return;
         }
 
         if(_outboundFrameSizeLimit > 0) {
-            effectiveMaxFrameSize = (int) Math.min(open.getMaxFrameSize().longValue(), _outboundFrameSizeLimit);
+            effectiveMaxFrameSize = Math.min(effectiveMaxFrameSize, _outboundFrameSizeLimit);
         }
 
         _frameWriter.setMaxFrameSize(effectiveMaxFrameSize);
@@ -1202,6 +1225,16 @@ public class TransportImpl extends EndpointImpl
         if (open.getIdleTimeOut() != null && open.getIdleTimeOut().longValue() > 0)
         {
             _remoteIdleTimeout = open.getIdleTimeOut().intValue();
+        }
+
+        setRemoteState(EndpointState.ACTIVE);
+        if(_connectionEndpoint != null)
+        {
+            _connectionEndpoint.handleOpen(open);
+        }
+        else
+        {
+            _open = open;
         }
     }
 
@@ -1470,7 +1503,7 @@ public class TransportImpl extends EndpointImpl
         }
 
         frame.getBody().invoke(this,frame.getPayload(), frame.getChannel());
-        return _closeReceived;
+        return _closeReceived || _conditionSet;
     }
 
     void put(Event.Type type, Object context) {
@@ -1494,6 +1527,10 @@ public class TransportImpl extends EndpointImpl
             if(!_conditionSet) {
                 if(error instanceof TransportDecodeException) {
                     setCondition(new ErrorCondition(AmqpError.DECODE_ERROR, error.getMessage()));
+                } else if (error instanceof TransportConditionException) {
+                    final Symbol condition = ((TransportConditionException) error).getCondition();
+                    ErrorCondition errorCondition = new ErrorCondition(condition, error.getMessage());
+                    setCondition(errorCondition);
                 } else {
                     String description =  error == null ? "connection aborted" : error.toString();
 
@@ -1510,6 +1547,7 @@ public class TransportImpl extends EndpointImpl
         }
 
         if (!postedTailClosed) {
+            // The FrameParser (_inputProcessor) sets _tail_closed when handleFrame returns _conditionSet.
             put(Event.Type.TRANSPORT_TAIL_CLOSED, this);
             postedTailClosed = true;
             maybePostClosed();
@@ -1875,11 +1913,28 @@ public class TransportImpl extends EndpointImpl
 
     @Override
     public void setOutboundFrameSizeLimit(int limit) {
+        if (limit > 0 && limit < MIN_MAX_FRAME_SIZE) {
+            throw new IllegalArgumentException("Outbound frame size limit should be at least 512 (MIN_MAX_FRAME_SIZE)");
+        }
         _outboundFrameSizeLimit = limit;
     }
 
     @Override
     public int getOutboundFrameSizeLimit() {
         return _outboundFrameSizeLimit;
+    }
+
+    @Override
+    public int getMaxTransfersPerDelivery() {
+        return _maxTransfersPerDelivery;
+    }
+
+    @Override
+    public void setMaxTransfersPerDelivery(final int maxTransfersPerDelivery) {
+        if (maxTransfersPerDelivery < 0) {
+            throw new IllegalArgumentException("maxTransfersPerDelivery must not be negative");
+        }
+
+        _maxTransfersPerDelivery = maxTransfersPerDelivery;
     }
 }

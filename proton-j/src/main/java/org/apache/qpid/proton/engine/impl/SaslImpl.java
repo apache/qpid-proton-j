@@ -53,8 +53,8 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
     public static final byte SASL_FRAME_TYPE = (byte) 1;
     private static final String HEADER_DESCRIPTION = "SASL";
 
-    private final DecoderImpl _decoder = new DecoderImpl();
-    private final EncoderImpl _encoder = new EncoderImpl(_decoder);
+    private final DecoderImpl _decoder = new DecoderImpl(true);
+    private final EncoderImpl _encoder = new EncoderImpl(_decoder, true);
 
     private final TransportImpl _transport;
 
@@ -98,7 +98,10 @@ public class SaslImpl implements Sasl, SaslFrameBody.SaslFrameBodyHandler<Void>,
         _transport = transport;
         _maxFrameSize = maxFrameSize;
 
-        AMQPDefinedTypes.registerAllTypes(_decoder,_encoder);
+        _decoder.setZeroWidthArrayElementLimit(0);
+        _decoder.setMaxDecodeDepth(2);
+
+        AMQPDefinedTypes.registerSecurityTypes(_decoder,_encoder);
         _frameParser = new SaslFrameParser(this, _decoder, maxFrameSize, _transport);
         _frameWriter = new FrameWriter(_encoder, maxFrameSize, FrameWriter.SASL_FRAME_TYPE, _transport);
     }
